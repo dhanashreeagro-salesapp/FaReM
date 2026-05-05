@@ -152,6 +152,10 @@ def validate_user_import(import_job_id):
     }
     roles = [r[0] for r in User.Role.choices]
 
+    # Pre-fetch existing data for performance
+    existing_mobiles = set(User.objects.values_list('mobile_number', flat=True))
+    existing_territories = set(Territory.objects.values_list('name', flat=True))
+
     for index, row in df.iterrows():
         try:
             mobile = str(row['Mobile Number']).split('.')[0].strip()
@@ -166,13 +170,13 @@ def validate_user_import(import_job_id):
             if role not in roles:
                 raise ValueError(f"Invalid Designation: {str(row['Designation'])}. Must map to one of {roles}")
 
-            if User.objects.filter(mobile_number=mobile).exists():
+            if mobile in existing_mobiles:
                 duplicate_count += 1
             
             # Check territory if provided
             if 'Territory' in df.columns and not pd.isna(row['Territory']):
                 t_name = str(row['Territory']).strip()
-                if not Territory.objects.filter(name=t_name).exists():
+                if t_name not in existing_territories:
                     raise ValueError(f"Territory '{t_name}' not found")
 
             valid_rows += 1
@@ -210,6 +214,12 @@ def commit_user_import(import_job_id):
         'content team': 'ContentTeam'
     }
 
+    existing_users = {u.mobile_number: u for u in User.objects.all()}
+    territories = {t.name: t for t in Territory.objects.all()}
+
+    users_to_create = []
+    users_to_update = []
+
     for index, row in df.iterrows():
         try:
             name_parts = str(row['Name']).strip().split(' ', 1)
@@ -230,27 +240,38 @@ def commit_user_import(import_job_id):
 
             territory = None
             if territory_name:
-                territory = Territory.objects.filter(name=territory_name).first()
+                territory = territories.get(territory_name)
 
-            user, created = User.objects.update_or_create(
-                mobile_number=mobile,
-                defaults={
-                    'username': mobile,
-                    'first_name': first_name,
-                    'last_name': last_name,
-                    'employee_id': employee_id,
-                    'role': role,
-                    'territory': territory,
-                    'status': 'Active'
-                }
-            )
-
-            if created:
-                created_count += 1
-            else:
+            if mobile in existing_users:
+                user = existing_users[mobile]
+                user.first_name = first_name
+                user.last_name = last_name
+                user.employee_id = employee_id
+                user.role = role
+                user.territory = territory
+                user.status = 'Active'
+                users_to_update.append(user)
                 updated_count += 1
+            else:
+                user = User(
+                    mobile_number=mobile,
+                    username=mobile,
+                    first_name=first_name,
+                    last_name=last_name,
+                    employee_id=employee_id,
+                    role=role,
+                    territory=territory,
+                    status='Active'
+                )
+                users_to_create.append(user)
+                created_count += 1
         except:
             continue
+
+    if users_to_create:
+        User.objects.bulk_create(users_to_create, batch_size=500)
+    if users_to_update:
+        User.objects.bulk_update(users_to_update, ['first_name', 'last_name', 'employee_id', 'role', 'territory', 'status'], batch_size=500)
 
     job.status = 'Completed'
     job.save()
