@@ -13,7 +13,7 @@ export default function FarmerManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
-    full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: ''
+    full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: ''
   });
 
   const fetchFarmers = async () => {
@@ -47,7 +47,8 @@ export default function FarmerManagement() {
       village: farmer.village || '',
       district: farmer.district || '',
       taluka: farmer.taluka || '',
-      state: farmer.state || ''
+      state: farmer.state || '',
+      pin_code: farmer.pin_code || ''
     });
     setEditingId(farmer.id);
     setShowForm(true);
@@ -63,10 +64,23 @@ export default function FarmerManagement() {
       }
       setShowForm(false);
       setEditingId(null);
-      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '' });
+      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: '' });
       fetchFarmers();
     } catch (e) {
-      alert(e.error || 'Failed to save farmer details');
+      console.error(e);
+      let errorMsg = 'Failed to save farmer details';
+      if (typeof e === 'object' && e !== null) {
+        if (e.error) errorMsg = e.error;
+        else {
+           const errors = [];
+           Object.keys(e).forEach(k => {
+             if (k !== 'status' && Array.isArray(e[k])) errors.push(`${k}: ${e[k].join(', ')}`);
+             else if (k !== 'status' && typeof e[k] === 'string') errors.push(`${k}: ${e[k]}`);
+           });
+           if (errors.length > 0) errorMsg = errors.join('\n');
+        }
+      }
+      alert(errorMsg);
     }
   };
 
@@ -142,19 +156,24 @@ export default function FarmerManagement() {
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">Taluka</label>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Taluka*</label>
               <input placeholder="Taluka..." value={form.taluka} onChange={e => setForm({...form, taluka: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">District</label>
+              <label className="block text-xs font-semibold text-text-muted mb-1">District*</label>
               <input placeholder="District..." value={form.district} onChange={e => setForm({...form, district: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">State</label>
+              <label className="block text-xs font-semibold text-text-muted mb-1">State*</label>
               <input placeholder="State..." value={form.state} onChange={e => setForm({...form, state: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">PIN Code*</label>
+              <input placeholder="PIN Code..." value={form.pin_code} onChange={e => setForm({...form, pin_code: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
             <div className="md:col-span-3 flex justify-end mt-2">
               <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm btn-press">
