@@ -68,11 +68,17 @@ export default function Dashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <StatCard icon={Users} label="Total Active Farmers" value={data.total_farmers?.toLocaleString()} color="bg-primary/10 text-primary" delay={0} />
         <StatCard icon={MapPin} label="Total Visits Logged" value={data.total_visits?.toLocaleString()} color="bg-accent/10 text-accent" delay={60} />
         <StatCard icon={Phone} label="Total Calls Logged" value={data.total_calls?.toLocaleString()} color="bg-warning/10 text-warning" delay={120} />
         <StatCard icon={AlertTriangle} label="Overdue Visits" value={data.overdue_visits?.toLocaleString()} color="bg-danger/10 text-danger" delay={180} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <StatCard icon={Users} label="Enrolled This Month" value={data.this_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={240} />
+        <StatCard icon={Users} label="Enrolled Last Month" value={data.last_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={300} />
+        <StatCard icon={Users} label="Enrolled YTD (from Apr 1)" value={data.ytd_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={360} />
       </div>
 
       {/* Top Villages */}

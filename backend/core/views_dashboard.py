@@ -29,6 +29,28 @@ class DashboardAPIView(APIView):
         data['total_visits'] = activities.filter(activity_type='Visit').count()
         data['total_calls'] = activities.filter(activity_type='Call').count()
         
+        import datetime
+        from django.utils import timezone
+        
+        today_date = timezone.now().date()
+        first_day_this_month = today_date.replace(day=1)
+        
+        if today_date.month == 1:
+            first_day_last_month = today_date.replace(year=today_date.year - 1, month=12, day=1)
+        else:
+            first_day_last_month = today_date.replace(month=today_date.month - 1, day=1)
+            
+        last_day_last_month = first_day_this_month - datetime.timedelta(days=1)
+
+        if today_date.month >= 4:
+            fy_start = today_date.replace(month=4, day=1)
+        else:
+            fy_start = today_date.replace(year=today_date.year - 1, month=4, day=1)
+            
+        data['this_month_farmers'] = farmers.filter(date_added__date__gte=first_day_this_month).count()
+        data['last_month_farmers'] = farmers.filter(date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
+        data['ytd_farmers'] = farmers.filter(date_added__date__gte=fy_start).count()
+        
         # Breakdown by village
         village_data = farmers.values('village').annotate(count=Count('id')).order_by('-count')[:5]
         data['top_villages'] = list(village_data)
@@ -38,12 +60,11 @@ class DashboardAPIView(APIView):
         from .models import AppConfiguration
         config = AppConfiguration.get_config()
         threshold_days = config.visit_frequency_norm_days
-        today = timezone.now().date()
         
         overdue_count = 0
         for farmer in farmers:
             last_visit = farmer.activities.filter(activity_type='Visit').order_by('-date').first()
-            days_since = (today - last_visit.date).days if last_visit else (today - farmer.date_added.date()).days
+            days_since = (today_date - last_visit.date).days if last_visit else (today_date - farmer.date_added.date()).days
             if days_since >= threshold_days:
                 overdue_count += 1
         
