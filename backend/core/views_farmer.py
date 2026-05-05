@@ -29,6 +29,24 @@ class FarmerViewSet(viewsets.ModelViewSet):
             instance.status = 'Inactive'
             instance.save()
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def download_template(self, request):
+        import pandas as pd
+        from django.http import HttpResponse
+        from io import BytesIO
+
+        df = pd.DataFrame(columns=['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile'])
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="farmers_import_template.xlsx"'
+        return response
+
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def upload_for_validation(self, request):
         if 'file' not in request.FILES:

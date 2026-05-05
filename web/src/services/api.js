@@ -146,6 +146,25 @@ class ApiClient {
     });
   }
 
+  // Farmers
+  downloadFarmerTemplate() {
+    return fetch(`${this.baseUrl}/farmers/download_template/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'farmers_import_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
+  }
+
   // Territories
   getTerritories() { return this.request('/territories/'); }
   createTerritory(data) { return this.request('/territories/', { method: 'POST', body: JSON.stringify(data) }); }

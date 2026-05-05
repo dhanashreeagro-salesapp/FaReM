@@ -114,9 +114,18 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
               )}
 
               {resource === 'farmers' && (
-                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted">
+                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted relative">
+                  <button 
+                    onClick={async () => {
+                      try { await api.downloadFarmerTemplate(); }
+                      catch (err) { alert('Failed to download template'); }
+                    }} 
+                    className="absolute top-3 right-3 text-primary font-medium hover:underline flex items-center gap-1"
+                  >
+                    Download Template
+                  </button>
                   <p className="font-bold mb-1">Required Columns:</p>
-                  <p>FullName, PrimaryMobile, Village, StaffMobile</p>
+                  <p>FullName, PrimaryMobile, Village, Taluka, District, State, PinCode, StaffMobile</p>
                   <p className="mt-1 font-bold mb-1">Tips:</p>
                   <p>StaffMobile must match an existing user's mobile number.</p>
                 </div>

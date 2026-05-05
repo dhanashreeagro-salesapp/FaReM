@@ -25,12 +25,15 @@ def validate_farmer_import(import_job_id):
     duplicate_count = 0
     error_report = []
 
-    required_columns = ['FullName', 'PrimaryMobile', 'Village', 'StaffMobile']
-    if not all(col in df.columns for col in required_columns):
+    required_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile']
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        found_cols = ", ".join(df.columns)
+        err_msg = f"Missing required columns in header: {', '.join(missing_cols)}. Found: {found_cols}"
         job.status = 'Failed'
-        job.error_report = [{"error": "Missing required columns"}]
+        job.error_report = [{"row": "Header", "error": err_msg}]
         job.save()
-        return {"status": "failed", "error": "Missing required columns"}
+        return {"status": "failed", "error": err_msg}
 
     for index, row in df.iterrows():
         try:
@@ -81,6 +84,10 @@ def commit_farmer_import(import_job_id):
             full_name = str(row['FullName']).strip()
             primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
             village = str(row['Village']).strip()
+            taluka = str(row.get('Taluka', '')).strip()
+            district = str(row.get('District', '')).strip()
+            state = str(row.get('State', '')).strip()
+            pin_code = str(row.get('PinCode', '')).split('.')[0].strip()
             staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
 
             assigned_staff = User.objects.get(mobile_number=staff_mobile)
@@ -90,6 +97,10 @@ def commit_farmer_import(import_job_id):
                 defaults={
                     'full_name': full_name,
                     'village': village,
+                    'taluka': taluka,
+                    'district': district,
+                    'state': state,
+                    'pin_code': pin_code,
                     'assigned_staff': assigned_staff,
                     'source': 'BulkImport',
                     'territory': assigned_staff.territory
@@ -136,11 +147,14 @@ def validate_user_import(import_job_id):
     error_report = []
 
     required_columns = ['Employee ID', 'Name', 'Mobile Number', 'Designation']
-    if not all(col in df.columns for col in required_columns):
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        found_cols = ", ".join(df.columns)
+        err_msg = f"Missing required columns in header: {', '.join(missing_cols)}. Found: {found_cols}"
         job.status = 'Failed'
-        job.error_report = [{"error": f"Missing required columns. Required: {required_columns}"}]
+        job.error_report = [{"row": "Header", "error": err_msg}]
         job.save()
-        return {"status": "failed", "error": "Missing required columns"}
+        return {"status": "failed", "error": err_msg}
 
     # Human-readable designation to system role mapping
     role_mapping = {
