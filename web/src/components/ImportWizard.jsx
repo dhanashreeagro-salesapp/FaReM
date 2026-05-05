@@ -175,6 +175,13 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
                     {jobData.error_report?.map((err, i) => (
                       <p key={i} className="mb-1">Row {err.row || 'N/A'}: {err.error}</p>
                     )) || <p>Unknown error</p>}
+                    
+                    <button 
+                      onClick={() => api.downloadImportJobResults(jobId)} 
+                      className="mt-3 bg-white px-3 py-1.5 rounded text-danger border border-danger hover:bg-danger/10 font-medium text-xs transition-colors"
+                    >
+                      Download Processed File
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -196,6 +203,15 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
                       <div className="text-xs text-accent mb-1">Duplicates</div>
                       <div className="text-xl font-heading font-bold text-accent">{jobData.duplicate_count}</div>
                     </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                     <button 
+                      onClick={() => api.downloadImportJobResults(jobId)} 
+                      className="text-primary hover:underline text-sm font-medium"
+                    >
+                      Download Validation Results
+                    </button>
                   </div>
 
                   <div className="flex gap-3">

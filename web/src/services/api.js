@@ -230,6 +230,23 @@ class ApiClient {
   getImportJobStatus(id) {
     return this.request(`/import-jobs/${id}/`);
   }
+  downloadImportJobResults(id) {
+    return fetch(`${this.baseUrl}/import-jobs/${id}/download_results/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `import_results_${id}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
+  }
 
   // Promotions
   getPromotions() { return this.request('/promotions/'); }

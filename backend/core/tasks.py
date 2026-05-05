@@ -35,6 +35,8 @@ def validate_farmer_import(import_job_id):
         job.save()
         return {"status": "failed", "error": err_msg}
 
+    df['Import Status'] = 'SUCCESS'
+
     for index, row in df.iterrows():
         try:
             primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
@@ -47,6 +49,8 @@ def validate_farmer_import(import_job_id):
             from .models import Farmer
             if Farmer.objects.filter(primary_mobile=primary_mobile).exists():
                 duplicate_count += 1
+                if df.at[index, 'Import Status'] == 'SUCCESS':
+                    df.at[index, 'Import Status'] = 'DUPLICATE (Will be updated)'
             
             # Resolve Staff
             if not User.objects.filter(mobile_number=staff_mobile).exists():
@@ -56,6 +60,13 @@ def validate_farmer_import(import_job_id):
         except Exception as e:
             error_count += 1
             error_report.append({"row": index + 2, "error": str(e)})
+            df.at[index, 'Import Status'] = f"ERROR: {str(e)}"
+
+    try:
+        with pd.ExcelWriter(job.filename, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+    except Exception as e:
+        pass # If we fail to write the status back, we can ignore it and continue
 
     job.total_rows = total_rows
     job.valid_rows = valid_rows
@@ -166,9 +177,10 @@ def validate_user_import(import_job_id):
     }
     roles = [r[0] for r in User.Role.choices]
 
-    # Pre-fetch existing data for performance
     existing_mobiles = set(User.objects.values_list('mobile_number', flat=True))
     existing_territories = set(Territory.objects.values_list('name', flat=True))
+
+    df['Import Status'] = 'SUCCESS'
 
     for index, row in df.iterrows():
         try:
@@ -186,6 +198,8 @@ def validate_user_import(import_job_id):
 
             if mobile in existing_mobiles:
                 duplicate_count += 1
+                if df.at[index, 'Import Status'] == 'SUCCESS':
+                    df.at[index, 'Import Status'] = 'DUPLICATE (Will be updated)'
             
             # Check territory if provided
             if 'Territory' in df.columns and not pd.isna(row['Territory']):
