@@ -92,6 +92,14 @@ export default function UserMaster() {
     } catch { /* already handled */ }
   };
 
+  const handleEnable = async (id) => {
+    if (!confirm('Enable this user? They will be able to log in again.')) return;
+    try {
+      await api.enableUser(id);
+      fetchUsers();
+    } catch { /* already handled */ }
+  };
+
   const filteredUsers = users.filter(user => {
     const searchLow = searchTerm.toLowerCase();
     return (
@@ -116,12 +124,22 @@ export default function UserMaster() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-heading font-bold text-text">User Management</h2>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <div className="relative hidden md:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+            <input 
+              type="text" 
+              placeholder="Search by name, mobile, etc..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none w-64"
+            />
+          </div>
           <button 
             onClick={() => setShowWizard(true)}
             className="flex items-center gap-2 bg-accent hover:bg-accent-light text-white px-4 py-2 rounded-lg font-medium text-sm cursor-pointer btn-press transition-colors"
           >
-            <Upload size={16} /> Bulk Import Excel
+            <Upload size={16} /> Bulk Import
           </button>
           <button id="add-user-btn" onClick={() => {
             setEditingUser(null);
@@ -263,6 +281,11 @@ export default function UserMaster() {
                     {user.status === 'Active' && (
                       <button onClick={() => handleDisable(user.id)} className="text-xs text-danger hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded-lg transition-colors">
                         Disable
+                      </button>
+                    )}
+                    {user.status === 'Inactive' && (
+                      <button onClick={() => handleEnable(user.id)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 hover:bg-green-50 rounded-lg transition-colors">
+                        Enable
                       </button>
                     )}
                   </div>

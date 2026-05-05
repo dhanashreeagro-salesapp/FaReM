@@ -87,11 +87,20 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
               <p className="text-sm text-text-muted">Upload your {resource === 'users' ? 'user' : resource === 'promotions' ? 'promotion' : 'farmer'} data Excel file for validation.</p>
               
               {resource === 'users' && (
-                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted">
+                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted relative">
+                  <button 
+                    onClick={async () => {
+                      try { await api.downloadUserTemplate(); }
+                      catch (err) { alert('Failed to download template'); }
+                    }} 
+                    className="absolute top-3 right-3 text-primary font-medium hover:underline flex items-center gap-1"
+                  >
+                    Download Template
+                  </button>
                   <p className="font-bold mb-1">Required Columns:</p>
-                  <p>FirstName, MobileNumber, Role</p>
+                  <p>Employee ID, Name, Mobile Number, Designation</p>
                   <p className="mt-1 font-bold mb-1">Optional Columns:</p>
-                  <p>LastName, EmployeeID, Email, Territory</p>
+                  <p>Territory</p>
                 </div>
               )}
 

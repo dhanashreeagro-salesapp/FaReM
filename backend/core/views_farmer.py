@@ -104,3 +104,53 @@ class FarmerViewSet(viewsets.ModelViewSet):
             user_id=str(request.user.id)
         )
         return Response({"message": "Disable request submitted to Admin"}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def export(self, request):
+        import pandas as pd
+        from django.http import HttpResponse
+        from io import BytesIO
+
+        farmers = self.get_queryset()
+        data = []
+        for f in farmers:
+            data.append({
+                'Name': f.full_name,
+                'Primary Mobile': f.primary_mobile,
+                'Village': f.village,
+                'Taluka': f.taluka,
+                'District': f.district,
+                'State': f.state,
+                'Assigned Staff': f.assigned_staff.mobile_number if f.assigned_staff else '',
+                'Status': f.status
+            })
+            
+        df = pd.DataFrame(data)
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+            
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="farmers_export.xlsx"'
+        return response
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def disable(self, request, pk=None):
+        instance = self.get_object()
+        instance.status = 'Inactive'
+        instance.save(update_fields=['status'])
+        
+        from .models import SystemAuditLog
+        SystemAuditLog.objects.create(
+            entity_type='Farmer',
+            entity_id=str(instance.id),
+            field_changed='status',
+            old_value='Active',
+            new_value='Inactive',
+            action_type='Update',
+            user_id=str(request.user.id)
+        )
+        return Response({"status": "Farmer disabled"}, status=status.HTTP_200_OK)

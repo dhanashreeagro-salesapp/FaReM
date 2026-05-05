@@ -104,6 +104,8 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Kolkata'
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_STORE_EAGER_RESULT = True
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -124,3 +126,6 @@ CACHES = {
 if os.name == 'nt':
     GDAL_LIBRARY_PATH = os.environ.get('GDAL_LIBRARY_PATH')
     GEOS_LIBRARY_PATH = os.environ.get('GEOS_LIBRARY_PATH')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

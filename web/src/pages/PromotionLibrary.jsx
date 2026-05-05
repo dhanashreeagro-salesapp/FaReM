@@ -16,15 +16,18 @@ export default function PromotionLibrary() {
   const [stages, setStages] = useState([]);
   const [products, setProducts] = useState([]);
 
+  const categories = ['Product', 'Tagline', 'WhatsApp', 'Facebook', 'Instagram', 'LinkedIn', 'Schedule', 'Testimonial', 'YouTube Playlist'];
+
   const [form, setForm] = useState({ 
     title: '', 
     content_type: 'Image', 
+    category: 'Product',
     file_url: '', 
     language_tags: ['English'], 
     expiry_date: '',
     crop: '',
     stage: '',
-    related_product: ''
+    related_products: []
   });
 
   // Derived filtered stages
@@ -61,7 +64,6 @@ export default function PromotionLibrary() {
     try {
       const payload = { ...form };
       if (!payload.expiry_date) delete payload.expiry_date;
-      if (!payload.related_product) payload.related_product = null;
       if (!payload.crop) payload.crop = null;
       if (!payload.stage) payload.stage = null;
 
@@ -73,7 +75,7 @@ export default function PromotionLibrary() {
       
       setShowForm(false);
       setEditingPromo(null);
-      setForm({ title: '', content_type: 'Image', file_url: '', language_tags: ['English'], expiry_date: '', crop: '', stage: '', related_product: '' });
+      setForm({ title: '', content_type: 'Image', category: 'Product', file_url: '', language_tags: ['English'], expiry_date: '', crop: '', stage: '', related_products: [] });
       fetchPromos();
     } catch (err) { alert(err.error || 'Failed to save'); }
   };
@@ -83,12 +85,13 @@ export default function PromotionLibrary() {
     setForm({
       title: promo.title,
       content_type: promo.content_type,
+      category: promo.category || 'Product',
       file_url: promo.file_url,
       language_tags: promo.language_tags || ['English'],
       expiry_date: promo.expiry_date || '',
       crop: promo.crop || '',
       stage: promo.stage || '',
-      related_product: promo.related_product || ''
+      related_products: promo.related_products || []
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -106,8 +109,9 @@ export default function PromotionLibrary() {
     const lowSearch = searchTerm.toLowerCase();
     return (
       p.title.toLowerCase().includes(lowSearch) ||
+      p.category?.toLowerCase().includes(lowSearch) ||
       p.content_type.toLowerCase().includes(lowSearch) ||
-      p.product_name?.toLowerCase().includes(lowSearch) ||
+      (p.product_names && p.product_names.some(n => n.toLowerCase().includes(lowSearch))) ||
       p.crop_name?.toLowerCase().includes(lowSearch) ||
       p.stage_name?.toLowerCase().includes(lowSearch)
     );
@@ -128,7 +132,7 @@ export default function PromotionLibrary() {
           </button>
           <button onClick={() => {
             setEditingPromo(null);
-            setForm({ title: '', content_type: 'Image', file_url: '', language_tags: ['English'], expiry_date: '', crop_tags: [], stage_tags: [], related_product: '' });
+            setForm({ title: '', content_type: 'Image', category: 'Product', file_url: '', language_tags: ['English'], expiry_date: '', crop: '', stage: '', related_products: [] });
             setShowForm(!showForm);
           }}
             className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
@@ -168,9 +172,11 @@ export default function PromotionLibrary() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">Expiry Date</label>
-              <input type="date" value={form.expiry_date} onChange={e => setForm({...form, expiry_date: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+              <label className="block text-xs font-semibold text-text-muted mb-1">Category</label>
+              <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none">
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
 
             <div className="col-span-2">
@@ -179,11 +185,18 @@ export default function PromotionLibrary() {
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-mono focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">Product (Optional)</label>
-              <select value={form.related_product} onChange={e => setForm({...form, related_product: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface">
-                <option value="">-- Select Product --</option>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-text-muted mb-1">Products (Hold Ctrl/Cmd to select multiple)</label>
+              <select 
+                multiple
+                value={form.related_products} 
+                onChange={e => {
+                  const values = Array.from(e.target.selectedOptions, option => option.value);
+                  setForm({...form, related_products: values});
+                }}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                size={4}
+              >
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
@@ -213,9 +226,15 @@ export default function PromotionLibrary() {
               </select>
             </div>
 
-            <div className="flex justify-end items-end col-span-2 gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 rounded-lg font-medium text-sm text-text-muted">Cancel</button>
-              <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Expiry Date</label>
+              <input type="date" value={form.expiry_date} onChange={e => setForm({...form, expiry_date: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+            </div>
+
+            <div className="flex justify-end items-end col-span-2 gap-3 mt-4">
+              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 rounded-lg font-medium text-sm text-text-muted border border-border hover:bg-surface">Cancel</button>
+              <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm transition-colors btn-press shadow-md">
                 {editingPromo ? 'Update Content' : 'Create Content'}
               </button>
             </div>
@@ -228,7 +247,7 @@ export default function PromotionLibrary() {
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input 
           type="text" 
-          placeholder="Search by title, product, crop, stage or type..." 
+          placeholder="Search by title, product, crop, stage, category or type..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-3 border border-border rounded-xl text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all"
@@ -242,43 +261,46 @@ export default function PromotionLibrary() {
             <p>Loading library...</p>
           </div>
         ) : filteredPromos.length === 0 ? (
-          <div className="col-span-3 card p-12 text-center text-text-muted">No content found.</div>
+          <div className="col-span-3 card p-12 text-center text-text-muted border-dashed border-2">No content found matching your search.</div>
         ) : filteredPromos.map((promo, i) => (
-          <div key={promo.id} className="card group overflow-hidden border border-border hover:border-primary/30 transition-all p-0 flex flex-col animate-stagger-in" style={{ animationDelay: `${i * 40}ms` }}>
-            <div className="p-4 flex-1">
+          <div key={promo.id} className="card group overflow-hidden border border-border hover:border-primary/30 transition-all p-0 flex flex-col animate-stagger-in shadow-sm hover:shadow-md" style={{ animationDelay: `${i * 40}ms` }}>
+            <div className="p-5 flex-1">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-3xl bg-bg rounded-lg p-2">{typeIcons[promo.content_type] || '📎'}</span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-3xl bg-surface rounded-lg p-2 shadow-sm">{typeIcons[promo.content_type] || '📎'}</span>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-surface rounded-lg p-1 shadow-sm">
                   <button onClick={() => handleEdit(promo)} className="p-1.5 text-text-muted hover:text-primary transition-colors"><Edit2 size={16} /></button>
                   <button onClick={() => handleDelete(promo.id)} className="p-1.5 text-text-muted hover:text-danger transition-colors"><Trash2 size={16} /></button>
                 </div>
               </div>
               
-              <h4 className="font-heading font-bold text-text mb-1 line-clamp-1">{promo.title}</h4>
+              <h4 className="font-heading font-bold text-text mb-1 line-clamp-2" title={promo.title}>{promo.title}</h4>
               
               <a 
                 href={promo.file_url} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-xs text-primary hover:underline flex items-center gap-1 mb-4"
+                className="text-xs text-primary hover:underline flex items-center gap-1 mb-4 w-fit"
               >
                 {promo.file_url.length > 35 ? promo.file_url.substring(0, 35) + '...' : promo.file_url}
                 <ExternalLink size={12} />
               </a>
 
-              <div className="flex flex-wrap gap-1.5 mt-auto">
-                <span className="badge bg-blue-50 text-blue-700 text-[10px]">{promo.content_type}</span>
-                {promo.product_name && <span className="badge bg-purple-50 text-purple-700 text-[10px] font-bold">📦 {promo.product_name}</span>}
-                {promo.crop_name && <span className="badge bg-green-50 text-green-700 text-[10px]">🌱 {promo.crop_name}</span>}
-                {promo.stage_name && <span className="badge bg-amber-50 text-amber-700 text-[10px]">📅 {promo.stage_name}</span>}
+              <div className="flex flex-wrap gap-2 mt-auto">
+                <span className="badge bg-blue-50 text-blue-700 text-[10px] font-medium border border-blue-100">{promo.content_type}</span>
+                {promo.category && <span className="badge bg-indigo-50 text-indigo-700 text-[10px] font-medium border border-indigo-100">🏷️ {promo.category}</span>}
+                {promo.product_names && promo.product_names.map((pn, idx) => (
+                  <span key={idx} className="badge bg-purple-50 text-purple-700 text-[10px] font-medium border border-purple-100">📦 {pn}</span>
+                ))}
+                {promo.crop_name && <span className="badge bg-green-50 text-green-700 text-[10px] border border-green-100">🌱 {promo.crop_name}</span>}
+                {promo.stage_name && <span className="badge bg-amber-50 text-amber-700 text-[10px] border border-amber-100">📅 {promo.stage_name}</span>}
                 <span className={`badge text-[10px] ${promo.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>{promo.status}</span>
               </div>
             </div>
             
             {promo.expiry_date && (
-              <div className="bg-bg/50 px-4 py-2 border-t border-border text-[10px] text-text-muted flex justify-between">
-                <span>Expires:</span>
-                <span className="font-medium">{new Date(promo.expiry_date).toLocaleDateString()}</span>
+              <div className="bg-surface px-5 py-2.5 border-t border-border text-[11px] text-text-muted flex justify-between items-center">
+                <span>Expires on</span>
+                <span className="font-semibold text-text">{new Date(promo.expiry_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               </div>
             )}
           </div>

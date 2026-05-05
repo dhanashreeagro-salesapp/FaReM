@@ -41,6 +41,7 @@ class Territory(models.Model):
     parent_territory = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_territories')
     manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_territories')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    location = gis_models.PointField(null=True, blank=True)
     
     def __str__(self):
         return self.name
@@ -87,7 +88,7 @@ class CropMaster(models.Model):
     crop_category = models.CharField(max_length=255)
     scientific_name = models.CharField(max_length=255, blank=True, null=True)
     crop_schedule_pdf = models.URLField(max_length=500, blank=True, null=True)
-    reference_image = models.URLField(max_length=500, blank=True, null=True)
+    reference_image = models.ImageField(upload_to='crop_images/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
 
     def __str__(self):
@@ -192,7 +193,8 @@ class PromotionLibrary(models.Model):
     file_url = models.URLField(max_length=500)
     crop = models.ForeignKey(CropMaster, on_delete=models.SET_NULL, null=True, blank=True)
     stage = models.ForeignKey(CropStage, on_delete=models.SET_NULL, null=True, blank=True)
-    related_product = models.ForeignKey(ProductMaster, on_delete=models.SET_NULL, null=True, blank=True)
+    related_products = models.ManyToManyField(ProductMaster, blank=True)
+    category = models.CharField(max_length=50, choices=[('Product', 'Product'), ('Tagline', 'Tagline'), ('WhatsApp', 'WhatsApp'), ('Facebook', 'Facebook'), ('Instagram', 'Instagram'), ('LinkedIn', 'LinkedIn'), ('Schedule', 'Schedule'), ('Testimonial', 'Testimonial'), ('YouTube Playlist', 'YouTube Playlist')], default='Product')
     language_tags = models.JSONField(default=list, blank=True) # list of languages e.g., ["English", "Marathi"]
     expiry_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)

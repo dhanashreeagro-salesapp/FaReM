@@ -32,6 +32,24 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def download_template(self, request):
+        import pandas as pd
+        from django.http import HttpResponse
+        from io import BytesIO
+
+        df = pd.DataFrame(columns=['Employee ID', 'Name', 'Mobile Number', 'Designation', 'Territory'])
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="users_import_template.xlsx"'
+        return response
+
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def upload_for_validation(self, request):
         if 'file' not in request.FILES:
@@ -100,3 +118,20 @@ class UserViewSet(viewsets.ModelViewSet):
             user_id=str(request.user.id)
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def enable(self, request, pk=None):
+        instance = self.get_object()
+        instance.status = 'Active'
+        instance.save(update_fields=['status'])
+        
+        SystemAuditLog.objects.create(
+            entity_type='User',
+            entity_id=str(instance.id),
+            field_changed='status',
+            old_value='Inactive',
+            new_value='Active',
+            action_type='Update',
+            user_id=str(request.user.id)
+        )
+        return Response({"status": "User enabled"}, status=status.HTTP_200_OK)

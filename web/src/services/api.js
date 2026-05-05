@@ -116,6 +116,7 @@ class ApiClient {
   createUser(data) { return this.request('/users/', { method: 'POST', body: JSON.stringify(data) }); }
   updateUser(id, data) { return this.request(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   deleteUser(id) { return this.request(`/users/${id}/`, { method: 'DELETE' }); }
+  enableUser(id) { return this.request(`/users/${id}/enable/`, { method: 'PATCH' }); }
   uploadUsersForValidation(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -125,6 +126,23 @@ class ApiClient {
     return this.request('/users/commit_import/', {
       method: 'POST',
       body: JSON.stringify({ import_job_id: jobId, is_acknowledged: acknowledged })
+    });
+  }
+  downloadUserTemplate() {
+    return fetch(`${this.baseUrl}/users/download_template/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'users_import_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
     });
   }
 
@@ -137,16 +155,43 @@ class ApiClient {
   // Crops
   getCrops() { return this.request('/crops/'); }
   getCrop(id) { return this.request(`/crops/${id}/`); }
-  createCrop(data) { return this.request('/crops/', { method: 'POST', body: JSON.stringify(data) }); }
-  updateCrop(id, data) { return this.request(`/crops/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  createCrop(data) { 
+    return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) }); 
+  }
+  updateCrop(id, data) { 
+    return this.request(`/crops/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) }); 
+  }
+  deleteCrop(id) { return this.request(`/crops/${id}/`, { method: 'DELETE' }); }
   createVariety(data) { return this.request('/crop-varieties/', { method: 'POST', body: JSON.stringify(data) }); }
+  updateVariety(id, data) { return this.request(`/crop-varieties/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  deleteVariety(id) { return this.request(`/crop-varieties/${id}/`, { method: 'DELETE' }); }
   createStage(data) { return this.request('/crop-stages/', { method: 'POST', body: JSON.stringify(data) }); }
+  updateStage(id, data) { return this.request(`/crop-stages/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  deleteStage(id) { return this.request(`/crop-stages/${id}/`, { method: 'DELETE' }); }
 
   // Farmers
   getFarmers() { return this.request('/farmers/'); }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
   createFarmer(data) { return this.request('/farmers/', { method: 'POST', body: JSON.stringify(data) }); }
   updateFarmer(id, data) { return this.request(`/farmers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  disableFarmer(id) { return this.request(`/farmers/${id}/disable/`, { method: 'PATCH' }); }
+  exportFarmers() {
+    return fetch(`${this.baseUrl}/farmers/export/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'farmers_export.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
+  }
   bulkImportFarmers(file) {
     const formData = new FormData();
     formData.append('file', file);

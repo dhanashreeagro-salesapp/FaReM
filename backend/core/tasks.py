@@ -34,8 +34,8 @@ def validate_farmer_import(import_job_id):
 
     for index, row in df.iterrows():
         try:
-            primary_mobile = str(row['PrimaryMobile']).strip()
-            staff_mobile = str(row['StaffMobile']).strip()
+            primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
+            staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
 
             if len(primary_mobile) > 15 or len(primary_mobile) < 10:
                 raise ValueError("Invalid PrimaryMobile format")
@@ -79,9 +79,9 @@ def commit_farmer_import(import_job_id):
     for index, row in df.iterrows():
         try:
             full_name = str(row['FullName']).strip()
-            primary_mobile = str(row['PrimaryMobile']).strip()
+            primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
             village = str(row['Village']).strip()
-            staff_mobile = str(row['StaffMobile']).strip()
+            staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
 
             assigned_staff = User.objects.get(mobile_number=staff_mobile)
             
@@ -135,25 +135,36 @@ def validate_user_import(import_job_id):
     duplicate_count = 0
     error_report = []
 
-    required_columns = ['FirstName', 'MobileNumber', 'Role']
+    required_columns = ['Employee ID', 'Name', 'Mobile Number', 'Designation']
     if not all(col in df.columns for col in required_columns):
         job.status = 'Failed'
         job.error_report = [{"error": f"Missing required columns. Required: {required_columns}"}]
         job.save()
         return {"status": "failed", "error": "Missing required columns"}
 
+    # Human-readable designation to system role mapping
+    role_mapping = {
+        'field staff': 'FieldStaff',
+        'territory manager': 'TerritoryManager',
+        'zonal manager': 'ZonalManager',
+        'admin': 'Admin',
+        'content team': 'ContentTeam'
+    }
     roles = [r[0] for r in User.Role.choices]
 
     for index, row in df.iterrows():
         try:
-            mobile = str(row['MobileNumber']).strip()
-            role = str(row['Role']).strip()
+            mobile = str(row['Mobile Number']).split('.')[0].strip()
+            
+            # Map human-readable designation to system role if necessary
+            designation = str(row['Designation']).strip().lower()
+            role = role_mapping.get(designation, str(row['Designation']).strip())
             
             if len(mobile) != 10 or not mobile.isdigit():
-                raise ValueError("MobileNumber must be exactly 10 digits")
+                raise ValueError("Mobile Number must be exactly 10 digits")
 
             if role not in roles:
-                raise ValueError(f"Invalid Role: {role}. Must be one of {roles}")
+                raise ValueError(f"Invalid Designation: {str(row['Designation'])}. Must map to one of {roles}")
 
             if User.objects.filter(mobile_number=mobile).exists():
                 duplicate_count += 1
@@ -191,15 +202,31 @@ def commit_user_import(import_job_id):
     created_count = 0
     updated_count = 0
 
+    role_mapping = {
+        'field staff': 'FieldStaff',
+        'territory manager': 'TerritoryManager',
+        'zonal manager': 'ZonalManager',
+        'admin': 'Admin',
+        'content team': 'ContentTeam'
+    }
+
     for index, row in df.iterrows():
         try:
-            first_name = str(row['FirstName']).strip()
-            last_name = str(row.get('LastName', '')).strip()
-            mobile = str(row['MobileNumber']).strip()
-            employee_id = str(row.get('EmployeeID', '')).strip()
-            email = str(row.get('Email', '')).strip()
-            role = str(row['Role']).strip()
+            name_parts = str(row['Name']).strip().split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            mobile = str(row['Mobile Number']).split('.')[0].strip()
+            employee_id = str(row.get('Employee ID', '')).strip()
+            if employee_id == 'nan' or pd.isna(row.get('Employee ID')):
+                employee_id = ''
+            
+            designation = str(row['Designation']).strip().lower()
+            role = role_mapping.get(designation, str(row['Designation']).strip())
+            
             territory_name = str(row.get('Territory', '')).strip()
+            if territory_name == 'nan' or pd.isna(row.get('Territory')):
+                territory_name = ''
 
             territory = None
             if territory_name:
@@ -212,7 +239,6 @@ def commit_user_import(import_job_id):
                     'first_name': first_name,
                     'last_name': last_name,
                     'employee_id': employee_id,
-                    'email': email,
                     'role': role,
                     'territory': territory,
                     'status': 'Active'
