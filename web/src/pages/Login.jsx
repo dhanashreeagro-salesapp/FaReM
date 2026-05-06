@@ -19,7 +19,14 @@ export default function Login() {
       await login(mobile, otp);
       navigate('/');
     } catch (err) {
-      setError(err.error || 'Invalid credentials');
+      console.error("Login error:", err);
+      if (err.error) {
+        setError(err.error);
+      } else if (err.message) {
+        setError("Network/Browser Error: " + err.message);
+      } else {
+        setError("Unknown Error: " + JSON.stringify(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -54,9 +61,8 @@ export default function Login() {
                 id="mobile-input"
                 type="tel"
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="9876543210"
-                maxLength={10}
                 minLength={10}
                 pattern="[0-9]{10}"
                 title="Please enter exactly 10 digits"
