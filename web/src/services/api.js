@@ -248,6 +248,24 @@ class ApiClient {
     });
   }
 
+  // Plots
+  getPlots(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/plots/${qs ? `?${qs}` : ''}`);
+  }
+  createPlot(data) { return this.request('/plots/', { method: 'POST', body: JSON.stringify(data) }); }
+  updatePlot(id, data) { return this.request(`/plots/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  deletePlot(id) { return this.request(`/plots/${id}/`, { method: 'DELETE' }); }
+
+  // Crop Seasons
+  getCropSeasons(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/crop-seasons/${qs ? `?${qs}` : ''}`);
+  }
+  createCropSeason(data) { return this.request('/crop-seasons/', { method: 'POST', body: JSON.stringify(data) }); }
+  updateCropSeason(id, data) { return this.request(`/crop-seasons/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  advanceCropStage(id) { return this.request(`/crop-seasons/${id}/advance_stage/`, { method: 'POST' }); }
+
   // Promotions
   getPromotions() { return this.request('/promotions/'); }
   createPromotion(data) { return this.request('/promotions/', { method: 'POST', body: JSON.stringify(data) }); }

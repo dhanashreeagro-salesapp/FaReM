@@ -12,8 +12,6 @@ class DashboardAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        if user.role == Role.FIELD_STAFF:
-            return Response({"error": "Field staff dashboards are managed locally"}, status=status.HTTP_403_FORBIDDEN)
             
         # Basic aggregate data
         data = {}
@@ -22,8 +20,17 @@ class DashboardAPIView(APIView):
         activities = ActivityLog.objects.all()
         
         if user.role == Role.TERRITORY_MANAGER:
-            farmers = farmers.filter(territory=user.territory)
-            activities = activities.filter(farmer__territory=user.territory)
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            farmers = farmers.filter(territory__in=territories)
+            activities = activities.filter(farmer__territory__in=territories)
+        elif user.role == Role.FIELD_STAFF:
+            farmers = farmers.filter(assigned_staff=user)
+            activities = activities.filter(farmer__assigned_staff=user)
             
         data['total_farmers'] = farmers.count()
         data['total_visits'] = activities.filter(activity_type='Visit').count()
@@ -70,6 +77,25 @@ class DashboardAPIView(APIView):
         
         data['overdue_visits'] = overdue_count
         
+        from .models import Plot, CropSeason
+        data['total_plots'] = Plot.objects.filter(farmer__in=farmers).count()
+        
+        active_seasons = CropSeason.objects.filter(plot__farmer__in=farmers, status='Active')
+        data['active_crop_seasons'] = active_seasons.count()
+
+        stage_breakup = {}
+        for season in active_seasons.select_related('crop', 'current_stage'):
+            if not season.crop: continue
+            crop_name = season.crop.crop_name
+            stage_name = season.current_stage.stage_name if season.current_stage else 'Unknown'
+            if crop_name not in stage_breakup:
+                stage_breakup[crop_name] = {}
+            if stage_name not in stage_breakup[crop_name]:
+                stage_breakup[crop_name][stage_name] = 0
+            stage_breakup[crop_name][stage_name] += 1
+        
+        data['crop_stage_breakup'] = stage_breakup
+
         return Response(data)
 
 class ExportReportAPIView(APIView):

@@ -9,16 +9,78 @@ from .serializers_plot import PlotSerializer, CropSeasonSerializer, StageChangeL
 from .permissions import IsStaffOrManagerOrAdmin
 
 class PlotViewSet(viewsets.ModelViewSet):
-    queryset = Plot.objects.all()
     serializer_class = PlotSerializer
     permission_classes = [IsAuthenticated]
 
-    # Additional query scoping can be added similar to FarmerViewSet
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
+            return Plot.objects.all()
+        elif user.role == Role.TERRITORY_MANAGER:
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            return Plot.objects.filter(farmer__territory__in=territories)
+        elif user.role == Role.FIELD_STAFF:
+            return Plot.objects.filter(farmer__assigned_staff=user)
+        return Plot.objects.none()
+
+    def perform_create(self, serializer):
+        wkt = serializer.validated_data.pop('location_wkt', None)
+        plot = serializer.save()
+        if wkt:
+            from django.contrib.gis.geos import GEOSGeometry
+            try:
+                geom = GEOSGeometry(wkt)
+                if geom.geom_type == 'Polygon':
+                    plot.location = geom
+                    geom.transform(3857)
+                    sq_meters = geom.area
+                    plot.area_acres = sq_meters * 0.000247105
+                    geom.transform(4326)
+                    plot.save(update_fields=['location', 'area_acres'])
+            except Exception:
+                pass
+
+    def perform_update(self, serializer):
+        wkt = serializer.validated_data.pop('location_wkt', None)
+        plot = serializer.save()
+        if wkt:
+            from django.contrib.gis.geos import GEOSGeometry
+            try:
+                geom = GEOSGeometry(wkt)
+                if geom.geom_type == 'Polygon':
+                    plot.location = geom
+                    geom.transform(3857)
+                    sq_meters = geom.area
+                    plot.area_acres = sq_meters * 0.000247105
+                    geom.transform(4326)
+                    plot.save(update_fields=['location', 'area_acres'])
+            except Exception:
+                pass
 
 class CropSeasonViewSet(viewsets.ModelViewSet):
-    queryset = CropSeason.objects.all()
     serializer_class = CropSeasonSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
+            return CropSeason.objects.all()
+        elif user.role == Role.TERRITORY_MANAGER:
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            return CropSeason.objects.filter(plot__farmer__territory__in=territories)
+        elif user.role == Role.FIELD_STAFF:
+            return CropSeason.objects.filter(plot__farmer__assigned_staff=user)
+        return CropSeason.objects.none()
 
     def perform_create(self, serializer):
         season = serializer.save()

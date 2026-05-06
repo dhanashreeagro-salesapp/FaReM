@@ -17,8 +17,13 @@ class FarmerViewSet(viewsets.ModelViewSet):
         if user.role == Role.ADMIN or user.role == Role.ZONAL_MANAGER or user.role == Role.CONTENT_TEAM:
             return Farmer.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
-            # Assumes territory has sub_territories structured to find farmers, simplified here
-            return Farmer.objects.filter(territory=user.territory)
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            return Farmer.objects.filter(territory__in=territories)
         elif user.role == Role.FIELD_STAFF:
             return Farmer.objects.filter(assigned_staff=user)
         return Farmer.objects.none()

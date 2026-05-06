@@ -68,11 +68,13 @@ export default function Dashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <StatCard icon={Users} label="Total Active Farmers" value={data.total_farmers?.toLocaleString()} color="bg-primary/10 text-primary" delay={0} />
-        <StatCard icon={MapPin} label="Total Visits Logged" value={data.total_visits?.toLocaleString()} color="bg-accent/10 text-accent" delay={60} />
-        <StatCard icon={Phone} label="Total Calls Logged" value={data.total_calls?.toLocaleString()} color="bg-warning/10 text-warning" delay={120} />
-        <StatCard icon={AlertTriangle} label="Overdue Visits" value={data.overdue_visits?.toLocaleString()} color="bg-danger/10 text-danger" delay={180} />
+        <StatCard icon={MapPin} label="Total Plots" value={data.total_plots?.toLocaleString()} color="bg-success/10 text-success" delay={30} />
+        <StatCard icon={TrendingUp} label="Active Crops" value={data.active_crop_seasons?.toLocaleString()} color="bg-success/10 text-success" delay={60} />
+        <StatCard icon={MapPin} label="Total Visits" value={data.total_visits?.toLocaleString()} color="bg-accent/10 text-accent" delay={90} />
+        <StatCard icon={Phone} label="Total Calls" value={data.total_calls?.toLocaleString()} color="bg-warning/10 text-warning" delay={120} />
+        <StatCard icon={AlertTriangle} label="Overdue Visits" value={data.overdue_visits?.toLocaleString()} color="bg-danger/10 text-danger" delay={150} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -106,6 +108,32 @@ export default function Dashboard() {
           </div>
         ) : (
           <p className="text-sm text-text-muted">No village data available.</p>
+        )}
+      </div>
+
+      {/* Crop Stage Breakup */}
+      <div className="card p-5 animate-stagger-in" style={{ animationDelay: '240ms' }}>
+        <h3 className="font-heading font-semibold text-text mb-4 flex items-center gap-2">
+          <TrendingUp size={16} className="text-success" /> Active Crops by Stage
+        </h3>
+        {data.crop_stage_breakup && Object.keys(data.crop_stage_breakup).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(data.crop_stage_breakup).map(([crop, stages]) => (
+              <div key={crop} className="border border-border rounded-lg p-4 bg-surface">
+                <h4 className="font-heading font-medium text-text mb-2 border-b border-border pb-1">{crop}</h4>
+                <div className="space-y-2">
+                  {Object.entries(stages).map(([stage, count]) => (
+                    <div key={stage} className="flex justify-between items-center text-sm">
+                      <span className="text-text-muted">{stage}</span>
+                      <span className="font-mono font-medium text-text bg-bg px-2 py-0.5 rounded-full">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted">No active crops data available.</p>
         )}
       </div>
     </div>

@@ -46,6 +46,15 @@ class Territory(models.Model):
     def __str__(self):
         return self.name
 
+    def get_all_sub_territories(self):
+        """Recursively get all sub-territories for this territory."""
+        territories = [self]
+        sub_territories = list(self.sub_territories.all())
+        while sub_territories:
+            territories.extend(sub_territories)
+            sub_territories = list(Territory.objects.filter(parent_territory__in=sub_territories))
+        return territories
+
 class Farmer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     full_name = models.CharField(max_length=255)
@@ -74,10 +83,10 @@ class Plot(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='plots')
     plot_name = models.CharField(max_length=255)
-    area_acres = models.DecimalField(max_digits=10, decimal_places=2)
+    area_acres = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     soil_type = models.CharField(max_length=100, blank=True, null=True)
     irrigation_source = models.CharField(max_length=100, blank=True, null=True)
-    location = gis_models.PointField(null=True, blank=True) # Used for GPS Latitude and Longitude
+    location = gis_models.PolygonField(null=True, blank=True) # Used for GPS plot corners
 
     def __str__(self):
         return self.plot_name
@@ -118,6 +127,9 @@ class CropSeason(models.Model):
     expected_next_stage_date = models.DateField(null=True, blank=True)
     previous_crop = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=[('Active', 'Active'), ('Completed', 'Completed')], default='Active')
+    total_yield_kg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_income_rs = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    total_expenses_rs = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
 class StageChangeLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
