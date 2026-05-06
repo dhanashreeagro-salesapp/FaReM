@@ -50,22 +50,19 @@ export default function Login() {
               <label className="block text-sm font-medium text-text-muted mb-1.5">
                 Registered Mobile Number (10 Digits)
               </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-mono font-medium">+91</span>
-                <input
-                  id="mobile-input"
-                  type="tel"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                  placeholder="9876543210"
-                  maxLength={10}
-                  minLength={10}
-                  pattern="[0-9]{10}"
-                  title="Please enter exactly 10 digits"
-                  className="w-full pl-12 pr-4 py-3 rounded-lg border border-border bg-surface text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-lg"
-                  required
-                />
-              </div>
+              <input
+                id="mobile-input"
+                type="tel"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                placeholder="9876543210"
+                maxLength={10}
+                minLength={10}
+                pattern="[0-9]{10}"
+                title="Please enter exactly 10 digits"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-surface text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-lg"
+                required
+              />
             </div>
             
             <div className="mb-4">
