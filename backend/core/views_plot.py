@@ -14,8 +14,9 @@ class PlotViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Plot.objects.none()
         if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
-            return Plot.objects.all()
+            queryset = Plot.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
             territories = []
             if user.territory:
@@ -23,10 +24,14 @@ class PlotViewSet(viewsets.ModelViewSet):
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
-            return Plot.objects.filter(farmer__territory__in=territories)
+            queryset = Plot.objects.filter(farmer__territory__in=territories)
         elif user.role == Role.FIELD_STAFF:
-            return Plot.objects.filter(farmer__assigned_staff=user)
-        return Plot.objects.none()
+            queryset = Plot.objects.filter(farmer__assigned_staff=user)
+            
+        farmer_id = self.request.query_params.get('farmer')
+        if farmer_id:
+            queryset = queryset.filter(farmer_id=farmer_id)
+        return queryset
 
     def perform_create(self, serializer):
         wkt = serializer.validated_data.pop('location_wkt', None)
@@ -68,8 +73,9 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = CropSeason.objects.none()
         if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
-            return CropSeason.objects.all()
+            queryset = CropSeason.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
             territories = []
             if user.territory:
@@ -77,10 +83,14 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
-            return CropSeason.objects.filter(plot__farmer__territory__in=territories)
+            queryset = CropSeason.objects.filter(plot__farmer__territory__in=territories)
         elif user.role == Role.FIELD_STAFF:
-            return CropSeason.objects.filter(plot__farmer__assigned_staff=user)
-        return CropSeason.objects.none()
+            queryset = CropSeason.objects.filter(plot__farmer__assigned_staff=user)
+            
+        plot_id = self.request.query_params.get('plot')
+        if plot_id:
+            queryset = queryset.filter(plot_id=plot_id)
+        return queryset
 
     def perform_create(self, serializer):
         season = serializer.save()

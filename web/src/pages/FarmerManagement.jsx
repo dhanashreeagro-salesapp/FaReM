@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Upload, Search, Download, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
+import PlotManagementModal from '../components/PlotManagementModal';
 
 export default function FarmerManagement() {
   const [farmers, setFarmers] = useState([]);
@@ -12,6 +13,7 @@ export default function FarmerManagement() {
   const [showWizard, setShowWizard] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [selectedFarmerForPlots, setSelectedFarmerForPlots] = useState(null);
   const [form, setForm] = useState({
     full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: ''
   });
@@ -229,6 +231,13 @@ export default function FarmerManagement() {
                     >
                       <Edit2 size={14} />
                     </button>
+                    <button 
+                      onClick={() => setSelectedFarmerForPlots(farmer)}
+                      className="p-1 hover:text-success transition-colors cursor-pointer"
+                      title="Manage Plots"
+                    >
+                      <Map size={14} />
+                    </button>
                     {farmer.status === 'Active' && (
                       <button 
                         onClick={() => handleDisable(farmer.id)}
@@ -246,6 +255,13 @@ export default function FarmerManagement() {
         </table>
         {filtered.length > 100 && <p className="text-center text-xs text-text-muted py-3">Showing first 100 of {filtered.length} results</p>}
       </div>
+
+      {selectedFarmerForPlots && (
+        <PlotManagementModal 
+          farmer={selectedFarmerForPlots} 
+          onClose={() => setSelectedFarmerForPlots(null)} 
+        />
+      )}
     </div>
   );
 }
