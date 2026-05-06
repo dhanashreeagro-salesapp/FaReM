@@ -64,66 +64,74 @@ def send_otp(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def verify_otp(request):
-    mobile_number = request.data.get('mobile_number')
-    otp = request.data.get('otp')
-    device_push_token = request.data.get('device_push_token')
-    
-    if not mobile_number or not otp:
-        return Response({"error": "mobile_number and otp are required"}, status=status.HTTP_400_BAD_REQUEST)
-        
     try:
-        user = User.objects.get(mobile_number=mobile_number)
-    except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        raw_mobile = str(request.data.get('mobile_number', '')).strip()
+        otp = str(request.data.get('otp', '')).strip()
+        device_push_token = request.data.get('device_push_token')
         
-    from django.utils import timezone
-    if user.locked_until and user.locked_until > timezone.now():
-        return Response({"error": f"Account is locked until {user.locked_until}. Try again later."}, status=status.HTTP_403_FORBIDDEN)
-        
-    # Bypass OTP cache check for testing phase
-    # cached_otp = cache.get(f"otp_{mobile_number}")
-    
-    if otp == '123456':
-        # Success
-        cache.delete(f"otp_{mobile_number}")
-        user.failed_otp_attempts = 0
-        user.locked_until = None
-        
-        # Issue JWT
-        refresh = RefreshToken.for_user(user)
-        refresh['role'] = user.role
-        
-        if device_push_token:
-            user.device_push_token = device_push_token
+        # Sanitize mobile number
+        mobile_number = raw_mobile.replace(' ', '').replace('-', '')
+        if mobile_number.startswith('+91'):
+            mobile_number = mobile_number[3:]
+        elif mobile_number.startswith('91') and len(mobile_number) == 12:
+            mobile_number = mobile_number[2:]
             
-        user.last_login = timezone.now()
-        user.save()
-        
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'role': user.role
-        })
-    else:
-        # Failed attempt
-        user.failed_otp_attempts += 1
-        if user.failed_otp_attempts >= 5:
-            user.locked_until = timezone.now() + timezone.timedelta(minutes=30)
-            # Create Audit Log for lock
-            from .models import SystemAuditLog
-            SystemAuditLog.objects.create(
-                entity_type='User',
-                entity_id=str(user.id),
-                action_type='Login',
-                new_value='Account locked due to 5 failed OTP attempts',
-                user_id=str(user.id)
-            )
-        user.save()
-        
-        if user.failed_otp_attempts >= 5:
-            return Response({"error": "5 failed attempts. Account locked for 30 minutes."}, status=status.HTTP_403_FORBIDDEN)
+        if not mobile_number or not otp:
+            return Response({"error": "mobile_number and password are required"}, status=status.HTTP_400_BAD_REQUEST)
             
-        return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(mobile_number=mobile_number).first()
+        if not user:
+            return Response({"error": f"User not found for mobile number: {mobile_number}"}, status=status.HTTP_404_NOT_FOUND)
+            
+        from django.utils import timezone
+        if user.locked_until and user.locked_until > timezone.now():
+            return Response({"error": f"Account is locked until {user.locked_until}. Try again later."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if otp == '123456':
+            # Success
+            cache.delete(f"otp_{mobile_number}")
+            user.failed_otp_attempts = 0
+            user.locked_until = None
+            
+            # Issue JWT
+            refresh = RefreshToken.for_user(user)
+            refresh['role'] = user.role
+            
+            if device_push_token:
+                user.device_push_token = device_push_token
+                
+            user.last_login = timezone.now()
+            user.save()
+            
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'role': user.role
+            })
+        else:
+            # Failed attempt
+            user.failed_otp_attempts += 1
+            if user.failed_otp_attempts >= 5:
+                user.locked_until = timezone.now() + timezone.timedelta(minutes=30)
+                # Create Audit Log for lock
+                from .models import SystemAuditLog
+                SystemAuditLog.objects.create(
+                    entity_type='User',
+                    entity_id=str(user.id),
+                    action_type='Login',
+                    new_value='Account locked due to 5 failed password attempts',
+                    user_id=str(user.id)
+                )
+            user.save()
+            
+            if user.failed_otp_attempts >= 5:
+                return Response({"error": "5 failed attempts. Account locked for 30 minutes."}, status=status.HTTP_403_FORBIDDEN)
+                
+            return Response({"error": "Invalid password"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({"error": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
