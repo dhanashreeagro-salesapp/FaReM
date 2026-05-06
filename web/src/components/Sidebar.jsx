@@ -4,11 +4,11 @@ import { useAuth } from './AuthProvider';
 import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut } from 'lucide-react';
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager'] },
+  { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/users', label: 'User Management', icon: Users, roles: ['Admin', 'ContentTeam'] },
   { path: '/territories', label: 'Territory Hierarchy', icon: Map, roles: ['Admin', 'ContentTeam'] },
   { path: '/crops', label: 'Crop Master', icon: Wheat, roles: ['Admin', 'ContentTeam'] },
-  { path: '/farmers', label: 'Farmer Management', icon: UserCheck, roles: ['Admin', 'ZonalManager', 'TerritoryManager'] },
+  { path: '/farmers', label: 'Farmer Management', icon: UserCheck, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam'] },
   { path: '/bulk-sends', label: 'Bulk Messages', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Admin'] },

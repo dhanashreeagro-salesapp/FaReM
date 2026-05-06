@@ -2,18 +2,28 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Users, Phone, MapPin, TrendingUp, Download, AlertTriangle } from 'lucide-react';
 
-function StatCard({ icon: Icon, label, value, color, delay }) {
-  return (
-    <div className="card p-5 animate-stagger-in" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-text-muted uppercase tracking-wide font-heading">{label}</p>
-          <p className="text-2xl font-heading font-bold text-text mt-1">{value ?? '—'}</p>
-        </div>
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon size={20} />
-        </div>
+import { Link } from 'react-router-dom';
+
+function StatCard({ icon: Icon, label, value, color, delay, to }) {
+  const content = (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-xs text-text-muted uppercase tracking-wide font-heading">{label}</p>
+        <p className="text-2xl font-heading font-bold text-text mt-1">{value ?? '—'}</p>
       </div>
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
+        <Icon size={20} />
+      </div>
+    </div>
+  );
+
+  return to ? (
+    <Link to={to} className="card p-5 animate-stagger-in hover:shadow-md transition-shadow block" style={{ animationDelay: `${delay}ms` }}>
+      {content}
+    </Link>
+  ) : (
+    <div className="card p-5 animate-stagger-in" style={{ animationDelay: `${delay}ms` }}>
+      {content}
     </div>
   );
 }
@@ -69,8 +79,8 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
-        <StatCard icon={Users} label="Total Active Farmers" value={data.total_farmers?.toLocaleString()} color="bg-primary/10 text-primary" delay={0} />
-        <StatCard icon={MapPin} label="Total Plots" value={data.total_plots?.toLocaleString()} color="bg-success/10 text-success" delay={30} />
+        <StatCard icon={Users} label="Total Active Farmers" value={data.total_farmers?.toLocaleString()} color="bg-primary/10 text-primary" delay={0} to="/farmers" />
+        <StatCard icon={MapPin} label="Total Plots" value={data.total_plots?.toLocaleString()} color="bg-success/10 text-success" delay={30} to="/farmers" />
         <StatCard icon={TrendingUp} label="Active Crops" value={data.active_crop_seasons?.toLocaleString()} color="bg-success/10 text-success" delay={60} />
         <StatCard icon={MapPin} label="Total Visits" value={data.total_visits?.toLocaleString()} color="bg-accent/10 text-accent" delay={90} />
         <StatCard icon={Phone} label="Total Calls" value={data.total_calls?.toLocaleString()} color="bg-warning/10 text-warning" delay={120} />
