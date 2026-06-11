@@ -6,6 +6,6 @@ class FarmerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Farmer
-        fields = ['id', 'full_name', 'primary_mobile', 'alternate_mobile', 'village', 'taluka', 'district', 
+        fields = ['id', 'full_name', 'primary_mobile', 'alternate_mobile', 'email', 'village', 'taluka', 'district', 
                   'pin_code', 'state', 'preferred_language', 'land_holding_acres', 'farmer_photo', 
                   'assigned_staff', 'assigned_staff_mobile', 'territory', 'source', 'status', 'date_added']

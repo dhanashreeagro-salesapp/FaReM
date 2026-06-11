@@ -7,8 +7,8 @@ class PlotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plot
-        fields = ['id', 'farmer', 'plot_name', 'area_acres', 'soil_type', 'irrigation_source', 'location_wkt', 'location_geojson']
-        read_only_fields = ['area_acres']
+        fields = ['id', 'farmer', 'plot_name', 'area_acres', 'calculated_area_acres', 'soil_type', 'irrigation_source', 'location_wkt', 'location_geojson', 'is_active']
+        read_only_fields = ['calculated_area_acres']
 
     def get_location_geojson(self, obj):
         if obj.location:

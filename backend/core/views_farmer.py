@@ -2,31 +2,83 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from .models import Farmer, Role
 from .serializers_farmer import FarmerSerializer
 from .permissions import IsAdminUser
+from django.core.cache import cache
+
+class FarmerPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
 
 class FarmerViewSet(viewsets.ModelViewSet):
     serializer_class = FarmerSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = FarmerPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['full_name', 'primary_mobile', 'village', 'assigned_staff__mobile_number']
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Farmer.objects.none()
         if user.role == Role.ADMIN or user.role == Role.ZONAL_MANAGER or user.role == Role.CONTENT_TEAM:
-            return Farmer.objects.all()
+            queryset = Farmer.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
-            territories = []
-            if user.territory:
-                territories.extend(user.territory.get_all_sub_territories())
-            for managed_territory in user.managed_territories.all():
-                territories.extend(managed_territory.get_all_sub_territories())
-            territories = list(set(territories))
-            return Farmer.objects.filter(territory__in=territories)
+            cache_key = f'user_territories_{user.id}'
+            territories = cache.get(cache_key)
+            if territories is None:
+                territories = []
+                if user.territory:
+                    territories.extend(user.territory.get_all_sub_territories())
+                for managed_territory in user.managed_territories.all():
+                    territories.extend(managed_territory.get_all_sub_territories())
+                territories = list(set(territories))
+                cache.set(cache_key, territories, 60 * 60) # 1 hour
+            queryset = Farmer.objects.filter(territory__in=territories)
         elif user.role == Role.FIELD_STAFF:
-            return Farmer.objects.filter(assigned_staff=user)
-        return Farmer.objects.none()
+            queryset = Farmer.objects.filter(assigned_staff=user)
+
+        crop_name = self.request.query_params.get('crop')
+        stage_name = self.request.query_params.get('stage')
+        enrolled = self.request.query_params.get('enrolled')
+        has_active_crops = self.request.query_params.get('has_active_crops')
+        has_plots = self.request.query_params.get('has_plots')
+
+        if enrolled:
+            from django.utils import timezone
+            import datetime
+            now = timezone.now()
+            if enrolled == 'this_month':
+                queryset = queryset.filter(date_added__year=now.year, date_added__month=now.month)
+            elif enrolled == 'last_month':
+                last_month = now.month - 1 if now.month > 1 else 12
+                year = now.year if now.month > 1 else now.year - 1
+                queryset = queryset.filter(date_added__year=year, date_added__month=last_month)
+            elif enrolled == 'ytd':
+                start_year = now.year if now.month >= 4 else now.year - 1
+                start_date = datetime.datetime(start_year, 4, 1, tzinfo=timezone.utc)
+                queryset = queryset.filter(date_added__gte=start_date)
+
+        if has_active_crops == 'true':
+            queryset = queryset.filter(plots__is_active=True, plots__seasons__status='Active').distinct()
+
+        if has_plots == 'true':
+            queryset = queryset.filter(plots__isnull=False).distinct()
+
+        if crop_name or stage_name:
+            plot_filters = {'plots__is_active': True, 'plots__seasons__status': 'Active'}
+            if crop_name:
+                plot_filters['plots__seasons__crop__crop_name'] = crop_name
+            if stage_name:
+                if stage_name.lower() == 'unknown':
+                    plot_filters['plots__seasons__current_stage__isnull'] = True
+                else:
+                    plot_filters['plots__seasons__current_stage__stage_name'] = stage_name
+            queryset = queryset.filter(**plot_filters).distinct()
+
+        return queryset.select_related('assigned_staff', 'territory')
 
     def perform_destroy(self, instance):
         # Soft delete is processed here if allowed, though specs say Admin processes delete request.

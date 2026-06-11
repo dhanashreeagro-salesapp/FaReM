@@ -80,17 +80,17 @@ export default function Dashboard() {
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <StatCard icon={Users} label="Total Active Farmers" value={data.total_farmers?.toLocaleString()} color="bg-primary/10 text-primary" delay={0} to="/farmers" />
-        <StatCard icon={MapPin} label="Total Plots" value={data.total_plots?.toLocaleString()} color="bg-success/10 text-success" delay={30} to="/farmers" />
-        <StatCard icon={TrendingUp} label="Active Crops" value={data.active_crop_seasons?.toLocaleString()} color="bg-success/10 text-success" delay={60} />
+        <StatCard icon={MapPin} label="Total Plots" value={data.total_plots?.toLocaleString()} color="bg-success/10 text-success" delay={30} to="/farmers?has_plots=true" />
+        <StatCard icon={TrendingUp} label="Active Crops" value={data.active_crop_seasons?.toLocaleString()} color="bg-success/10 text-success" delay={60} to="/farmers?has_active_crops=true" />
         <StatCard icon={MapPin} label="Total Visits" value={data.total_visits?.toLocaleString()} color="bg-accent/10 text-accent" delay={90} />
         <StatCard icon={Phone} label="Total Calls" value={data.total_calls?.toLocaleString()} color="bg-warning/10 text-warning" delay={120} />
         <StatCard icon={AlertTriangle} label="Overdue Visits" value={data.overdue_visits?.toLocaleString()} color="bg-danger/10 text-danger" delay={150} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <StatCard icon={Users} label="Enrolled This Month" value={data.this_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={240} />
-        <StatCard icon={Users} label="Enrolled Last Month" value={data.last_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={300} />
-        <StatCard icon={Users} label="Enrolled YTD (from Apr 1)" value={data.ytd_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={360} />
+        <StatCard icon={Users} label="Enrolled This Month" value={data.this_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={240} to="/farmers?enrolled=this_month" />
+        <StatCard icon={Users} label="Enrolled Last Month" value={data.last_month_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={300} to="/farmers?enrolled=last_month" />
+        <StatCard icon={Users} label="Enrolled YTD (from Apr 1)" value={data.ytd_farmers?.toLocaleString()} color="bg-success/10 text-success" delay={360} to="/farmers?enrolled=ytd" />
       </div>
 
       {/* Top Villages */}
@@ -133,10 +133,10 @@ export default function Dashboard() {
                 <h4 className="font-heading font-medium text-text mb-2 border-b border-border pb-1">{crop}</h4>
                 <div className="space-y-2">
                   {Object.entries(stages).map(([stage, count]) => (
-                    <div key={stage} className="flex justify-between items-center text-sm">
-                      <span className="text-text-muted">{stage}</span>
+                    <Link to={`/farmers?crop=${encodeURIComponent(crop)}&stage=${encodeURIComponent(stage)}`} key={stage} className="flex justify-between items-center text-sm hover:bg-bg/50 p-1 rounded transition-colors block">
+                      <span className="text-text-muted hover:text-primary transition-colors">{stage}</span>
                       <span className="font-mono font-medium text-text bg-bg px-2 py-0.5 rounded-full">{count}</span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>

@@ -214,12 +214,31 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
                     </button>
                   </div>
 
+                  {jobData.total_rows > 1000 && (
+                    <div className="bg-warning/10 border border-warning/30 p-3 rounded-lg flex items-start gap-3">
+                      <AlertTriangle className="text-warning shrink-0 mt-0.5" size={18} />
+                      <div>
+                        <p className="text-sm font-medium text-warning-dark mb-1">Large Import Warning</p>
+                        <p className="text-xs text-text-muted mb-2">You are attempting to import over 1,000 records. This may take some time.</p>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={acknowledged} 
+                            onChange={(e) => setAcknowledged(e.target.checked)}
+                            className="rounded border-border text-primary focus:ring-primary"
+                          />
+                          <span className="text-xs font-medium text-text">I acknowledge this is a large import and wish to proceed.</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3">
                     <button onClick={() => setStep(1)} className="btn-secondary flex-1">Start Over</button>
                     <button
                       onClick={handleCommit}
-                      disabled={loading}
-                      className="btn-primary flex-1 flex items-center justify-center gap-2"
+                      disabled={loading || (jobData.total_rows > 1000 && !acknowledged)}
+                      className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading && <Loader2 size={16} className="animate-spin" />}
                       Commit Import

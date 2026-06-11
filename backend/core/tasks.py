@@ -3,6 +3,37 @@ import pandas as pd
 from .models import Farmer, User, SystemAuditLog
 import io
 
+def normalize_dataframe_headers(df, expected_columns):
+    req_lower = [c.lower() for c in expected_columns]
+    current_cols = [str(c).lower().strip() for c in df.columns]
+    
+    header_found = False
+    # If at least 2 expected columns match, we assume we found the header
+    if sum([1 for r in req_lower if r in current_cols]) >= 2:
+        header_found = True
+    else:
+        # Search the first 20 rows
+        for index, row in df.head(20).iterrows():
+            row_values = [str(v).lower().strip() for v in row.values]
+            if sum([1 for r in req_lower if r in row_values]) >= 2:
+                df.columns = row.values
+                df = df.iloc[index+1:].reset_index(drop=True)
+                header_found = True
+                break
+
+    if header_found:
+        col_map = {}
+        for c in df.columns:
+            cl = str(c).lower().strip()
+            for r in expected_columns:
+                if cl == r.lower():
+                    col_map[c] = r
+                    break
+        df = df.rename(columns=col_map)
+        
+    df = df.dropna(how='all')
+    return df
+
 @shared_task
 def validate_farmer_import(import_job_id):
     from .models import ImportJob, User
@@ -26,9 +57,12 @@ def validate_farmer_import(import_job_id):
     error_report = []
 
     required_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile']
+    
+    df = normalize_dataframe_headers(df, required_columns)
+    
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
-        found_cols = ", ".join(df.columns)
+        found_cols = ", ".join(str(c) for c in df.columns)
         err_msg = f"Missing required columns in header: {', '.join(missing_cols)}. Found: {found_cols}"
         job.status = 'Failed'
         job.error_report = [{"row": "Header", "error": err_msg}]
@@ -158,9 +192,13 @@ def validate_user_import(import_job_id):
     error_report = []
 
     required_columns = ['Employee ID', 'Name', 'Mobile Number', 'Designation']
+    expected_columns = required_columns + ['Territory']
+    
+    df = normalize_dataframe_headers(df, expected_columns)
+    
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
-        found_cols = ", ".join(df.columns)
+        found_cols = ", ".join(str(c) for c in df.columns)
         err_msg = f"Missing required columns in header: {', '.join(missing_cols)}. Found: {found_cols}"
         job.status = 'Failed'
         job.error_report = [{"row": "Header", "error": err_msg}]
@@ -372,7 +410,32 @@ def check_overdue_visits_and_stage_transitions():
                 )
             overdue_count += 1
 
-    # 2. Check Stage Transitions
+    # 2. Check Stage Transitions & Update Stages
+    # First, update the current_stage dynamically based on days since sowing
+    all_active_seasons = CropSeason.objects.filter(status='Active')
+    stages_updated_count = 0
+    for season in all_active_seasons:
+        if not season.crop or not season.sowing_date:
+            continue
+        days_since_sowing = (today - season.sowing_date).days
+        stages = season.crop.stages.all().order_by('sequence_number')
+        
+        cumulative_days = 0
+        selected_stage = None
+        for stage in stages:
+            cumulative_days += stage.days_from_previous_stage
+            if days_since_sowing <= cumulative_days:
+                selected_stage = stage
+                break
+        
+        if not selected_stage and stages:
+            selected_stage = list(stages)[-1]
+            
+        if selected_stage and season.current_stage != selected_stage:
+            season.current_stage = selected_stage
+            season.save(update_fields=['current_stage'])
+            stages_updated_count += 1
+
     seasons = CropSeason.objects.filter(expected_next_stage_date=today, status='Active').select_related('plot__farmer__assigned_staff')
     stage_transitions_count = seasons.count()
     for season in seasons:
@@ -387,7 +450,8 @@ def check_overdue_visits_and_stage_transitions():
     return {
         "status": "success",
         "overdue_alerts_sent": overdue_count,
-        "stage_transition_alerts_sent": stage_transitions_count
+        "stage_transition_alerts_sent": stage_transitions_count,
+        "stages_updated": stages_updated_count
     }
 
 @shared_task
@@ -461,9 +525,13 @@ def validate_promotion_import(import_job_id):
     error_report = []
 
     required_columns = ['Title', 'ContentType', 'FileURL']
+    expected_columns = required_columns + ['Crop', 'Stage', 'Product']
+    
+    df = normalize_dataframe_headers(df, expected_columns)
+    
     if not all(col in df.columns for col in required_columns):
         job.status = 'Failed'
-        job.error_report = [{"error": f"Missing required columns. Required: {required_columns}"}]
+        job.error_report = [{"error": f"Missing required columns. Required: {required_columns}. Found: {', '.join(str(c) for c in df.columns)}"}]
         job.save()
         return {"status": "failed", "error": "Missing required columns"}
 

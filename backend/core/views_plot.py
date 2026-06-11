@@ -35,35 +35,48 @@ class PlotViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         wkt = serializer.validated_data.pop('location_wkt', None)
+        # Capture any manually provided area_acres before save
+        manual_area = serializer.validated_data.get('area_acres')
         plot = serializer.save()
+        
+        update_fields = []
         if wkt:
             from django.contrib.gis.geos import GEOSGeometry
             try:
                 geom = GEOSGeometry(wkt)
                 if geom.geom_type == 'Polygon':
                     plot.location = geom
-                    geom.transform(3857)
-                    sq_meters = geom.area
-                    plot.area_acres = sq_meters * 0.000247105
-                    geom.transform(4326)
-                    plot.save(update_fields=['location', 'area_acres'])
+                    update_fields.append('location')
+                    geom_proj = geom.clone()
+                    geom_proj.transform(3857)
+                    sq_meters = geom_proj.area
+                    plot.calculated_area_acres = round(sq_meters * 0.000247105, 4)
+                    update_fields.append('calculated_area_acres')
+                    if update_fields:
+                        plot.save(update_fields=update_fields)
             except Exception:
                 pass
 
     def perform_update(self, serializer):
         wkt = serializer.validated_data.pop('location_wkt', None)
+        manual_area = serializer.validated_data.get('area_acres')
         plot = serializer.save()
+        
+        update_fields = []
         if wkt:
             from django.contrib.gis.geos import GEOSGeometry
             try:
                 geom = GEOSGeometry(wkt)
                 if geom.geom_type == 'Polygon':
                     plot.location = geom
-                    geom.transform(3857)
-                    sq_meters = geom.area
-                    plot.area_acres = sq_meters * 0.000247105
-                    geom.transform(4326)
-                    plot.save(update_fields=['location', 'area_acres'])
+                    update_fields.append('location')
+                    geom_proj = geom.clone()
+                    geom_proj.transform(3857)
+                    sq_meters = geom_proj.area
+                    plot.calculated_area_acres = round(sq_meters * 0.000247105, 4)
+                    update_fields.append('calculated_area_acres')
+                    if update_fields:
+                        plot.save(update_fields=update_fields)
             except Exception:
                 pass
 
@@ -94,6 +107,28 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         season = serializer.save()
+        if not season.current_stage and season.sowing_date:
+            from django.utils import timezone
+            today = timezone.now().date()
+            days_since_sowing = (today - season.sowing_date).days
+
+            stages = CropStage.objects.filter(crop=season.crop).order_by('sequence_number')
+            cumulative_days = 0
+            selected_stage = None
+
+            for stage in stages:
+                cumulative_days += stage.days_from_previous_stage
+                if days_since_sowing <= cumulative_days:
+                    selected_stage = stage
+                    break
+            
+            if not selected_stage and stages.exists():
+                selected_stage = stages.last()
+
+            if selected_stage:
+                season.current_stage = selected_stage
+                season.save(update_fields=['current_stage'])
+
         self._calculate_next_stage_date(season)
 
     def _calculate_next_stage_date(self, season):

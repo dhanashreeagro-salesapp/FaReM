@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.0.48:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000/api`;
 
 class ApiClient {
   constructor() {
@@ -189,7 +189,10 @@ class ApiClient {
   deleteStage(id) { return this.request(`/crop-stages/${id}/`, { method: 'DELETE' }); }
 
   // Farmers
-  getFarmers() { return this.request('/farmers/'); }
+  getFarmers(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/farmers/${qs ? `?${qs}` : ''}`);
+  }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
   createFarmer(data) { return this.request('/farmers/', { method: 'POST', body: JSON.stringify(data) }); }
   updateFarmer(id, data) { return this.request(`/farmers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }

@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from django.core.cache import cache
 from .models import Farmer, User, ActivityLog, Role
 from django.http import HttpResponse
 
@@ -12,6 +13,11 @@ class DashboardAPIView(APIView):
 
     def get(self, request):
         user = request.user
+        
+        cache_key = f'dashboard_api_data_{user.id}'
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
             
         # Basic aggregate data
         data = {}
@@ -59,58 +65,69 @@ class DashboardAPIView(APIView):
         data['ytd_farmers'] = farmers.filter(date_added__date__gte=fy_start).count()
         
         # Breakdown by village
-        village_data = farmers.values('village').annotate(count=Count('id')).order_by('-count')[:5]
+        village_data = farmers.exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
         data['top_villages'] = list(village_data)
 
-        # Overdue Visits calculation
+        # Overdue Visits calculation — single query, no Python loop
         from django.utils import timezone
         from .models import AppConfiguration
+        from django.db.models import Max, Subquery, OuterRef
         config = AppConfiguration.get_config()
         threshold_days = config.visit_frequency_norm_days
-        
-        overdue_count = 0
-        for farmer in farmers:
-            last_visit = farmer.activities.filter(activity_type='Visit').order_by('-date').first()
-            days_since = (today_date - last_visit.date).days if last_visit else (today_date - farmer.date_added.date()).days
-            if days_since >= threshold_days:
-                overdue_count += 1
-        
+        cutoff_date = today_date - datetime.timedelta(days=threshold_days)
+
+        # Get the most recent visit date per farmer
+        last_visit_subq = ActivityLog.objects.filter(
+            farmer=OuterRef('pk'), activity_type='Visit'
+        ).order_by('-date').values('date')[:1]
+
+        # Annotate each farmer with their last visit date, then filter overdue
+        overdue_count = farmers.annotate(
+            last_visit_date=Subquery(last_visit_subq)
+        ).filter(
+            Q(last_visit_date__lt=cutoff_date) | Q(last_visit_date__isnull=True)
+        ).count()
+
         data['overdue_visits'] = overdue_count
         
         from .models import Plot, CropSeason
-        data['total_plots'] = Plot.objects.filter(farmer__in=farmers).count()
+        data['total_plots'] = Plot.objects.filter(farmer__in=farmers, is_active=True).count()
         
-        active_seasons = CropSeason.objects.filter(plot__farmer__in=farmers, status='Active')
+        active_seasons = CropSeason.objects.filter(
+            plot__farmer__in=farmers, plot__is_active=True, status='Active'
+        ).select_related('crop', 'current_stage').prefetch_related('crop__stages')
         data['active_crop_seasons'] = active_seasons.count()
 
         stage_breakup = {}
-        for season in active_seasons.select_related('crop').prefetch_related('crop__stages'):
+        for season in active_seasons:
             if not season.crop: continue
             crop_name = season.crop.crop_name
             
-            days_since_sowing = (today_date - season.sowing_date).days
-            stage_name = 'Unknown'
-            
-            if days_since_sowing >= 0:
-                accumulated_days = 0
-                stages = sorted(season.crop.stages.all(), key=lambda s: s.sequence_number)
-                for stage in stages:
-                    accumulated_days += stage.days_from_previous_stage
-                    if days_since_sowing <= accumulated_days:
-                        stage_name = stage.stage_name
-                        break
-                else:
-                    if stages:
-                        stage_name = stages[-1].stage_name
-                        
+            # Use already-assigned current_stage if available, else infer from days
+            if season.current_stage:
+                stage_name = season.current_stage.stage_name
+            else:
+                days_since_sowing = (today_date - season.sowing_date).days
+                stage_name = 'Unknown'
+                if days_since_sowing >= 0:
+                    accumulated_days = 0
+                    stages = sorted(season.crop.stages.all(), key=lambda s: s.sequence_number)
+                    for stage in stages:
+                        accumulated_days += stage.days_from_previous_stage
+                        if days_since_sowing <= accumulated_days:
+                            stage_name = stage.stage_name
+                            break
+                    else:
+                        if stages:
+                            stage_name = stages[-1].stage_name
+                            
             if crop_name not in stage_breakup:
                 stage_breakup[crop_name] = {}
-            if stage_name not in stage_breakup[crop_name]:
-                stage_breakup[crop_name][stage_name] = 0
-            stage_breakup[crop_name][stage_name] += 1
+            stage_breakup[crop_name][stage_name] = stage_breakup[crop_name].get(stage_name, 0) + 1
         
         data['crop_stage_breakup'] = stage_breakup
 
+        cache.set(cache_key, data, 60 * 15) # Cache for 15 minutes
         return Response(data)
 
 class ExportReportAPIView(APIView):

@@ -60,6 +60,7 @@ class Farmer(models.Model):
     full_name = models.CharField(max_length=255)
     primary_mobile = models.CharField(max_length=15, unique=True, validators=[RegexValidator(r'^\+?1?\d{9,15}$')])
     alternate_mobile = models.CharField(max_length=15, blank=True, null=True, validators=[RegexValidator(r'^\+?1?\d{9,15}$')])
+    email = models.EmailField(blank=True, null=True)
     village = models.CharField(max_length=255)
     taluka = models.CharField(max_length=255)
     district = models.CharField(max_length=255)
@@ -84,9 +85,11 @@ class Plot(models.Model):
     farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='plots')
     plot_name = models.CharField(max_length=255)
     area_acres = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    calculated_area_acres = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     soil_type = models.CharField(max_length=100, blank=True, null=True)
     irrigation_source = models.CharField(max_length=100, blank=True, null=True)
     location = gis_models.PolygonField(null=True, blank=True) # Used for GPS plot corners
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.plot_name
@@ -122,6 +125,7 @@ class CropSeason(models.Model):
     plot = models.ForeignKey(Plot, on_delete=models.CASCADE, related_name='seasons')
     crop = models.ForeignKey(CropMaster, on_delete=models.PROTECT, related_name='seasons')
     variety_name = models.CharField(max_length=255, blank=True, null=True)
+    area_acres = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     sowing_date = models.DateField()
     current_stage = models.ForeignKey(CropStage, on_delete=models.SET_NULL, null=True, blank=True)
     expected_next_stage_date = models.DateField(null=True, blank=True)
