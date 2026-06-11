@@ -121,6 +121,28 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Market Trends */}
+      {data.market_trends && data.market_trends.length > 0 && (
+        <div className="card p-5 animate-stagger-in mb-6" style={{ animationDelay: '200ms' }}>
+          <h3 className="font-heading font-semibold text-text mb-4 flex items-center gap-2">
+            <TrendingUp size={16} className="text-primary" /> Market Trends
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {data.market_trends.map((trend, i) => (
+              <div key={i} className={`border border-border rounded-lg p-4 bg-surface flex flex-col justify-between ${trend.trend === 'UP' ? 'border-success/30 bg-success/5' : trend.trend === 'DOWN' ? 'border-danger/30 bg-danger/5' : ''}`}>
+                <h4 className="font-heading font-medium text-text mb-1">{trend.crop_name}</h4>
+                <div className="flex items-end justify-between mt-2">
+                  <span className="text-xl font-bold font-mono">₹{trend.latest_price}</span>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${trend.trend === 'UP' ? 'bg-success/20 text-success' : trend.trend === 'DOWN' ? 'bg-danger/20 text-danger' : 'bg-bg text-text-muted'}`}>
+                    {trend.trend === 'UP' ? '▲' : trend.trend === 'DOWN' ? '▼' : '—'} {trend.percentage_change}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Crop Stage Breakup */}
       <div className="card p-5 animate-stagger-in" style={{ animationDelay: '240ms' }}>
         <h3 className="font-heading font-semibold text-text mb-4 flex items-center gap-2">
@@ -128,8 +150,19 @@ export default function Dashboard() {
         </h3>
         {data.crop_stage_breakup && Object.keys(data.crop_stage_breakup).length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(data.crop_stage_breakup).map(([crop, stages]) => (
-              <div key={crop} className="border border-border rounded-lg p-4 bg-surface">
+            {Object.entries(data.crop_stage_breakup).map(([crop, stages]) => {
+              const trendData = data.market_trends?.find(t => t.crop_name === crop);
+              let cardClass = "border border-border rounded-lg p-4 bg-surface";
+              if (trendData && trendData.percentage_change > 10) {
+                 if (trendData.trend === 'UP') {
+                    cardClass = "border border-success/20 bg-success/5 rounded-lg p-4";
+                 } else if (trendData.trend === 'DOWN') {
+                    cardClass = "border border-danger/20 bg-danger/5 rounded-lg p-4";
+                 }
+              }
+              
+              return (
+              <div key={crop} className={cardClass}>
                 <h4 className="font-heading font-medium text-text mb-2 border-b border-border pb-1">{crop}</h4>
                 <div className="space-y-2">
                   {Object.entries(stages).map(([stage, count]) => (
@@ -140,7 +173,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         ) : (
           <p className="text-sm text-text-muted">No active crops data available.</p>

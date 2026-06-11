@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
 import PlotManagementModal from '../components/PlotManagementModal';
+import SendMessageModal from '../components/SendMessageModal';
 
 export default function FarmerManagement() {
   const [farmers, setFarmers] = useState([]);
@@ -18,6 +19,10 @@ export default function FarmerManagement() {
 
   const [showWizard, setShowWizard] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showSendMessage, setShowSendMessage] = useState(false);
+  const [selectedFarmers, setSelectedFarmers] = useState([]);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  
   const [editingId, setEditingId] = useState(null);
   const [selectedFarmerForPlots, setSelectedFarmerForPlots] = useState(null);
   const [form, setForm] = useState({
@@ -107,6 +112,46 @@ export default function FarmerManagement() {
     setPage(newPage);
     fetchFarmers(newPage, search);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectAll = async (e) => {
+    const checked = e.target.checked;
+    setIsSelectingAll(checked);
+    if (checked) {
+      setLoading(true);
+      try {
+        const params = {};
+        if (search) params.search = search;
+        const crop = searchParams.get('crop');
+        const stage = searchParams.get('stage');
+        const enrolled = searchParams.get('enrolled');
+        const hasActiveCrops = searchParams.get('has_active_crops');
+        const hasPlots = searchParams.get('has_plots');
+        if (crop) params.crop = crop;
+        if (stage) params.stage = stage;
+        if (enrolled) params.enrolled = enrolled;
+        if (hasActiveCrops) params.has_active_crops = hasActiveCrops;
+        if (hasPlots) params.has_plots = hasPlots;
+        
+        const data = await api.getFarmerIds(params);
+        setSelectedFarmers(data);
+      } catch (err) {
+        alert('Failed to select all farmers');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setSelectedFarmers([]);
+    }
+  };
+
+  const handleSelectFarmer = (id, checked) => {
+    if (checked) {
+      setSelectedFarmers(prev => [...prev, id]);
+    } else {
+      setSelectedFarmers(prev => prev.filter(fid => fid !== id));
+      setIsSelectingAll(false);
+    }
   };
 
   const handleExport = () => api.exportFarmers();
@@ -272,10 +317,22 @@ export default function FarmerManagement() {
         )}
       </div>
 
+      {selectedFarmers.length > 0 && (
+        <div className="flex items-center gap-4 bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 animate-stagger-in">
+          <p className="text-sm font-semibold text-primary flex-1">{selectedFarmers.length} farmers selected</p>
+          <button onClick={() => setShowSendMessage(true)} className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press">
+            <MessageSquare size={16} /> Send Message
+          </button>
+        </div>
+      )}
+
       <div className="card overflow-hidden">
         <table className="data-table">
           <thead>
             <tr>
+              <th className="w-12">
+                <input type="checkbox" className="rounded text-primary focus:ring-primary" checked={isSelectingAll} onChange={handleSelectAll} />
+              </th>
               <th>Name</th>
               <th>Mobile</th>
               <th>Village</th>
@@ -299,6 +356,9 @@ export default function FarmerManagement() {
               <tr><td colSpan="7" className="text-center py-10 text-text-muted">No farmers found.</td></tr>
             ) : farmers.map((farmer, i) => (
               <tr key={farmer.id} className="animate-stagger-in" style={{ animationDelay: `${i * 15}ms` }}>
+                <td>
+                  <input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedFarmers.includes(farmer.id)} onChange={e => handleSelectFarmer(farmer.id, e.target.checked)} />
+                </td>
                 <td className="font-medium">{farmer.full_name}</td>
                 <td className="font-mono text-xs">{farmer.primary_mobile}</td>
                 <td>{farmer.village}</td>
@@ -380,6 +440,19 @@ export default function FarmerManagement() {
         <PlotManagementModal
           farmer={selectedFarmerForPlots}
           onClose={() => setSelectedFarmerForPlots(null)}
+        />
+      )}
+
+      {showSendMessage && (
+        <SendMessageModal
+          farmerIds={selectedFarmers}
+          onClose={() => setShowSendMessage(false)}
+          onSuccess={() => {
+            setShowSendMessage(false);
+            setSelectedFarmers([]);
+            setIsSelectingAll(false);
+            alert('Messages scheduled successfully!');
+          }}
         />
       )}
     </div>

@@ -193,7 +193,12 @@ class ApiClient {
     const qs = new URLSearchParams(params).toString();
     return this.request(`/farmers/${qs ? `?${qs}` : ''}`);
   }
+  getVillages() { return this.request('/farmers/villages/'); }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
+  getFarmerIds(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/farmers/all_ids/${qs ? `?${qs}` : ''}`);
+  }
   createFarmer(data) { return this.request('/farmers/', { method: 'POST', body: JSON.stringify(data) }); }
   updateFarmer(id, data) { return this.request(`/farmers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   disableFarmer(id) { return this.request(`/farmers/${id}/disable/`, { method: 'PATCH' }); }
@@ -298,6 +303,17 @@ class ApiClient {
   // Dashboard & Reports
   getDashboard() { return this.request('/dashboard/'); }
   exportReport(type = 'excel') { return this.request(`/export-report/?type=${type}`); }
+
+  // Planner
+  getDailyPlan(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/planner/daily_plan/${qs ? `?${qs}` : ''}`);
+  }
+
+  // Activities
+  logActivity(data) {
+    return this.request('/activities/', { method: 'POST', body: JSON.stringify(data) });
+  }
 
   // Audit Logs
   getAuditLogs() { return this.request('/audit-logs/'); }

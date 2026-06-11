@@ -474,12 +474,31 @@ def send_push_notification(push_token, title, body):
         return {"status": "failed", "error": str(e)}
 
 @shared_task
+def process_scheduled_batches():
+    from .models import BulkSendBatch
+    from django.utils import timezone
+    
+    today = timezone.now().date()
+    
+    batches = BulkSendBatch.objects.filter(
+        approval_status='Approved',
+        send_status__in=['Pending', 'InProgress']
+    )
+    
+    for batch in batches:
+        exec_date = batch.next_execution_date or batch.scheduled_start_date or today
+        if exec_date <= today:
+            execute_bulk_send_batch.delay(str(batch.id))
+
+@shared_task
 def execute_bulk_send_batch(batch_id):
     from .models import BulkSendBatch
+    from django.utils import timezone
+    import datetime
     try:
         batch = BulkSendBatch.objects.get(id=batch_id)
-        if batch.send_status != 'Pending':
-            return {"status": "failed", "error": "Not in pending state"}
+        if batch.send_status == 'Completed' and batch.frequency == 'Once':
+            return {"status": "failed", "error": "Already completed"}
             
         batch.send_status = 'InProgress'
         batch.save(update_fields=['send_status'])
@@ -488,15 +507,31 @@ def execute_bulk_send_batch(batch_id):
         failed = 0
         # Iterate over farmer_ids
         for farmer_id in batch.farmer_ids:
-            # Send message logic
-            # E.g., check channel, hit Interakt/MSG91
             # Mock success for now
             sent += 1
             
-        batch.sent_count = sent
-        batch.failed_count = failed
-        batch.send_status = 'Completed'
-        batch.save(update_fields=['sent_count', 'failed_count', 'send_status'])
+        batch.sent_count += sent
+        batch.failed_count += failed
+        
+        if batch.frequency == 'Once' or not batch.frequency:
+            batch.send_status = 'Completed'
+        else:
+            today = timezone.now().date()
+            if batch.frequency == 'Daily':
+                next_date = today + datetime.timedelta(days=1)
+            elif batch.frequency == 'Weekly':
+                next_date = today + datetime.timedelta(days=7)
+            else:
+                next_date = today + datetime.timedelta(days=1)
+                
+            batch.next_execution_date = next_date
+            
+            if batch.scheduled_end_date and next_date > batch.scheduled_end_date:
+                batch.send_status = 'Completed'
+            else:
+                batch.send_status = 'Pending'
+                
+        batch.save(update_fields=['sent_count', 'failed_count', 'send_status', 'next_execution_date'])
         
         return {"status": "success", "sent": sent, "failed": failed}
     except BulkSendBatch.DoesNotExist:
@@ -611,3 +646,86 @@ def commit_promotion_import(import_job_id):
         os.remove(job.filename)
 
     return {"status": "import_complete", "created": created_count}
+
+@shared_task
+def scrape_apmc_rates():
+    import requests
+    from bs4 import BeautifulSoup
+    import re
+    from datetime import datetime
+    from .models import CropMaster, MarketRate
+    
+    urls = [
+        'https://apmcmumbai.org/bajarbhav/daily-bajarbhav-dates/veg',
+        'https://apmcmumbai.org/bajarbhav/daily-bajarbhav-dates/fruit'
+    ]
+    
+    total_scraped = 0
+    total_saved = 0
+    
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            date_str = None
+            for h5 in soup.find_all('h5'):
+                text = h5.get_text(strip=True)
+                if 'बाजारभाव -' in text:
+                    match = re.search(r'(\d{1,2})\s*([^,]+),\s*(\d{4})', text)
+                    if match:
+                        day, month_mr, year = match.groups()
+                        month_map = {
+                            'जाने': 1, 'फेब्रु': 2, 'मार्च': 3, 'एप्रिल': 4,
+                            'मे': 5, 'मे.': 5, 'जून': 6, 'जून.': 6, 'जुलै': 7,
+                            'ऑगस्ट': 8, 'सप्टें': 9, 'ऑक्टो': 10, 'नोव्हें': 11, 'डिसें': 12
+                        }
+                        m = month_map.get(month_mr.strip('. '), 1)
+                        date_str = f"{year}-{m:02d}-{int(day):02d}"
+                    break
+            
+            if not date_str:
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                
+            table = soup.find('table')
+            if not table:
+                continue
+                
+            tbody = table.find('tbody')
+            if not tbody:
+                continue
+                
+            for tr in tbody.find_all('tr'):
+                cols = tr.find_all('td')
+                if len(cols) >= 5:
+                    crop_name_mr = cols[0].get_text(strip=True)
+                    try:
+                        inward_str = cols[1].get_text(strip=True)
+                        inward_quantity = float(inward_str) if inward_str and inward_str.replace('.', '', 1).isdigit() else None
+                        
+                        min_price = float(cols[2].get_text(strip=True))
+                        max_price = float(cols[3].get_text(strip=True))
+                        avg_price = float(cols[4].get_text(strip=True))
+                        
+                        total_scraped += 1
+                        
+                        # Find matching crop
+                        crop = CropMaster.objects.filter(marathi_name=crop_name_mr).first()
+                        if crop:
+                            MarketRate.objects.update_or_create(
+                                crop=crop,
+                                date=date_str,
+                                defaults={
+                                    'inward_quantity': inward_quantity,
+                                    'min_price': min_price,
+                                    'max_price': max_price,
+                                    'avg_price': avg_price
+                                }
+                            )
+                            total_saved += 1
+                    except ValueError:
+                        pass
+        except Exception as e:
+            print(f"Error scraping {url}: {e}")
+            
+    return {"status": "success", "scraped": total_scraped, "saved": total_saved}

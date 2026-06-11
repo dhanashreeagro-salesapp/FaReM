@@ -16,41 +16,45 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         channel = serializer.validated_data.get('channel')
-        filter_criteria = serializer.validated_data.get('filter_criteria', {})
         
-        # Resolve Farmer IDs
-        farmers = Farmer.objects.filter(status='Active')
-        
-        # Enforce scope
-        if user.role == Role.FIELD_STAFF:
-            farmers = farmers.filter(assigned_staff=user)
-        elif user.role == Role.TERRITORY_MANAGER:
-            farmers = farmers.filter(territory=user.territory)
+        explicit_farmer_ids = self.request.data.get('farmer_ids')
+        if explicit_farmer_ids and isinstance(explicit_farmer_ids, list):
+            farmer_ids = [str(fid) for fid in explicit_farmer_ids]
+        else:
+            filter_criteria = serializer.validated_data.get('filter_criteria', {})
+            farmers = Farmer.objects.filter(status='Active')
+            if user.role == Role.FIELD_STAFF:
+                farmers = farmers.filter(assigned_staff=user)
+            elif user.role == Role.TERRITORY_MANAGER:
+                farmers = farmers.filter(territory=user.territory)
+                
+            crop_id = filter_criteria.get('crop')
+            village = filter_criteria.get('village')
+            if crop_id:
+                farmers = farmers.filter(plots__seasons__crop_id=crop_id, plots__seasons__status='Active')
+            if village:
+                farmers = farmers.filter(village__icontains=village)
+                
+            if channel == 'WhatsApp':
+                farmers = farmers.exclude(opt_out_whatsapp=True)
+            elif channel == 'SMS':
+                farmers = farmers.exclude(opt_out_sms=True)
+                
+            farmer_ids = list(farmers.values_list('id', flat=True))
             
-        crop_id = filter_criteria.get('crop')
-        village = filter_criteria.get('village')
-        
-        if crop_id:
-            farmers = farmers.filter(plots__seasons__crop_id=crop_id, plots__seasons__status='Active')
-        if village:
-            farmers = farmers.filter(village__icontains=village)
-            
-        # Exclude opt-outs
-        if channel == 'WhatsApp':
-            farmers = farmers.exclude(opt_out_whatsapp=True)
-        elif channel == 'SMS':
-            farmers = farmers.exclude(opt_out_sms=True)
-            
-        farmer_ids = list(farmers.values_list('id', flat=True))
-        
         batch = serializer.save(
             created_by_user=user,
-            farmer_ids=[str(fid) for fid in farmer_ids],
-            recipient_count=len(farmer_ids)
+            farmer_ids=farmer_ids,
+            recipient_count=len(farmer_ids),
+            approval_status='Approved',
+            send_status='Pending'
         )
         
-        # Notify RM
-        # logic...
+        from django.utils import timezone
+        today = timezone.now().date()
+        exec_date = batch.scheduled_start_date or today
+        if exec_date <= today:
+            execute_bulk_send_batch.delay(str(batch.id))
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):

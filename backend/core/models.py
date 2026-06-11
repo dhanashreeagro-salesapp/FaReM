@@ -97,6 +97,7 @@ class Plot(models.Model):
 class CropMaster(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     crop_name = models.CharField(max_length=255)
+    marathi_name = models.CharField(max_length=255, blank=True, null=True)
     crop_category = models.CharField(max_length=255)
     scientific_name = models.CharField(max_length=255, blank=True, null=True)
     crop_schedule_pdf = models.URLField(max_length=500, blank=True, null=True)
@@ -105,6 +106,22 @@ class CropMaster(models.Model):
 
     def __str__(self):
         return self.crop_name
+
+class MarketRate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE, related_name='market_rates')
+    date = models.DateField()
+    inward_quantity = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    avg_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    class Meta:
+        unique_together = ('crop', 'date')
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.crop.crop_name} - {self.date} - {self.avg_price}"
 
 class CropVariety(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -232,6 +249,12 @@ class BulkSendBatch(models.Model):
     send_status = models.CharField(max_length=20, choices=[('Pending', 'Pending'), ('InProgress', 'In Progress'), ('Completed', 'Completed')], default='Pending')
     sent_count = models.IntegerField(default=0)
     failed_count = models.IntegerField(default=0)
+    
+    scheduled_start_date = models.DateField(null=True, blank=True)
+    scheduled_end_date = models.DateField(null=True, blank=True)
+    frequency = models.CharField(max_length=20, choices=[('Once', 'Once'), ('Daily', 'Daily'), ('Weekly', 'Weekly')], default='Once')
+    next_execution_date = models.DateField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
 class ImportJob(models.Model):

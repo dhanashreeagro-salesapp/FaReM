@@ -127,6 +127,41 @@ class DashboardAPIView(APIView):
         
         data['crop_stage_breakup'] = stage_breakup
 
+        # Market Trends logic
+        from .models import MarketRate
+        
+        market_trends = []
+        active_crop_ids = active_seasons.values_list('crop_id', flat=True).distinct()
+        for crop_id in active_crop_ids:
+            rates = list(MarketRate.objects.filter(crop_id=crop_id).order_by('-date')[:3])
+            if rates:
+                latest = rates[0]
+                trend = 'FLAT'
+                percentage_change = 0.0
+                
+                prev = None
+                if len(rates) == 3:
+                    prev = rates[2]
+                elif len(rates) == 2:
+                    prev = rates[1]
+                    
+                if prev and prev.avg_price and latest.avg_price and prev.avg_price > 0:
+                    if latest.avg_price > prev.avg_price:
+                        trend = 'UP'
+                        percentage_change = float(((latest.avg_price - prev.avg_price) / prev.avg_price) * 100)
+                    elif latest.avg_price < prev.avg_price:
+                        trend = 'DOWN'
+                        percentage_change = float(((prev.avg_price - latest.avg_price) / prev.avg_price) * 100)
+
+                market_trends.append({
+                    'crop_name': latest.crop.crop_name,
+                    'latest_price': float(latest.avg_price) if latest.avg_price else 0,
+                    'date': latest.date.isoformat(),
+                    'trend': trend,
+                    'percentage_change': round(percentage_change, 2)
+                })
+        data['market_trends'] = market_trends
+
         cache.set(cache_key, data, 60 * 15) # Cache for 15 minutes
         return Response(data)
 

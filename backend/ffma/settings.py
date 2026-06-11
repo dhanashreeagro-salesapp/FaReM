@@ -114,6 +114,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.check_overdue_visits_and_stage_transitions',
         'schedule': 86400.0,  # Every 24 hours (configured via AppConfiguration for exact time)
     },
+    'scrape-apmc-rates-daily': {
+        'task': 'core.tasks.scrape_apmc_rates',
+        'schedule': 86400.0,  # Every 24 hours
+    },
 }
 
 CACHES = {

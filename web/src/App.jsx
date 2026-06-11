@@ -12,6 +12,7 @@ import BulkSendManagement from './pages/BulkSendManagement';
 import Dashboard from './pages/Dashboard';
 import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
+import VisitPlanner from './pages/VisitPlanner';
 
 function ProtectedLayout() {
   const { isAuthenticated, loading, user } = useAuth();
@@ -50,6 +51,7 @@ function ProtectedLayout() {
             <Route path="/crops" element={<CropMaster />} />
             <Route path="/territories" element={<TerritoryManagement />} />
             <Route path="/farmers" element={<FarmerManagement />} />
+            <Route path="/planner" element={<VisitPlanner />} />
             <Route path="/promotions" element={<PromotionLibrary />} />
             <Route path="/bulk-sends" element={<BulkSendManagement />} />
             <Route path="/dashboard" element={<Dashboard />} />

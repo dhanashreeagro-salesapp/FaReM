@@ -229,3 +229,17 @@ class FarmerViewSet(viewsets.ModelViewSet):
             user_id=str(request.user.id)
         )
         return Response({"status": "Farmer disabled"}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def villages(self, request):
+        queryset = self.get_queryset()
+        villages = queryset.exclude(village='').exclude(village__isnull=True)\
+            .values('village', 'taluka', 'district')\
+            .distinct().order_by('village')
+        return Response(list(villages))
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def all_ids(self, request):
+        queryset = self.get_queryset()
+        ids = list(queryset.values_list('id', flat=True))
+        return Response(ids)
