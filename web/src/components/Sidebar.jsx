@@ -11,7 +11,7 @@ const navItems = [
   { path: '/farmers', label: 'Farmer Management', icon: UserCheck, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/planner', label: 'Smart Planner', icon: Map, roles: ['Admin', 'FieldStaff'] },
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam'] },
-  { path: '/bulk-sends', label: 'Bulk Messages', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager'] },
+  { path: '/promotions-management', label: 'Promotions Management', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Admin'] },
   { path: '/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];

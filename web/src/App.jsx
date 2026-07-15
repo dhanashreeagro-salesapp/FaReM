@@ -8,7 +8,7 @@ import CropMaster from './pages/CropMaster';
 import TerritoryManagement from './pages/TerritoryManagement';
 import FarmerManagement from './pages/FarmerManagement';
 import PromotionLibrary from './pages/PromotionLibrary';
-import BulkSendManagement from './pages/BulkSendManagement';
+import PromotionsManagement from './pages/PromotionsManagement';
 import Dashboard from './pages/Dashboard';
 import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
@@ -53,7 +53,7 @@ function ProtectedLayout() {
             <Route path="/farmers" element={<FarmerManagement />} />
             <Route path="/planner" element={<VisitPlanner />} />
             <Route path="/promotions" element={<PromotionLibrary />} />
-            <Route path="/bulk-sends" element={<BulkSendManagement />} />
+            <Route path="/promotions-management" element={<PromotionsManagement />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/settings" element={<SettingsPage />} />

@@ -297,6 +297,8 @@ class ApiClient {
   // Bulk Sends
   getBulkSends() { return this.request('/bulk-sends/'); }
   createBulkSend(data) { return this.request('/bulk-sends/', { method: 'POST', body: JSON.stringify(data) }); }
+  updateBulkSend(id, data) { return this.request(`/bulk-sends/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  cancelBulkSend(id) { return this.request(`/bulk-sends/${id}/cancel/`, { method: 'POST' }); }
   approveBulkSend(id) { return this.request(`/bulk-sends/${id}/approve/`, { method: 'POST' }); }
   rejectBulkSend(id) { return this.request(`/bulk-sends/${id}/reject/`, { method: 'POST' }); }
 

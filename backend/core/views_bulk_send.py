@@ -9,9 +9,15 @@ from .tasks import execute_bulk_send_batch
 from .permissions import IsAdminOrZonalManager
 
 class BulkSendBatchViewSet(viewsets.ModelViewSet):
-    queryset = BulkSendBatch.objects.all()
     serializer_class = BulkSendBatchSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = BulkSendBatch.objects.all().order_by('-created_at')
+        if user.role == Role.FIELD_STAFF:
+            qs = qs.filter(created_by_user=user)
+        return qs
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -55,6 +61,15 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
         exec_date = batch.scheduled_start_date or today
         if exec_date <= today:
             execute_bulk_send_batch.delay(str(batch.id))
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def cancel(self, request, pk=None):
+        batch = self.get_object()
+        if batch.send_status in ['Pending', 'InProgress']:
+            batch.send_status = 'Cancelled'
+            batch.save(update_fields=['send_status'])
+            return Response({"message": "Batch cancelled"})
+        return Response({"error": "Cannot cancel this batch"}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):

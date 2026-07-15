@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Calendar, Clock, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 
-export default function SendMessageModal({ farmerIds, onClose, onSuccess }) {
+export default function SendMessageModal({ farmerIds, onClose, onSuccess, initialData, mode = 'create' }) {
   const [promotions, setPromotions] = useState([]);
-  const [selectedPromo, setSelectedPromo] = useState('');
-  const [channel, setChannel] = useState('WhatsApp');
-  const [scheduleMode, setScheduleMode] = useState('Immediate'); // Immediate, Scheduled, Recurring
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [frequency, setFrequency] = useState('Daily');
+  const [selectedPromo, setSelectedPromo] = useState(initialData?.content || '');
+  const [channel, setChannel] = useState(initialData?.channel || 'WhatsApp');
+  const [scheduleMode, setScheduleMode] = useState(initialData?.scheduleMode || 'Immediate');
+  const [startDate, setStartDate] = useState(initialData?.startDate || '');
+  const [endDate, setEndDate] = useState(initialData?.endDate || '');
+  const [frequency, setFrequency] = useState(initialData?.frequency || 'Daily');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -54,11 +54,15 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess }) {
       } else {
         payload.frequency = 'Once';
       }
-
-      await api.createBulkSend(payload);
+      
+      if (mode === 'edit') {
+        await api.updateBulkSend(initialData.id, payload);
+      } else {
+        await api.createBulkSend(payload);
+      }
       onSuccess();
     } catch (e) {
-      alert('Failed to schedule messages.');
+      alert(`Failed to ${mode === 'edit' ? 'update' : 'schedule'} messages.`);
       console.error(e);
     } finally {
       setLoading(false);
