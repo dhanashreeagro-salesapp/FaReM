@@ -16,16 +16,12 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = async (mobile_number, otp) => {
-    const data = await api.verifyOtp(mobile_number, otp);
+  const login = async (email, password) => {
+    const data = await api.login(email, password);
     api.setTokens(data.access, data.refresh);
     localStorage.setItem('ffma_role', data.role);
     setUser({ role: data.role });
     return data;
-  };
-
-  const sendOtp = async (mobile_number) => {
-    return api.sendOtp(mobile_number);
   };
 
   const logout = async () => {

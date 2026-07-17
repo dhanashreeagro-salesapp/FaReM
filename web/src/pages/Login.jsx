@@ -3,20 +3,19 @@ import { useAuth } from '../components/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
-  const { sendOtp, login } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState('mobile'); // 'mobile' | 'otp'
-  const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleVerifyOtp = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(mobile, otp);
+      await login(email, password);
       navigate('/');
     } catch (err) {
       console.error("Login error:", err);
@@ -52,36 +51,33 @@ export default function Login() {
           </div>
         )}
 
-          <form onSubmit={handleVerifyOtp}>
+          <form onSubmit={handleLogin}>
             <div className="mb-4">
               <label className="block text-sm font-medium text-text-muted mb-1.5">
-                Registered Mobile Number (10 Digits)
+                Email Address
               </label>
               <input
-                id="mobile-input"
-                type="tel"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="9876543210"
-                minLength={10}
-                pattern="[0-9]{10}"
-                title="Please enter exactly 10 digits"
-                className="w-full px-4 py-3 rounded-lg border border-border bg-surface text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-lg"
+                id="email-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@plantnutrition.in"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-surface text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
                 required
               />
             </div>
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-text-muted mb-1.5">
-                Password (Testing Phase)
+                Password
               </label>
               <input
-                id="otp-input"
+                id="password-input"
                 type="password"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
-                className="w-full px-4 py-3 rounded-lg border border-border bg-surface text-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-lg"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-surface text-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
                 required
               />
             </div>

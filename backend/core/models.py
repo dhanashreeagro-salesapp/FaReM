@@ -22,6 +22,7 @@ class Status(models.TextChoices):
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
     mobile_number = models.CharField(max_length=15, unique=True, validators=[RegexValidator(r'^\+?1?\d{9,15}$')])
     employee_id = models.CharField(max_length=50, blank=True, null=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.FIELD_STAFF)
@@ -32,8 +33,8 @@ class User(AbstractUser):
     failed_otp_attempts = models.IntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
     
-    USERNAME_FIELD = 'mobile_number'
-    REQUIRED_FIELDS = ['username']
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'mobile_number']
 
 class Territory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

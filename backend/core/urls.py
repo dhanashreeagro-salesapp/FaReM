@@ -38,8 +38,7 @@ router.register(r'bulk-sends', views_bulk_send.BulkSendBatchViewSet, basename='b
 from . import views_dashboard
 
 urlpatterns = [
-    path('auth/send-otp/', views.send_otp, name='send_otp'),
-    path('auth/verify-otp/', views.verify_otp, name='verify_otp'),
+    path('auth/login/', views.login_view, name='login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/invalidate-session/', views.invalidate_session, name='invalidate_session'),
     path('dashboard/', views_dashboard.DashboardAPIView.as_view(), name='dashboard'),

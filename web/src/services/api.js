@@ -85,17 +85,10 @@ class ApiClient {
   }
 
   // Auth
-  sendOtp(mobile_number) {
-    return this.request('/auth/send-otp/', {
+  login(email, password) {
+    return this.request('/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ mobile_number }),
-    });
-  }
-
-  verifyOtp(mobile_number, otp) {
-    return this.request('/auth/verify-otp/', {
-      method: 'POST',
-      body: JSON.stringify({ mobile_number, otp }),
+      body: JSON.stringify({ email, password }),
     });
   }
 
