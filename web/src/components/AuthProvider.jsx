@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
   const isContentTeam = user?.role === 'ContentTeam';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, sendOtp, logout, isAuthenticated, isAdmin, isManager, isContentTeam }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated, isAdmin, isManager, isContentTeam }}>
       {children}
     </AuthContext.Provider>
   );
