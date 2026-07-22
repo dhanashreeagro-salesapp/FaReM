@@ -17,8 +17,9 @@ class FarmerViewSet(viewsets.ModelViewSet):
     serializer_class = FarmerSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = FarmerPagination
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['full_name', 'primary_mobile', 'village', 'assigned_staff__mobile_number']
+    ordering = ['full_name']
 
     def get_queryset(self):
         user = self.request.user
@@ -92,7 +93,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
         from django.http import HttpResponse
         from io import BytesIO
 
-        df = pd.DataFrame(columns=['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile'])
+        df = pd.DataFrame(columns=['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile', 'AcquisitionDate', 'Source'])
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
@@ -197,6 +198,8 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 'District': f.district,
                 'State': f.state,
                 'Assigned Staff': f.assigned_staff.mobile_number if f.assigned_staff else '',
+                'Acquisition Date': str(f.acquisition_date) if f.acquisition_date else '',
+                'Source': f.source,
                 'Status': f.status
             })
             

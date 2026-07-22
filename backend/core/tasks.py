@@ -57,8 +57,9 @@ def validate_farmer_import(import_job_id):
     error_report = []
 
     required_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile']
+    expected_columns = required_columns + ['AcquisitionDate', 'Source']
     
-    df = normalize_dataframe_headers(df, required_columns)
+    df = normalize_dataframe_headers(df, expected_columns)
     
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
@@ -135,6 +136,20 @@ def commit_farmer_import(import_job_id):
             pin_code = str(row.get('PinCode', '')).split('.')[0].strip()
             staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
 
+            from django.utils import timezone
+            source = str(row.get('Source', '')).strip()
+            if source == 'nan' or not source:
+                source = 'BulkImport'
+                
+            acq_date_val = row.get('AcquisitionDate')
+            if pd.isna(acq_date_val):
+                acquisition_date = timezone.now().date()
+            else:
+                try:
+                    acquisition_date = pd.to_datetime(acq_date_val).date()
+                except:
+                    acquisition_date = timezone.now().date()
+
             assigned_staff = User.objects.get(mobile_number=staff_mobile)
             
             farmer, created = Farmer.objects.update_or_create(
@@ -147,7 +162,8 @@ def commit_farmer_import(import_job_id):
                     'state': state,
                     'pin_code': pin_code,
                     'assigned_staff': assigned_staff,
-                    'source': 'BulkImport',
+                    'source': source,
+                    'acquisition_date': acquisition_date,
                     'territory': assigned_staff.territory
                 }
             )

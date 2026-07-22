@@ -338,6 +338,7 @@ export default function FarmerManagement() {
               <th>Village</th>
               <th>District</th>
               <th>Source</th>
+              <th>Acquisition Date</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -364,10 +365,11 @@ export default function FarmerManagement() {
                 <td>{farmer.village}</td>
                 <td>{farmer.district || '—'}</td>
                 <td>
-                  <span className={`badge ${farmer.source === 'BulkImport' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                    {farmer.source}
+                  <span className={`badge ${farmer.source === 'BulkImport' ? 'bg-blue-50 text-blue-700' : farmer.source === 'InApp' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {farmer.source || '—'}
                   </span>
                 </td>
+                <td className="text-xs text-text-muted whitespace-nowrap">{farmer.acquisition_date || '—'}</td>
                 <td>
                   <span className={`badge ${farmer.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
                     {farmer.status}
