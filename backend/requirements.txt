@@ -17,3 +17,4 @@ django-celery-results>=2.5.1
 django-celery-beat>=2.6.0
 python-dotenv>=1.0.1
 dj-database-url>=2.1.0
+gunicorn>=21.2.0
