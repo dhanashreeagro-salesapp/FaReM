@@ -31,7 +31,9 @@ COPY . /app/
 
 # Copy the start script and make it executable
 COPY start.sh /app/
+RUN sed -i 's/\r$//' /app/start.sh
 RUN chmod +x /app/start.sh
+
 
 # Expose port
 EXPOSE 8000
