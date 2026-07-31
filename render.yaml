@@ -3,7 +3,7 @@ services:
   - type: redis
     name: farem-redis
     ipAllowList: []
-    plan: free # Note: free redis does not persist data on restarts, but fine for celery broker
+    plan: free # Free redis instance
 
   # 2. Django Web Service
   - type: web
@@ -27,57 +27,6 @@ services:
         value: "False"
       - key: PORT
         value: "8000"
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "True"
 
-  # 3. Celery Worker
-  - type: worker
-    name: farem-celery-worker
-    env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    plan: free
-    dockerCommand: celery -A ffma worker -l info
-    envVars:
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: farem-redis
-          property: connectionString
-      - key: DATABASE_URL
-        fromService:
-          type: web
-          name: farem-web
-          envVarKey: DATABASE_URL
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: farem-web
-          envVarKey: SECRET_KEY
-      - key: DEBUG
-        value: "False"
-
-  # 4. Celery Beat (Scheduler)
-  - type: worker
-    name: farem-celery-beat
-    env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    plan: free
-    dockerCommand: celery -A ffma beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    envVars:
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: farem-redis
-          property: connectionString
-      - key: DATABASE_URL
-        fromService:
-          type: web
-          name: farem-web
-          envVarKey: DATABASE_URL
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: farem-web
-          envVarKey: SECRET_KEY
-      - key: DEBUG
-        value: "False"
