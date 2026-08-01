@@ -35,7 +35,7 @@ class ApiClient {
     localStorage.removeItem('ffma_role');
   }
 
-  async request(endpoint, options = {}) {
+  async request(endpoint, options = {}, retries = 3) {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = { ...options.headers };
 
@@ -48,34 +48,55 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    let response = await fetch(url, { ...options, headers });
+    let lastError = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        let response = await fetch(url, { ...options, headers });
 
-    // If 401, try to refresh
-    if (response.status === 401 && this.getRefreshToken()) {
-      const refreshed = await this.refreshAccessToken();
-      if (refreshed) {
-        headers['Authorization'] = `Bearer ${this.getToken()}`;
-        response = await fetch(url, { ...options, headers });
-      } else {
-        this.clearTokens();
-        window.location.href = '/login';
-        throw new Error('Session expired');
+        // If gateway cold start error (502, 503, 504), wait and retry
+        if ([502, 503, 504].includes(response.status) && attempt < retries) {
+          await new Promise((res) => setTimeout(res, (attempt + 1) * 2000));
+          continue;
+        }
+
+        // If 401, try to refresh token
+        if (response.status === 401 && this.getRefreshToken()) {
+          const refreshed = await this.refreshAccessToken();
+          if (refreshed) {
+            headers['Authorization'] = `Bearer ${this.getToken()}`;
+            response = await fetch(url, { ...options, headers });
+          } else {
+            this.clearTokens();
+            window.location.href = '/login';
+            throw new Error('Session expired');
+          }
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw { status: response.status, ...errorData };
+        }
+
+        if (response.status === 204) return null;
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return await response.json();
+        }
+        return response;
+      } catch (err) {
+        lastError = err;
+        // Auto retry network "Failed to fetch" errors up to retries count
+        if (attempt < retries && (err.name === 'TypeError' || (err.message && err.message.includes('fetch')))) {
+          await new Promise((res) => setTimeout(res, (attempt + 1) * 2000));
+        } else {
+          throw err;
+        }
       }
     }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw { status: response.status, ...errorData };
-    }
-
-    if (response.status === 204) return null;
-    
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return response.json();
-    }
-    return response;
+    throw lastError;
   }
+
 
   async refreshAccessToken() {
     try {
@@ -110,7 +131,7 @@ class ApiClient {
       return this.request('/auth/invalidate-session/', {
         method: 'POST',
         body: JSON.stringify({ refresh }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
@@ -137,17 +158,17 @@ class ApiClient {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.getToken()}` }
     })
-    .then(response => response.blob())
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = 'users_import_template.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    });
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'users_import_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
   }
 
   // Farmers
@@ -156,17 +177,17 @@ class ApiClient {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.getToken()}` }
     })
-    .then(response => response.blob())
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = 'farmers_import_template.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    });
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'farmers_import_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
   }
 
   // Territories
@@ -178,11 +199,11 @@ class ApiClient {
   // Crops
   getCrops() { return this.request('/crops/'); }
   getCrop(id) { return this.request(`/crops/${id}/`); }
-  createCrop(data) { 
-    return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) }); 
+  createCrop(data) {
+    return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
-  updateCrop(id, data) { 
-    return this.request(`/crops/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) }); 
+  updateCrop(id, data) {
+    return this.request(`/crops/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
   deleteCrop(id) { return this.request(`/crops/${id}/`, { method: 'DELETE' }); }
   createVariety(data) { return this.request('/crop-varieties/', { method: 'POST', body: JSON.stringify(data) }); }
@@ -211,17 +232,17 @@ class ApiClient {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.getToken()}` }
     })
-    .then(response => response.blob())
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = 'farmers_export.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    });
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'farmers_export.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
   }
   bulkImportFarmers(file) {
     const formData = new FormData();
@@ -247,17 +268,17 @@ class ApiClient {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.getToken()}` }
     })
-    .then(response => response.blob())
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `import_results_${id}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    });
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `import_results_${id}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
   }
 
   // Plots

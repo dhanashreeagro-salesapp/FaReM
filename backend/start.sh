@@ -11,7 +11,7 @@ fi
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear || true
 
-echo "Starting Gunicorn server on port ${PORT:-8000}..."
-exec gunicorn --bind 0.0.0.0:${PORT:-8000} ffma.wsgi:application
+exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120 --keep-alive 65 ffma.wsgi:application
+
 
 
