@@ -106,13 +106,33 @@ class FarmerViewSet(viewsets.ModelViewSet):
         return queryset.select_related('assigned_staff', 'territory')
 
 
+    def create(self, request, *args, **kwargs):
+        primary_mobile = str(request.data.get('primary_mobile', '')).strip()
+        
+        # If farmer with this mobile number already exists, update details and assign to current user
+        existing_farmer = Farmer.objects.filter(primary_mobile=primary_mobile).first() if primary_mobile else None
+        if existing_farmer:
+            serializer = self.get_serializer(existing_farmer, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(assigned_staff=request.user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Create new farmer and default assigned_staff to requesting user if not provided
+        data = request.data.copy()
+        if not data.get('assigned_staff'):
+            data['assigned_staff'] = str(request.user.id)
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def perform_destroy(self, instance):
-        # Soft delete is processed here if allowed, though specs say Admin processes delete request.
         if self.request.user.role == Role.ADMIN:
             instance.status = 'Inactive'
             instance.save()
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def download_template(self, request):
         import pandas as pd
         from django.http import HttpResponse
@@ -130,14 +150,13 @@ class FarmerViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = 'attachment; filename="farmers_import_template.xlsx"'
         return response
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def upload_for_validation(self, request):
         if 'file' not in request.FILES:
             return Response({"error": "excel file is required"}, status=status.HTTP_400_BAD_REQUEST)
             
         file_obj = request.FILES['file']
         
-        # Save file to media/imports/
         import os
         from django.conf import settings
         import_dir = os.path.join(settings.BASE_DIR, 'media', 'imports')
@@ -151,18 +170,18 @@ class FarmerViewSet(viewsets.ModelViewSet):
         from .models import ImportJob
         import_job = ImportJob.objects.create(
             created_by=request.user,
-            filename=file_path, # We'll store the path here for the task
+            filename=file_path,
             status='Processing'
         )
         
-        # Dispatch to celery for validation
         from .tasks import validate_farmer_import
         validate_farmer_import.delay(str(import_job.id))
         
         return Response({"message": "Validation started", "import_job_id": str(import_job.id)}, status=status.HTTP_202_ACCEPTED)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def commit_import(self, request):
+
         import_job_id = request.data.get('import_job_id')
         is_acknowledged = request.data.get('is_acknowledged', False)
         
