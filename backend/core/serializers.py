@@ -8,9 +8,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'mobile_number', 'email', 'employee_id', 'role', 'status',
+        fields = ['id', 'username', 'mobile_number', 'email', 'employee_id', 'salesapp_user_id', 'role', 'status',
                   'first_name', 'last_name', 'territory', 'territory_name',
                   'reporting_manager', 'reporting_manager_name', 'device_push_token']
+
         read_only_fields = ['id']
 
     def get_reporting_manager_name(self, obj):

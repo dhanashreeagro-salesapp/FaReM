@@ -25,7 +25,10 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     mobile_number = models.CharField(max_length=15, unique=True, validators=[RegexValidator(r'^\+?1?\d{9,15}$')])
     employee_id = models.CharField(max_length=50, blank=True, null=True)
+    salesapp_user_id = models.UUIDField(null=True, blank=True)
+
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.FIELD_STAFF)
+
     territory = models.ForeignKey('Territory', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     reporting_manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
