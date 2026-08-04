@@ -14,6 +14,8 @@ import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
 import VisitPlanner from './pages/VisitPlanner';
 
+import { MapPin } from 'lucide-react';
+
 function ProtectedLayout() {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -35,15 +37,22 @@ function ProtectedLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-surface border-b border-border z-10 py-3 px-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-heading font-semibold text-text-muted">Admin Dashboard</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-heading font-bold text-text">{user?.full_name || 'FaReM App'}</h2>
+              {user?.territory_name && (
+                <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <MapPin size={11} /> {user.territory_name}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-text-muted">{user?.role}</span>
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-heading font-bold">
-                {user?.role?.[0] || 'A'}
+                {user?.full_name?.[0]?.toUpperCase() || 'U'}
               </div>
             </div>
           </div>
         </header>
+
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" />} />

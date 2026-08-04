@@ -124,6 +124,11 @@ class ApiClient {
     });
   }
 
+  getMe() {
+    return this.request('/auth/me/');
+  }
+
+
   logout() {
     const refresh = this.getRefreshToken();
     this.clearTokens();

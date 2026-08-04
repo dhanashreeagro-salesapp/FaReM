@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut } from 'lucide-react';
+import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
@@ -26,14 +26,22 @@ export default function Sidebar() {
 
   return (
     <div className="w-64 bg-surface border-r border-border flex flex-col h-full">
-      {/* Logo */}
-      <div className="flex items-center h-16 px-5 border-b border-border">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center mr-3">
-          <span className="text-white text-sm font-heading font-bold">D</span>
+      {/* Top Left User Info */}
+      <div className="flex items-center h-16 px-4 border-b border-border bg-surface">
+        <div className="w-9 h-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center mr-3 font-heading font-bold text-sm shrink-0">
+          {user?.full_name?.[0]?.toUpperCase() || 'U'}
         </div>
-        <div>
-          <h1 className="text-sm font-heading font-bold text-text leading-tight">FFMA Admin</h1>
-          <p className="text-xs text-text-muted leading-tight">Dhanashree Crops</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-sm font-heading font-bold text-text truncate leading-tight">
+            {user?.full_name || 'User'}
+          </h1>
+          {user?.territory_name ? (
+            <p className="text-xs text-primary font-medium truncate flex items-center gap-1 leading-tight mt-0.5">
+              <MapPin size={11} className="inline shrink-0" /> {user.territory_name}
+            </p>
+          ) : (
+            <p className="text-[11px] text-text-muted leading-tight mt-0.5">Dhanashree Crops</p>
+          )}
         </div>
       </div>
 

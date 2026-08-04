@@ -39,7 +39,9 @@ from . import views_dashboard
 
 urlpatterns = [
     path('auth/login/', views.login_view, name='login'),
+    path('auth/me/', views.me_view, name='auth_me'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
     path('auth/invalidate-session/', views.invalidate_session, name='invalidate_session'),
     path('dashboard/', views_dashboard.DashboardAPIView.as_view(), name='dashboard'),
     path('export-report/', views_dashboard.ExportReportAPIView.as_view(), name='export_report'),

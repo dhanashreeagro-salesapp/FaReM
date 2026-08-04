@@ -47,11 +47,20 @@ def login_view(request):
             user.last_login = timezone.now()
             user.save()
             
+            first_name = user.first_name or ''
+            last_name = user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip() if (first_name or last_name) else user.email
+            territory_name = user.territory.name if user.territory else None
+
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-                'role': user.role
+                'role': user.role,
+                'full_name': full_name,
+                'email': user.email,
+                'territory_name': territory_name
             })
+
         else:
             user.failed_otp_attempts += 1
             if user.failed_otp_attempts >= 5:
@@ -87,3 +96,21 @@ def invalidate_session(request):
         return Response({"message": "Session invalidated"}, status=status.HTTP_205_RESET_CONTENT)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me_view(request):
+    user = request.user
+    first_name = user.first_name or ''
+    last_name = user.last_name or ''
+    full_name = f"{first_name} {last_name}".strip() if (first_name or last_name) else user.email
+    territory_name = user.territory.name if user.territory else None
+
+    return Response({
+        'id': str(user.id),
+        'email': user.email,
+        'full_name': full_name,
+        'role': user.role,
+        'territory_name': territory_name
+    })
+

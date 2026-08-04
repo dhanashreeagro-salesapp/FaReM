@@ -8,25 +8,54 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('ffma_access_token');
-    const role = localStorage.getItem('ffma_role');
-    if (token && role) {
-      setUser({ role });
+    async function initAuth() {
+      const token = localStorage.getItem('ffma_access_token');
+      const role = localStorage.getItem('ffma_role');
+      const fullName = localStorage.getItem('ffma_full_name');
+      const territoryName = localStorage.getItem('ffma_territory_name');
+
+      if (token && role) {
+        setUser({ role, full_name: fullName || '', territory_name: territoryName || '' });
+        try {
+          const meData = await api.getMe();
+          setUser({
+            role: meData.role,
+            full_name: meData.full_name,
+            email: meData.email,
+            territory_name: meData.territory_name
+          });
+          if (meData.full_name) localStorage.setItem('ffma_full_name', meData.full_name);
+          if (meData.territory_name) localStorage.setItem('ffma_territory_name', meData.territory_name || '');
+        } catch (err) {
+          console.error("Failed to fetch fresh user profile:", err);
+        }
+      }
+      setLoading(false);
     }
-    setLoading(false);
+    initAuth();
   }, []);
 
   const login = async (email, password) => {
     const data = await api.login(email, password);
     api.setTokens(data.access, data.refresh);
     localStorage.setItem('ffma_role', data.role);
-    setUser({ role: data.role });
+    if (data.full_name) localStorage.setItem('ffma_full_name', data.full_name);
+    if (data.territory_name) localStorage.setItem('ffma_territory_name', data.territory_name || '');
+    
+    setUser({
+      role: data.role,
+      full_name: data.full_name || '',
+      email: data.email || email,
+      territory_name: data.territory_name || ''
+    });
     return data;
   };
 
   const logout = async () => {
     await api.logout();
     api.clearTokens();
+    localStorage.removeItem('ffma_full_name');
+    localStorage.removeItem('ffma_territory_name');
     setUser(null);
   };
 
