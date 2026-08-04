@@ -260,9 +260,16 @@ class ApiClient {
       body: JSON.stringify({ import_job_id: jobId, is_acknowledged: acknowledged })
     });
   }
+  bulkAssignFarmers(farmerIds, assignedStaffId) {
+    return this.request('/farmers/bulk_assign/', {
+      method: 'POST',
+      body: JSON.stringify({ farmer_ids: farmerIds, assigned_staff_id: assignedStaffId })
+    });
+  }
   getImportJobStatus(id) {
     return this.request(`/import-jobs/${id}/`);
   }
+
   downloadImportJobResults(id) {
     return fetch(`${this.baseUrl}/import-jobs/${id}/download_results/`, {
       method: 'GET',

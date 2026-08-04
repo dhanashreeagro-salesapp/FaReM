@@ -18,7 +18,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = FarmerPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['full_name', 'primary_mobile', 'village', 'assigned_staff__mobile_number']
+    search_fields = ['full_name', 'primary_mobile', 'village', 'taluka', 'district', 'pin_code', 'assigned_staff__mobile_number', 'assigned_staff__email', 'assigned_staff__first_name', 'assigned_staff__last_name']
     ordering = ['full_name']
 
     def get_queryset(self):
@@ -40,6 +40,30 @@ class FarmerViewSet(viewsets.ModelViewSet):
             queryset = Farmer.objects.filter(territory__in=territories)
         elif user.role == Role.FIELD_STAFF:
             queryset = Farmer.objects.filter(assigned_staff=user)
+
+        # Filters for location and assignment
+        pin_code = self.request.query_params.get('pin_code')
+        village = self.request.query_params.get('village')
+        taluka = self.request.query_params.get('taluka')
+        district = self.request.query_params.get('district')
+        territory_id = self.request.query_params.get('territory')
+        assigned_staff_param = self.request.query_params.get('assigned_staff')
+
+        if pin_code:
+            queryset = queryset.filter(pin_code__icontains=pin_code.strip())
+        if village:
+            queryset = queryset.filter(village__icontains=village.strip())
+        if taluka:
+            queryset = queryset.filter(taluka__icontains=taluka.strip())
+        if district:
+            queryset = queryset.filter(district__icontains=district.strip())
+        if territory_id:
+            queryset = queryset.filter(territory_id=territory_id)
+        if assigned_staff_param:
+            if assigned_staff_param == 'unassigned':
+                queryset = queryset.filter(assigned_staff__isnull=True)
+            else:
+                queryset = queryset.filter(assigned_staff_id=assigned_staff_param)
 
         crop_name = self.request.query_params.get('crop')
         stage_name = self.request.query_params.get('stage')
@@ -80,6 +104,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(**plot_filters).distinct()
 
         return queryset.select_related('assigned_staff', 'territory')
+
 
     def perform_destroy(self, instance):
         # Soft delete is processed here if allowed, though specs say Admin processes delete request.
@@ -246,3 +271,35 @@ class FarmerViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         ids = list(queryset.values_list('id', flat=True))
         return Response(ids)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def bulk_assign(self, request):
+        farmer_ids = request.data.get('farmer_ids', [])
+        assigned_staff_id = request.data.get('assigned_staff_id')
+
+        if not farmer_ids or not isinstance(farmer_ids, list):
+            return Response({"error": "farmer_ids must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        staff = None
+        if assigned_staff_id:
+            try:
+                staff = User.objects.get(id=assigned_staff_id)
+            except User.DoesNotExist:
+                return Response({"error": "Assigned staff user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        updated_count = Farmer.objects.filter(id__in=farmer_ids).update(assigned_staff=staff)
+
+        from .models import SystemAuditLog
+        SystemAuditLog.objects.create(
+            entity_type='Farmer Bulk Reassign',
+            entity_id=f'{updated_count}_farmers',
+            action_type='Update',
+            new_value=f'Reassigned {updated_count} farmers to {staff.email if staff else "Unassigned"}',
+            user_id=str(request.user.id)
+        )
+
+        return Response({
+            "message": f"Successfully reassigned {updated_count} farmers",
+            "updated_count": updated_count
+        }, status=status.HTTP_200_OK)
+

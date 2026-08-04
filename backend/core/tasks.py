@@ -75,7 +75,8 @@ def validate_farmer_import(import_job_id):
     for index, row in df.iterrows():
         try:
             primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
-            staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
+            staff_raw = row.get('StaffMobile') or row.get('StaffEmail') or row.get('AssignedStaff')
+            staff_val = str(staff_raw).split('.')[0].strip() if pd.notna(staff_raw) else ''
 
             if len(primary_mobile) > 15 or len(primary_mobile) < 10:
                 raise ValueError("Invalid PrimaryMobile format")
@@ -87,9 +88,15 @@ def validate_farmer_import(import_job_id):
                 if df.at[index, 'Import Status'] == 'SUCCESS':
                     df.at[index, 'Import Status'] = 'DUPLICATE (Will be updated)'
             
-            # Resolve Staff
-            if not User.objects.filter(mobile_number=staff_mobile).exists():
-                raise ValueError(f"Staff with mobile {staff_mobile} not found")
+            # Resolve Staff (by mobile, email, or username)
+            if staff_val:
+                staff_user = User.objects.filter(mobile_number=staff_val).first()
+                if not staff_user:
+                    staff_user = User.objects.filter(email__iexact=staff_val).first()
+                if not staff_user:
+                    staff_user = User.objects.filter(username__iexact=staff_val).first()
+                if not staff_user:
+                    raise ValueError(f"Staff with mobile/email '{staff_val}' not found")
 
             valid_rows += 1
         except Exception as e:
@@ -134,7 +141,19 @@ def commit_farmer_import(import_job_id):
             district = str(row.get('District', '')).strip()
             state = str(row.get('State', '')).strip()
             pin_code = str(row.get('PinCode', '')).split('.')[0].strip()
-            staff_mobile = str(row['StaffMobile']).split('.')[0].strip()
+            
+            staff_raw = row.get('StaffMobile') or row.get('StaffEmail') or row.get('AssignedStaff')
+            staff_val = str(staff_raw).split('.')[0].strip() if pd.notna(staff_raw) else ''
+            
+            assigned_staff_user = None
+            if staff_val:
+                assigned_staff_user = User.objects.filter(mobile_number=staff_val).first()
+                if not assigned_staff_user:
+                    assigned_staff_user = User.objects.filter(email__iexact=staff_val).first()
+                if not assigned_staff_user:
+                    assigned_staff_user = User.objects.filter(username__iexact=staff_val).first()
+            if not assigned_staff_user:
+                assigned_staff_user = job.created_by
 
             from django.utils import timezone
             source = str(row.get('Source', '')).strip()
@@ -142,6 +161,7 @@ def commit_farmer_import(import_job_id):
                 source = 'BulkImport'
                 
             acq_date_val = row.get('AcquisitionDate')
+
             if pd.isna(acq_date_val):
                 acquisition_date = timezone.now().date()
             else:
@@ -150,9 +170,10 @@ def commit_farmer_import(import_job_id):
                 except:
                     acquisition_date = timezone.now().date()
 
-            assigned_staff = User.objects.get(mobile_number=staff_mobile)
+            assigned_staff = assigned_staff_user
             
             farmer, created = Farmer.objects.update_or_create(
+
                 primary_mobile=primary_mobile,
                 defaults={
                     'full_name': full_name,

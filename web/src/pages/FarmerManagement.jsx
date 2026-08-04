@@ -1,34 +1,66 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare, UserCheck, Filter, RotateCcw } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
 import PlotManagementModal from '../components/PlotManagementModal';
 import SendMessageModal from '../components/SendMessageModal';
+import BulkReassignModal from '../components/BulkReassignModal';
 
 export default function FarmerManagement() {
   const [farmers, setFarmers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
+  
+  // Search & Filter State
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [filterPinCode, setFilterPinCode] = useState('');
+  const [filterVillage, setFilterVillage] = useState('');
+  const [filterTaluka, setFilterTaluka] = useState('');
+  const [filterDistrict, setFilterDistrict] = useState('');
+  const [filterTerritory, setFilterTerritory] = useState('');
+  const [filterStaff, setFilterStaff] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Pagination State
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
   const PAGE_SIZE = 50;
 
+  // Modals & Selection State
   const [showWizard, setShowWizard] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showSendMessage, setShowSendMessage] = useState(false);
+  const [showBulkReassign, setShowBulkReassign] = useState(false);
   const [selectedFarmers, setSelectedFarmers] = useState([]);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
   
   const [editingId, setEditingId] = useState(null);
   const [selectedFarmerForPlots, setSelectedFarmerForPlots] = useState(null);
   const [form, setForm] = useState({
-    full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: ''
+    full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: '', assigned_staff: ''
   });
   const [villages, setVillages] = useState([]);
+  
+  // Options lists for dropdowns
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [territories, setTerritories] = useState([]);
+
+  useEffect(() => {
+    async function loadOptions() {
+      try {
+        const usersData = await api.getUsers();
+        setStaffUsers(Array.isArray(usersData) ? usersData : (usersData.results || []));
+        const terrData = await api.getTerritories();
+        setTerritories(Array.isArray(terrData) ? terrData : (terrData.results || []));
+      } catch (err) {
+        console.error("Failed to load options:", err);
+      }
+    }
+    loadOptions();
+  }, []);
 
   const handlePinCodeChange = async (e) => {
     const pin = e.target.value;
@@ -62,24 +94,34 @@ export default function FarmerManagement() {
 
   const searchTimer = useRef(null);
 
-  const fetchFarmers = useCallback(async (pageNum = 1, searchTerm = '') => {
+  const buildQueryParams = useCallback((pageNum = 1) => {
+    const params = { page: pageNum, page_size: PAGE_SIZE };
+    if (search) params.search = search;
+    if (filterPinCode) params.pin_code = filterPinCode;
+    if (filterVillage) params.village = filterVillage;
+    if (filterTaluka) params.taluka = filterTaluka;
+    if (filterDistrict) params.district = filterDistrict;
+    if (filterTerritory) params.territory = filterTerritory;
+    if (filterStaff) params.assigned_staff = filterStaff;
+
+    const crop = searchParams.get('crop');
+    const stage = searchParams.get('stage');
+    const enrolled = searchParams.get('enrolled');
+    const hasActiveCrops = searchParams.get('has_active_crops');
+    const hasPlots = searchParams.get('has_plots');
+    if (crop) params.crop = crop;
+    if (stage) params.stage = stage;
+    if (enrolled) params.enrolled = enrolled;
+    if (hasActiveCrops) params.has_active_crops = hasActiveCrops;
+    if (hasPlots) params.has_plots = hasPlots;
+
+    return params;
+  }, [search, filterPinCode, filterVillage, filterTaluka, filterDistrict, filterTerritory, filterStaff, searchParams]);
+
+  const fetchFarmers = useCallback(async (pageNum = 1) => {
     setLoading(true);
     try {
-      const params = { page: pageNum, page_size: PAGE_SIZE };
-      if (searchTerm) params.search = searchTerm;
-
-      // Pass crop/stage from URL if present
-      const crop = searchParams.get('crop');
-      const stage = searchParams.get('stage');
-      const enrolled = searchParams.get('enrolled');
-      const hasActiveCrops = searchParams.get('has_active_crops');
-      const hasPlots = searchParams.get('has_plots');
-      if (crop) params.crop = crop;
-      if (stage) params.stage = stage;
-      if (enrolled) params.enrolled = enrolled;
-      if (hasActiveCrops) params.has_active_crops = hasActiveCrops;
-      if (hasPlots) params.has_plots = hasPlots;
-
+      const params = buildQueryParams(pageNum);
       const data = await api.getFarmers(params);
       if (data && data.results) {
         setFarmers(data.results);
@@ -92,25 +134,39 @@ export default function FarmerManagement() {
         setHasNext(false);
         setHasPrev(false);
       }
-    } catch { setFarmers([]); }
+    } catch (err) { 
+      console.error(err);
+      setFarmers([]); 
+    }
     setLoading(false);
-  }, [searchParams]);
+  }, [buildQueryParams]);
 
   useEffect(() => {
-    fetchFarmers(1, search);
-  }, []);
+    fetchFarmers(1);
+  }, [fetchFarmers]);
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearch(val);
     setPage(1);
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => fetchFarmers(1, val), 400);
+    searchTimer.current = setTimeout(() => fetchFarmers(1), 400);
+  };
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setFilterPinCode('');
+    setFilterVillage('');
+    setFilterTaluka('');
+    setFilterDistrict('');
+    setFilterTerritory('');
+    setFilterStaff('');
+    setPage(1);
   };
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    fetchFarmers(newPage, search);
+    fetchFarmers(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -120,19 +176,9 @@ export default function FarmerManagement() {
     if (checked) {
       setLoading(true);
       try {
-        const params = {};
-        if (search) params.search = search;
-        const crop = searchParams.get('crop');
-        const stage = searchParams.get('stage');
-        const enrolled = searchParams.get('enrolled');
-        const hasActiveCrops = searchParams.get('has_active_crops');
-        const hasPlots = searchParams.get('has_plots');
-        if (crop) params.crop = crop;
-        if (stage) params.stage = stage;
-        if (enrolled) params.enrolled = enrolled;
-        if (hasActiveCrops) params.has_active_crops = hasActiveCrops;
-        if (hasPlots) params.has_plots = hasPlots;
-        
+        const params = buildQueryParams(1);
+        delete params.page;
+        delete params.page_size;
         const data = await api.getFarmerIds(params);
         setSelectedFarmers(data);
       } catch (err) {
@@ -160,7 +206,7 @@ export default function FarmerManagement() {
     if (!confirm('Are you sure you want to disable this farmer?')) return;
     try {
       await api.disableFarmer(id);
-      fetchFarmers(page, search);
+      fetchFarmers(page);
     } catch (e) {
       alert(e.error || 'Failed to disable farmer');
     }
@@ -175,7 +221,8 @@ export default function FarmerManagement() {
       village: farmer.village || '',
       district: farmer.district || '',
       taluka: farmer.taluka || '',
-      state: farmer.state || ''
+      state: farmer.state || '',
+      assigned_staff: farmer.assigned_staff || ''
     });
     setVillages([]);
     setEditingId(farmer.id);
@@ -185,15 +232,18 @@ export default function FarmerManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = { ...form };
+      if (!payload.assigned_staff) delete payload.assigned_staff;
+
       if (editingId) {
-        await api.updateFarmer(editingId, form);
+        await api.updateFarmer(editingId, payload);
       } else {
-        await api.createFarmer(form);
+        await api.createFarmer(payload);
       }
       setShowForm(false);
       setEditingId(null);
-      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: '' });
-      fetchFarmers(page, search);
+      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: '', assigned_staff: '' });
+      fetchFarmers(page);
     } catch (e) {
       console.error(e);
       let errorMsg = 'Failed to save farmer details';
@@ -216,8 +266,11 @@ export default function FarmerManagement() {
   const startItem = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endItem = Math.min(page * PAGE_SIZE, totalCount);
 
+  const hasActiveFilters = search || filterPinCode || filterVillage || filterTaluka || filterDistrict || filterTerritory || filterStaff;
+
   return (
     <div>
+      {/* Page Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-xl font-heading font-bold text-text">Farmer Management</h2>
@@ -233,7 +286,7 @@ export default function FarmerManagement() {
           <button
             onClick={() => {
               setEditingId(null);
-              setForm({ full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: '' });
+              setForm({ full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: '', assigned_staff: '' });
               setVillages([]);
               setShowForm(true);
             }}
@@ -245,9 +298,10 @@ export default function FarmerManagement() {
       </div>
 
       {showWizard && (
-        <ImportWizard onClose={() => setShowWizard(false)} onComplete={() => fetchFarmers(1, search)} />
+        <ImportWizard onClose={() => setShowWizard(false)} onComplete={() => fetchFarmers(1)} />
       )}
 
+      {/* Add / Edit Farmer Modal */}
       {showForm && (
         <div className="card p-6 mb-6 animate-stagger-in shadow-lg border-2 border-primary/20">
           <div className="flex justify-between items-center mb-4">
@@ -293,6 +347,17 @@ export default function FarmerManagement() {
               <label className="block text-xs font-semibold text-text-muted mb-1">State *</label>
               <input required placeholder="State..." value={form.state} onChange={e => setForm({...form, state: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Assigned Field Staff</label>
+              <select value={form.assigned_staff || ''} onChange={e => setForm({...form, assigned_staff: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none">
+                <option value="">Unassigned</option>
+                {staffUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email} ({u.role})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="md:col-span-3 flex justify-end mt-2">
               <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm btn-press">
                 {editingId ? 'Update Farmer' : 'Save Farmer'}
@@ -302,43 +367,157 @@ export default function FarmerManagement() {
         </div>
       )}
 
-      {/* Server-side Search */}
-      <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          type="text"
-          placeholder="Search by name, village, or mobile..."
-          value={search}
-          onChange={handleSearchChange}
-          className="w-full pl-9 pr-10 py-2.5 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
-        />
-        {loading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      {/* Search & Filter Bar */}
+      <div className="card p-4 mb-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search by name, village, taluka, district, or mobile..."
+              value={search}
+              onChange={handleSearchChange}
+              className="w-full pl-9 pr-10 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+            />
+            {loading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg font-medium text-sm transition-colors cursor-pointer ${
+              showFilters || hasActiveFilters ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-surface text-text-muted hover:text-text'
+            }`}
+          >
+            <Filter size={16} /> Filters {hasActiveFilters && '•'}
+          </button>
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-muted hover:text-danger rounded-lg border border-border hover:bg-bg transition-colors"
+              title="Clear all filters"
+            >
+              <RotateCcw size={14} /> Clear
+            </button>
+          )}
+        </div>
+
+        {/* Extended Filter Panel */}
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-border animate-fade-in">
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">PIN Code</label>
+              <input
+                type="text"
+                placeholder="e.g. 413001"
+                value={filterPinCode}
+                onChange={e => setFilterPinCode(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">Village</label>
+              <input
+                type="text"
+                placeholder="Village name..."
+                value={filterVillage}
+                onChange={e => setFilterVillage(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">Taluka</label>
+              <input
+                type="text"
+                placeholder="Taluka name..."
+                value={filterTaluka}
+                onChange={e => setFilterTaluka(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">District</label>
+              <input
+                type="text"
+                placeholder="District name..."
+                value={filterDistrict}
+                onChange={e => setFilterDistrict(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">Territory</label>
+              <select
+                value={filterTerritory}
+                onChange={e => setFilterTerritory(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              >
+                <option value="">All Territories</option>
+                {territories.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-text-muted mb-1">Assigned Staff</label>
+              <select
+                value={filterStaff}
+                onChange={e => setFilterStaff(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-md text-xs bg-bg focus:ring-1 focus:ring-primary focus:outline-none"
+              >
+                <option value="">All Staff</option>
+                <option value="unassigned">Unassigned</option>
+                {staffUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         )}
       </div>
 
+      {/* Bulk Action Controls */}
       {selectedFarmers.length > 0 && (
         <div className="flex items-center gap-4 bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 animate-stagger-in">
-          <p className="text-sm font-semibold text-primary flex-1">{selectedFarmers.length} farmers selected</p>
-          <button onClick={() => setShowSendMessage(true)} className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press">
-            <MessageSquare size={16} /> Send Message
-          </button>
+          <p className="text-sm font-semibold text-primary flex-1">
+            {selectedFarmers.length} farmer{selectedFarmers.length > 1 ? 's' : ''} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowBulkReassign(true)}
+              className="flex items-center gap-2 bg-accent hover:bg-accent-light text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press"
+            >
+              <UserCheck size={16} /> Reassign Staff ({selectedFarmers.length})
+            </button>
+            <button
+              onClick={() => setShowSendMessage(true)}
+              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press"
+            >
+              <MessageSquare size={16} /> Send Message
+            </button>
+          </div>
         </div>
       )}
 
+      {/* Farmers Data Table */}
       <div className="card overflow-hidden">
         <table className="data-table">
           <thead>
             <tr>
               <th className="w-12">
-                <input type="checkbox" className="rounded text-primary focus:ring-primary" checked={isSelectingAll} onChange={handleSelectAll} />
+                <input
+                  type="checkbox"
+                  className="rounded text-primary focus:ring-primary"
+                  checked={isSelectingAll}
+                  onChange={handleSelectAll}
+                />
               </th>
               <th>Name</th>
               <th>Mobile</th>
-              <th>Village</th>
-              <th>District</th>
+              <th>Village / Taluka</th>
+              <th>District / PIN</th>
+              <th>Assigned Staff</th>
               <th>Source</th>
-              <th>Acquisition Date</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -346,7 +525,7 @@ export default function FarmerManagement() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="text-center py-10 text-text-muted">
+                <td colSpan="9" className="text-center py-10 text-text-muted">
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     Loading farmers...
@@ -354,22 +533,42 @@ export default function FarmerManagement() {
                 </td>
               </tr>
             ) : farmers.length === 0 ? (
-              <tr><td colSpan="7" className="text-center py-10 text-text-muted">No farmers found.</td></tr>
+              <tr><td colSpan="9" className="text-center py-10 text-text-muted">No farmers found matching filters.</td></tr>
             ) : farmers.map((farmer, i) => (
               <tr key={farmer.id} className="animate-stagger-in" style={{ animationDelay: `${i * 15}ms` }}>
                 <td>
-                  <input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedFarmers.includes(farmer.id)} onChange={e => handleSelectFarmer(farmer.id, e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    className="rounded text-primary focus:ring-primary"
+                    checked={selectedFarmers.includes(farmer.id)}
+                    onChange={e => handleSelectFarmer(farmer.id, e.target.checked)}
+                  />
                 </td>
                 <td className="font-medium">{farmer.full_name}</td>
                 <td className="font-mono text-xs">{farmer.primary_mobile}</td>
-                <td>{farmer.village}</td>
-                <td>{farmer.district || '—'}</td>
+                <td>
+                  <div className="text-xs font-medium text-text">{farmer.village}</div>
+                  <div className="text-[11px] text-text-muted">{farmer.taluka || '—'}</div>
+                </td>
+                <td>
+                  <div className="text-xs font-medium text-text">{farmer.district || '—'}</div>
+                  <div className="text-[11px] font-mono text-text-muted">{farmer.pin_code || '—'}</div>
+                </td>
+                <td>
+                  {farmer.assigned_staff_name ? (
+                    <div>
+                      <div className="text-xs font-medium text-text">{farmer.assigned_staff_name}</div>
+                      <div className="text-[11px] text-text-muted">{farmer.assigned_staff_mobile || farmer.assigned_staff_email}</div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-text-muted italic">Unassigned</span>
+                  )}
+                </td>
                 <td>
                   <span className={`badge ${farmer.source === 'BulkImport' ? 'bg-blue-50 text-blue-700' : farmer.source === 'InApp' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                     {farmer.source || '—'}
                   </span>
                 </td>
-                <td className="text-xs text-text-muted whitespace-nowrap">{farmer.acquisition_date || '—'}</td>
                 <td>
                   <span className={`badge ${farmer.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
                     {farmer.status}
@@ -454,6 +653,19 @@ export default function FarmerManagement() {
             setSelectedFarmers([]);
             setIsSelectingAll(false);
             alert('Messages scheduled successfully!');
+          }}
+        />
+      )}
+
+      {showBulkReassign && (
+        <BulkReassignModal
+          farmerIds={selectedFarmers}
+          onClose={() => setShowBulkReassign(false)}
+          onSuccess={() => {
+            setShowBulkReassign(false);
+            setSelectedFarmers([]);
+            setIsSelectingAll(false);
+            fetchFarmers(page);
           }}
         />
       )}
