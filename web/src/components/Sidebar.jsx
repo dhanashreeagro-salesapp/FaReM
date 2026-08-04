@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin } from 'lucide-react';
+import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
@@ -10,11 +10,13 @@ const navItems = [
   { path: '/crops', label: 'Crop Master', icon: Wheat, roles: ['Admin', 'ContentTeam'] },
   { path: '/farmers', label: 'Farmer Management', icon: UserCheck, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/planner', label: 'Smart Planner', icon: Map, roles: ['Admin', 'FieldStaff'] },
+  { path: '/recommendations-dashboard', label: 'Recommendation Engine', icon: Award, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam'] },
   { path: '/promotions-management', label: 'Promotions Management', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Admin'] },
   { path: '/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];
+
 
 export default function Sidebar() {
   const location = useLocation();

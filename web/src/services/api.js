@@ -360,6 +360,45 @@ class ApiClient {
   // Config
   getConfig() { return this.request('/config/'); }
   updateConfig(data) { return this.request('/config/', { method: 'PUT', body: JSON.stringify(data) }); }
+
+  // Field Visits
+  getFieldVisits(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/field-visits/${qs ? `?${qs}` : ''}`);
+  }
+  createFieldVisit(data) { return this.request('/field-visits/', { method: 'POST', body: JSON.stringify(data) }); }
+  checkOutFieldVisit(id, data = {}) { return this.request(`/field-visits/${id}/check_out/`, { method: 'POST', body: JSON.stringify(data) }); }
+  uploadVisitPhoto(id, data) { return this.request(`/field-visits/${id}/upload_photo/`, { method: 'POST', body: JSON.stringify(data) }); }
+  getWeeklyVisitSummary() { return this.request('/field-visits/weekly_summary/'); }
+
+  // Call Logs
+  getCallLogs(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/call-logs/${qs ? `?${qs}` : ''}`);
+  }
+  createCallLog(data) { return this.request('/call-logs/', { method: 'POST', body: JSON.stringify(data) }); }
+
+  // Recommendations
+  getRecommendations(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/recommendations/${qs ? `?${qs}` : ''}`);
+  }
+  createRecommendation(data) { return this.request('/recommendations/', { method: 'POST', body: JSON.stringify(data) }); }
+  getAiRecommendationSuggestions(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/recommendations/suggestions/${qs ? `?${qs}` : ''}`);
+  }
+  sendRecommendationWhatsApp(id, data = {}) { return this.request(`/recommendations/${id}/send_whatsapp/`, { method: 'POST', body: JSON.stringify(data) }); }
+  sendRecommendationSms(id, data = {}) { return this.request(`/recommendations/${id}/send_sms/`, { method: 'POST', body: JSON.stringify(data) }); }
+  reviewRecommendation(id, data) { return this.request(`/recommendations/${id}/review/`, { method: 'POST', body: JSON.stringify(data) }); }
+  getRecommendationAnalytics() { return this.request('/recommendations/analytics/'); }
+
+  // Unified Farmer Timeline
+  getFarmerTimeline(farmerId, page = 1) { return this.request(`/farmers/${farmerId}/timeline/?page=${page}`); }
+
+  // Offline Sync
+  syncOfflineBatch(data) { return this.request('/sync/offline_batch/', { method: 'POST', body: JSON.stringify(data) }); }
+
 }
 
 const api = new ApiClient();

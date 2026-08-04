@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare, UserCheck, Filter, RotateCcw } from 'lucide-react';
+import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare, UserCheck, Filter, RotateCcw, MapPin, PhoneCall, Award, History, BarChart2 } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
 import PlotManagementModal from '../components/PlotManagementModal';
 import SendMessageModal from '../components/SendMessageModal';
 import BulkReassignModal from '../components/BulkReassignModal';
+import LogVisitModal from '../components/LogVisitModal';
+import CallLogModal from '../components/CallLogModal';
+import RecommendationModal from '../components/RecommendationModal';
+import FarmerTimeline from '../components/FarmerTimeline';
+import WeeklyVisitSummary from '../components/WeeklyVisitSummary';
+
 
 export default function FarmerManagement() {
   const [farmers, setFarmers] = useState([]);
@@ -34,8 +40,14 @@ export default function FarmerManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [showBulkReassign, setShowBulkReassign] = useState(false);
+  const [selectedFarmerForVisit, setSelectedFarmerForVisit] = useState(null);
+  const [selectedFarmerForCall, setSelectedFarmerForCall] = useState(null);
+  const [selectedFarmerForRecommend, setSelectedFarmerForRecommend] = useState(null);
+  const [selectedFarmerForTimeline, setSelectedFarmerForTimeline] = useState(null);
+  const [showWeeklySummary, setShowWeeklySummary] = useState(false);
   const [selectedFarmers, setSelectedFarmers] = useState([]);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
+
   
   const [editingId, setEditingId] = useState(null);
   const [selectedFarmerForPlots, setSelectedFarmerForPlots] = useState(null);
@@ -575,7 +587,19 @@ export default function FarmerManagement() {
                   </span>
                 </td>
                 <td className="text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button onClick={() => setSelectedFarmerForVisit(farmer)} className="p-1 hover:text-emerald-600 transition-colors cursor-pointer" title="Log Field Visit">
+                      <MapPin size={14} />
+                    </button>
+                    <button onClick={() => setSelectedFarmerForCall(farmer)} className="p-1 hover:text-blue-600 transition-colors cursor-pointer" title="Call Farmer & Log Outcome">
+                      <PhoneCall size={14} />
+                    </button>
+                    <button onClick={() => setSelectedFarmerForRecommend(farmer)} className="p-1 hover:text-amber-600 transition-colors cursor-pointer" title="AI Recommendation Advisory">
+                      <Award size={14} />
+                    </button>
+                    <button onClick={() => setSelectedFarmerForTimeline(farmer)} className="p-1 hover:text-purple-600 transition-colors cursor-pointer" title="View Activity Timeline">
+                      <History size={14} />
+                    </button>
                     <button onClick={() => handleEdit(farmer)} className="p-1 hover:text-primary transition-colors cursor-pointer" title="Edit Farmer">
                       <Edit2 size={14} />
                     </button>
@@ -589,6 +613,7 @@ export default function FarmerManagement() {
                     )}
                   </div>
                 </td>
+
               </tr>
             ))}
           </tbody>
@@ -669,6 +694,54 @@ export default function FarmerManagement() {
           }}
         />
       )}
+
+      {selectedFarmerForVisit && (
+        <LogVisitModal
+          farmer={selectedFarmerForVisit}
+          onClose={() => setSelectedFarmerForVisit(null)}
+          onSuccess={() => {
+            setSelectedFarmerForVisit(null);
+            fetchFarmers(page);
+          }}
+        />
+      )}
+
+      {selectedFarmerForCall && (
+        <CallLogModal
+          farmer={selectedFarmerForCall}
+          onClose={() => setSelectedFarmerForCall(null)}
+          onSuccess={() => setSelectedFarmerForCall(null)}
+        />
+      )}
+
+      {selectedFarmerForRecommend && (
+        <RecommendationModal
+          farmer={selectedFarmerForRecommend}
+          onClose={() => setSelectedFarmerForRecommend(null)}
+          onSuccess={() => setSelectedFarmerForRecommend(null)}
+        />
+      )}
+
+      {selectedFarmerForTimeline && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end">
+          <div className="bg-surface border-l border-border w-full max-w-xl h-full p-6 overflow-y-auto shadow-2xl space-y-4 animate-slide-in-right">
+            <div className="flex justify-between items-center border-b border-border pb-4">
+              <div className="flex items-center gap-2">
+                <History size={20} className="text-primary" />
+                <div>
+                  <h3 className="text-base font-heading font-bold text-text">Activity Timeline</h3>
+                  <p className="text-xs text-text-muted">{selectedFarmerForTimeline.full_name} ({selectedFarmerForTimeline.primary_mobile})</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedFarmerForTimeline(null)} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-bg">
+                <X size={20} />
+              </button>
+            </div>
+            <FarmerTimeline farmerId={selectedFarmerForTimeline.id} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

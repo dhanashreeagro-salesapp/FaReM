@@ -2,7 +2,11 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.gis.db import models as gis_models
 from django.db import models
 from django.core.validators import RegexValidator
+from django.utils import timezone
 import uuid
+
+
+
 
 class Role(models.TextChoices):
     FIELD_STAFF = 'FieldStaff', 'Field Staff'
@@ -200,20 +204,84 @@ class ActivityLog(models.Model):
         # Prevent deletion
         return
 
-class Recommendation(models.Model):
+class FieldVisit(models.Model):
+    PURPOSE_CHOICES = [
+        ('Product Demonstration', 'Product Demonstration'),
+        ('Crop Advisory', 'Crop Advisory'),
+        ('Issue Resolution', 'Issue Resolution'),
+        ('Routine Visit', 'Routine Visit'),
+        ('Complaint Investigation', 'Complaint Investigation'),
+        ('New Farmer Registration', 'New Farmer Registration'),
+        ('Collection', 'Collection'),
+        ('Other', 'Other')
+    ]
+    STATUS_CHOICES = [
+        ('Verified', 'Verified'),
+        ('Outside Radius', 'Outside Radius'),
+        ('Pending Check-Out', 'Pending Check-Out'),
+        ('Completed', 'Completed')
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='recommendations')
-    created_by_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    product_name = models.CharField(max_length=255)
-    dose = models.CharField(max_length=255)
-    timing = models.CharField(max_length=255)
-    application_method = models.CharField(max_length=255)
+    farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='field_visits')
+    plot = models.ForeignKey(Plot, on_delete=models.SET_NULL, null=True, blank=True, related_name='field_visits')
+    staff = models.ForeignKey(User, on_delete=models.CASCADE, related_name='visits')
+    purpose = models.CharField(max_length=50, choices=PURPOSE_CHOICES, default='Routine Visit')
     notes = models.TextField(blank=True, null=True)
-    crop = models.ForeignKey(CropMaster, on_delete=models.SET_NULL, null=True, blank=True)
-    stage = models.ForeignKey(CropStage, on_delete=models.SET_NULL, null=True, blank=True)
-    channel = models.CharField(max_length=20, choices=[('WhatsApp', 'WhatsApp'), ('SMS', 'SMS')])
-    send_status = models.CharField(max_length=50, choices=[('Sent', 'Sent'), ('Delivered', 'Delivered'), ('Failed', 'Failed')], default='Sent')
-    timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='Verified')
+    
+    check_in_time = models.DateTimeField()
+    check_out_time = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.IntegerField(null=True, blank=True)
+    
+    latitude = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    gps_accuracy = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    distance_from_plot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    inside_radius = models.BooleanField(default=True)
+    photo_count = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_visits')
+
+    def __str__(self):
+        return f"Visit - {self.farmer.full_name} by {self.staff.email} ({self.purpose})"
+
+class VisitPhoto(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    visit = models.ForeignKey(FieldVisit, on_delete=models.CASCADE, related_name='photos')
+    photo_url = models.URLField(max_length=500)
+    thumbnail_url = models.URLField(max_length=500, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class CallLog(models.Model):
+    DIRECTION_CHOICES = [('Outgoing', 'Outgoing'), ('Incoming', 'Incoming')]
+    OUTCOME_CHOICES = [
+        ('Interested', 'Interested'),
+        ('Not Interested', 'Not Interested'),
+        ('Follow-up Required', 'Follow-up Required'),
+        ('No Answer', 'No Answer'),
+        ('Busy', 'Busy'),
+        ('Switched Off', 'Switched Off'),
+        ('Complaint', 'Complaint'),
+        ('Other', 'Other')
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='call_logs')
+    staff = models.ForeignKey(User, on_delete=models.CASCADE, related_name='call_logs')
+    direction = models.CharField(max_length=20, choices=DIRECTION_CHOICES, default='Outgoing')
+    call_time = models.DateTimeField(default=timezone.now)
+    duration = models.IntegerField(null=True, blank=True, help_text='Call duration in seconds')
+    outcome = models.CharField(max_length=50, choices=OUTCOME_CHOICES, default='Other')
+    notes = models.TextField(blank=True, null=True)
+    next_action = models.CharField(max_length=255, blank=True, null=True)
+    followup_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Call ({self.direction}) - {self.farmer.full_name} ({self.outcome})"
 
 class ProductMaster(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -224,6 +292,47 @@ class ProductMaster(models.Model):
     def __str__(self):
         return self.name
 
+class Recommendation(models.Model):
+    PRIORITY_CHOICES = [('Normal', 'Normal'), ('High', 'High'), ('Urgent', 'Urgent')]
+    REVIEW_CHOICES = [('Pending', 'Pending'), ('Approved', 'Approved'), ('Needs Review', 'Needs Review'), ('Rejected', 'Rejected')]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='recommendations')
+    plot = models.ForeignKey(Plot, on_delete=models.SET_NULL, null=True, blank=True, related_name='recommendations')
+    created_by_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    crop = models.ForeignKey(CropMaster, on_delete=models.SET_NULL, null=True, blank=True)
+    stage = models.ForeignKey(CropStage, on_delete=models.SET_NULL, null=True, blank=True)
+    product = models.ForeignKey(ProductMaster, on_delete=models.SET_NULL, null=True, blank=True, related_name='recommendations')
+    product_name = models.CharField(max_length=255)
+    dose = models.CharField(max_length=255)
+    dose_unit = models.CharField(max_length=50, blank=True, null=True, default='g/L')
+    timing = models.CharField(max_length=255)
+    application_method = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, null=True)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Normal')
+    review_status = models.CharField(max_length=20, choices=REVIEW_CHOICES, default='Approved')
+    manager_comment = models.TextField(blank=True, null=True)
+    channel = models.CharField(max_length=20, choices=[('WhatsApp', 'WhatsApp'), ('SMS', 'SMS'), ('Internal', 'Internal')], default='Internal')
+    send_status = models.CharField(max_length=50, choices=[('Sent', 'Sent'), ('Delivered', 'Delivered'), ('Failed', 'Failed')], default='Sent')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Recommendation: {self.product_name} for {self.farmer.full_name}"
+
+class RecommendationMessage(models.Model):
+    CHANNEL_CHOICES = [('WhatsApp', 'WhatsApp'), ('SMS', 'SMS'), ('Internal', 'Internal')]
+    STATUS_CHOICES = [('Pending', 'Pending'), ('Sent', 'Sent'), ('Failed', 'Failed')]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='messages')
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='Internal')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    sent_time = models.DateTimeField(null=True, blank=True)
+    content = models.TextField()
+    delivery_status = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
 class PromotionLibrary(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
@@ -233,7 +342,7 @@ class PromotionLibrary(models.Model):
     stage = models.ForeignKey(CropStage, on_delete=models.SET_NULL, null=True, blank=True)
     related_products = models.ManyToManyField(ProductMaster, blank=True)
     category = models.CharField(max_length=50, choices=[('Product', 'Product'), ('Tagline', 'Tagline'), ('WhatsApp', 'WhatsApp'), ('Facebook', 'Facebook'), ('Instagram', 'Instagram'), ('LinkedIn', 'LinkedIn'), ('Schedule', 'Schedule'), ('Testimonial', 'Testimonial'), ('YouTube Playlist', 'YouTube Playlist')], default='Product')
-    language_tags = models.JSONField(default=list, blank=True) # list of languages e.g., ["English", "Marathi"]
+    language_tags = models.JSONField(default=list, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     whatsapp_template = models.CharField(max_length=255, blank=True, null=True)
@@ -271,8 +380,8 @@ class ImportJob(models.Model):
     valid_rows = models.IntegerField(default=0)
     error_count = models.IntegerField(default=0)
     duplicate_count = models.IntegerField(default=0)
-    error_report = models.JSONField(default=list) # List of row-level errors
-    is_acknowledged = models.BooleanField(default=False) # For > 1000 records
+    error_report = models.JSONField(default=list)
+    is_acknowledged = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -296,6 +405,8 @@ class AppConfiguration(models.Model):
     """Singleton model for admin-configurable system settings."""
     visit_frequency_norm_days = models.IntegerField(default=14, help_text='Default days before a farmer visit is considered overdue')
     planner_refresh_hour = models.IntegerField(default=6, help_text='Hour (0-23) when daily smart planner refreshes')
+    visit_radius_meters = models.IntegerField(default=150, help_text='Maximum distance in meters for verified visit')
+    gps_validation_mode = models.CharField(max_length=20, choices=[('Strict', 'Strict'), ('Warning', 'Warning')], default='Warning', help_text='Strict blocks save outside radius; Warning flags visit and permits save')
     msg91_auth_key = models.CharField(max_length=255, blank=True, null=True)
     interakt_api_key = models.CharField(max_length=255, blank=True, null=True)
     cloudinary_url = models.CharField(max_length=500, blank=True, null=True)
@@ -313,3 +424,4 @@ class AppConfiguration(models.Model):
     class Meta:
         verbose_name = 'App Configuration'
         verbose_name_plural = 'App Configuration'
+

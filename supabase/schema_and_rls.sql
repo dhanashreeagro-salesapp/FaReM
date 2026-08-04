@@ -2,43 +2,102 @@
 -- 1. Enable PostGIS
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- 2. Configure app_user role (assuming Django connects using this)
--- Replace 'app_user' with the actual connection user
-DO
-$do$
-BEGIN
-   IF NOT EXISTS (
-      SELECT FROM pg_catalog.pg_roles
-      WHERE  rolname = 'app_user') THEN
-      CREATE ROLE app_user LOGIN PASSWORD 'password';
-   END IF;
-END
-$do$;
+-- 2. Field Visit Logging Table
+CREATE TABLE IF NOT EXISTS public.core_fieldvisit (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    farmer_id UUID NOT NULL REFERENCES public.core_farmer(id) ON DELETE CASCADE,
+    plot_id UUID REFERENCES public.core_plot(id) ON DELETE SET NULL,
+    staff_id UUID NOT NULL REFERENCES public.core_user(id) ON DELETE CASCADE,
+    purpose VARCHAR(50) NOT NULL DEFAULT 'Routine Visit',
+    notes TEXT,
+    status VARCHAR(30) NOT NULL DEFAULT 'Verified',
+    check_in_time TIMESTAMPTZ NOT NULL,
+    check_out_time TIMESTAMPTZ,
+    duration_minutes INT,
+    latitude NUMERIC(10, 7) NOT NULL,
+    longitude NUMERIC(10, 7) NOT NULL,
+    gps_accuracy NUMERIC(8, 2),
+    distance_from_plot NUMERIC(10, 2),
+    inside_radius BOOLEAN DEFAULT TRUE,
+    photo_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by_id UUID REFERENCES public.core_user(id) ON DELETE SET NULL
+);
 
-GRANT ALL PRIVILEGES ON DATABASE postgres TO app_user;
+-- Visit Photos Table
+CREATE TABLE IF NOT EXISTS public.core_visitphoto (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    visit_id UUID NOT NULL REFERENCES public.core_fieldvisit(id) ON DELETE CASCADE,
+    photo_url VARCHAR(500) NOT NULL,
+    thumbnail_url VARCHAR(500),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- 3. Make AuditLog table append-only
--- This assumes Django has migrated the tables. The table name for SystemAuditLog is core_systemauditlog.
--- Run this AFTER Django migrations.
-REVOKE UPDATE, DELETE ON TABLE public.core_systemauditlog FROM app_user;
+-- Call Logs Table
+CREATE TABLE IF NOT EXISTS public.core_calllog (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    farmer_id UUID NOT NULL REFERENCES public.core_farmer(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES public.core_user(id) ON DELETE CASCADE,
+    direction VARCHAR(20) NOT NULL DEFAULT 'Outgoing',
+    call_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    duration INT,
+    outcome VARCHAR(50) NOT NULL DEFAULT 'Other',
+    notes TEXT,
+    next_action VARCHAR(255),
+    followup_date DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- Similarly for StageChangeLog
-REVOKE UPDATE, DELETE ON TABLE public.core_stagechangelog FROM app_user;
+-- Recommendation Messages Table
+CREATE TABLE IF NOT EXISTS public.core_recommendationmessage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recommendation_id UUID NOT NULL REFERENCES public.core_recommendation(id) ON DELETE CASCADE,
+    channel VARCHAR(20) NOT NULL DEFAULT 'Internal',
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+    sent_time TIMESTAMPTZ,
+    content TEXT NOT NULL,
+    delivery_status VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- Similarly for ActivityLog (Visits/Calls)
-REVOKE UPDATE, DELETE ON TABLE public.core_activitylog FROM app_user;
+-- 3. Indexes for Performance (<1s responses)
+CREATE INDEX IF NOT EXISTS idx_fieldvisit_farmer ON public.core_fieldvisit(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_fieldvisit_staff ON public.core_fieldvisit(staff_id);
+CREATE INDEX IF NOT EXISTS idx_fieldvisit_created ON public.core_fieldvisit(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_calllog_farmer ON public.core_calllog(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_calllog_staff ON public.core_calllog(staff_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_farmer ON public.core_recommendation(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_created ON public.core_recommendation(timestamp DESC);
 
--- 4. Enable Row Level Security (RLS) policies
--- Note: Django's ORM typically bypasses RLS if it connects as a superuser.
--- For production environments where the API connects via Supabase REST API (PostgREST), you would apply RLS directly.
--- Since we use Django DRF for APIs (auth handled at the API layer), Postgres RLS acts as a defense-in-depth measure.
+-- 4. Enable Row Level Security (RLS)
+ALTER TABLE public.core_fieldvisit ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.core_visitphoto ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.core_calllog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.core_recommendation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.core_recommendationmessage ENABLE ROW LEVEL SECURITY;
 
--- Enable RLS on Farmer Master
-ALTER TABLE public.core_farmer ENABLE ROW LEVEL SECURITY;
+-- Field Visits RLS Policies
+CREATE POLICY "Staff can view own visits" ON public.core_fieldvisit
+    FOR SELECT USING (staff_id = uuid(current_setting('request.jwt.claim.sub', true)));
 
--- If connecting via Supabase API (assuming JWT claims are mapped):
--- CREATE POLICY "Field Staff can view own farmers" ON public.core_farmer
---     FOR SELECT USING (assigned_staff_id = uuid(current_setting('request.jwt.claim.sub')));
-    
--- Note: Because we use Django for the backend (Module 1, 2, 3 details Django Auth and DRF),
--- we will enforce RBAC at the Django API Layer. RLS is mostly for Supabase Data API constraints.
+CREATE POLICY "Staff can insert own visits" ON public.core_fieldvisit
+    FOR INSERT WITH CHECK (staff_id = uuid(current_setting('request.jwt.claim.sub', true)));
+
+-- Call Logs RLS Policies
+CREATE POLICY "Staff can view own call logs" ON public.core_calllog
+    FOR SELECT USING (staff_id = uuid(current_setting('request.jwt.claim.sub', true)));
+
+CREATE POLICY "Staff can insert own call logs" ON public.core_calllog
+    FOR INSERT WITH CHECK (staff_id = uuid(current_setting('request.jwt.claim.sub', true)));
+
+-- 5. Storage Bucket Configuration for Visit Photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('visit-photos', 'visit-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Public read for visit photos" ON storage.objects
+    FOR SELECT USING (bucket_id = 'visit-photos');
+
+CREATE POLICY "Authenticated users can upload visit photos" ON storage.objects
+    FOR INSERT WITH CHECK (bucket_id = 'visit-photos' AND auth.role() = 'authenticated');

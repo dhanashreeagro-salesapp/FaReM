@@ -13,6 +13,8 @@ import Dashboard from './pages/Dashboard';
 import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
 import VisitPlanner from './pages/VisitPlanner';
+import RecommendationDashboard from './pages/RecommendationDashboard';
+
 
 import { MapPin } from 'lucide-react';
 
@@ -63,7 +65,9 @@ function ProtectedLayout() {
             <Route path="/planner" element={<VisitPlanner />} />
             <Route path="/promotions" element={<PromotionLibrary />} />
             <Route path="/promotions-management" element={<PromotionsManagement />} />
+            <Route path="/recommendations-dashboard" element={<RecommendationDashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
+
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

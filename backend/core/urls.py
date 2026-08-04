@@ -16,6 +16,10 @@ from . import views_bulk_send
 from . import views_config
 from . import views_product
 from . import views_import
+from . import views_visit
+from . import views_call
+from . import views_timeline
+from . import views_sync
 
 router = DefaultRouter()
 router.register(r'users', views_users.UserViewSet, basename='users')
@@ -34,6 +38,8 @@ router.register(r'import-jobs', views_import.ImportJobViewSet, basename='import-
 router.register(r'recommendations', views_recommendation.RecommendationViewSet, basename='recommendations')
 router.register(r'planner', views_planner.PlannerViewSet, basename='planner')
 router.register(r'bulk-sends', views_bulk_send.BulkSendBatchViewSet, basename='bulk-sends')
+router.register(r'field-visits', views_visit.FieldVisitViewSet, basename='field-visits')
+router.register(r'call-logs', views_call.CallLogViewSet, basename='call-logs')
 
 from . import views_dashboard
 
@@ -41,10 +47,11 @@ urlpatterns = [
     path('auth/login/', views.login_view, name='login'),
     path('auth/me/', views.me_view, name='auth_me'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-
     path('auth/invalidate-session/', views.invalidate_session, name='invalidate_session'),
     path('dashboard/', views_dashboard.DashboardAPIView.as_view(), name='dashboard'),
     path('export-report/', views_dashboard.ExportReportAPIView.as_view(), name='export_report'),
     path('config/', views_config.AppConfigurationView.as_view(), name='app_config'),
+    path('farmers/<uuid:farmer_id>/timeline/', views_timeline.farmer_timeline_view, name='farmer_timeline'),
+    path('sync/offline_batch/', views_sync.offline_batch_sync_view, name='offline_batch_sync'),
     path('', include(router.urls)),
 ]
