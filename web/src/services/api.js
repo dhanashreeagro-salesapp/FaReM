@@ -1,4 +1,7 @@
 let getApiBase = () => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://farem-web.onrender.com/api';
+  }
   let envUrl = import.meta.env.VITE_API_URL;
   if (!envUrl) return `http://${window.location.hostname}:8000/api`;
   envUrl = envUrl.trim().replace(/\/+$/, '');
@@ -9,7 +12,6 @@ let getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
-
 
 class ApiClient {
   constructor() {
@@ -34,6 +36,37 @@ class ApiClient {
     localStorage.removeItem('ffma_refresh_token');
     localStorage.removeItem('ffma_role');
   }
+
+  async requestWithCache(endpoint, options = {}, cacheKey = null) {
+    const key = cacheKey || `ffma_cache_${endpoint}`;
+    const cachedStr = localStorage.getItem(key);
+    
+    // Background fresh fetch to update cache silently
+    const networkPromise = this.request(endpoint, options).then(data => {
+      if (data) {
+        try {
+          localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) { /* localstorage quota handler */ }
+      }
+      return data;
+    }).catch(err => {
+      console.warn(`Background fetch failed for ${endpoint}:`, err);
+      return null;
+    });
+
+    if (cachedStr) {
+      try {
+        const cachedData = JSON.parse(cachedStr);
+        // Instant response from cache for fast low-network loading!
+        return cachedData;
+      } catch (e) {
+        localStorage.removeItem(key);
+      }
+    }
+
+    return await networkPromise;
+  }
+
 
   async request(endpoint, options = {}, retries = 3) {
     const url = `${this.baseUrl}${endpoint}`;
@@ -141,7 +174,7 @@ class ApiClient {
   }
 
   // Users
-  getUsers() { return this.request('/users/'); }
+  getUsers() { return this.requestWithCache('/users/', {}, 'cache_users'); }
   getUser(id) { return this.request(`/users/${id}/`); }
   createUser(data) { return this.request('/users/', { method: 'POST', body: JSON.stringify(data) }); }
   updateUser(id, data) { return this.request(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
@@ -196,13 +229,13 @@ class ApiClient {
   }
 
   // Territories
-  getTerritories() { return this.request('/territories/'); }
+  getTerritories() { return this.requestWithCache('/territories/', {}, 'cache_territories'); }
   createTerritory(data) { return this.request('/territories/', { method: 'POST', body: JSON.stringify(data) }); }
   updateTerritory(id, data) { return this.request(`/territories/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   deleteTerritory(id) { return this.request(`/territories/${id}/`, { method: 'DELETE' }); }
 
   // Crops
-  getCrops() { return this.request('/crops/'); }
+  getCrops() { return this.requestWithCache('/crops/', {}, 'cache_crops'); }
   getCrop(id) { return this.request(`/crops/${id}/`); }
   createCrop(data) {
     return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
@@ -221,8 +254,9 @@ class ApiClient {
   // Farmers
   getFarmers(params = {}) {
     const qs = new URLSearchParams(params).toString();
-    return this.request(`/farmers/${qs ? `?${qs}` : ''}`);
+    return this.requestWithCache(`/farmers/${qs ? `?${qs}` : ''}`, {}, `cache_farmers_${qs}`);
   }
+
   getVillages() { return this.request('/farmers/villages/'); }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
   getFarmerIds(params = {}) {

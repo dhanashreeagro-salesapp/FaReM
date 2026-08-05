@@ -8,14 +8,22 @@ from .permissions import IsAdminUser
 
 class UserViewSet(viewsets.ModelViewSet):
     """
-    CRUD endpoint for Admin to manage users.
-    Only Admin has access. Roles can only be assigned here.
+    User Management Endpoint.
+    List/Retrieve accessible to all authenticated users for staff dropdowns and views.
+    Mutations (Create/Update/Delete) restricted to Admin users.
     """
-    queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
     filter_backends = [filters.SearchFilter]
     search_fields = ['mobile_number', 'employee_id', 'first_name', 'last_name', 'email', 'territory__name']
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+    def get_queryset(self):
+        return User.objects.all().select_related('territory', 'reporting_manager')
+
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

@@ -6,6 +6,7 @@ from rest_framework.pagination import PageNumberPagination
 from .models import Farmer, Role
 from .serializers_farmer import FarmerSerializer
 from .permissions import IsAdminUser
+from django.db.models import Q
 from django.core.cache import cache
 
 class FarmerPagination(PageNumberPagination):
@@ -23,23 +24,27 @@ class FarmerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Farmer.objects.none()
-        if user.role == Role.ADMIN or user.role == Role.ZONAL_MANAGER or user.role == Role.CONTENT_TEAM:
+        queryset = Farmer.objects.all()
+        if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
             queryset = Farmer.objects.all()
-        elif user.role == Role.TERRITORY_MANAGER:
-            cache_key = f'user_territories_{user.id}'
-            territories = cache.get(cache_key)
-            if territories is None:
-                territories = []
-                if user.territory:
-                    territories.extend(user.territory.get_all_sub_territories())
-                for managed_territory in user.managed_territories.all():
-                    territories.extend(managed_territory.get_all_sub_territories())
-                territories = list(set(territories))
-                cache.set(cache_key, territories, 60 * 60) # 1 hour
-            queryset = Farmer.objects.filter(territory__in=territories)
-        elif user.role == Role.FIELD_STAFF:
-            queryset = Farmer.objects.filter(assigned_staff=user)
+        elif user.role in [Role.TERRITORY_MANAGER, Role.FIELD_STAFF]:
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            
+            if user.role == Role.TERRITORY_MANAGER:
+                queryset = Farmer.objects.filter(Q(territory__in=territories) | Q(assigned_staff=user))
+            else: # FIELD_STAFF
+                if territories:
+                    queryset = Farmer.objects.filter(Q(assigned_staff=user) | Q(territory__in=territories))
+                else:
+                    queryset = Farmer.objects.filter(assigned_staff=user)
+
+        queryset = queryset.select_related('assigned_staff', 'territory')
+
 
         # Filters for location and assignment
         pin_code = self.request.query_params.get('pin_code')

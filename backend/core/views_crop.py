@@ -11,9 +11,12 @@ class IsAdminOrReadOnly(BasePermission):
         return IsAdminUser().has_permission(request, view)
 
 class CropMasterViewSet(viewsets.ModelViewSet):
-    queryset = CropMaster.objects.all()
     serializer_class = CropMasterSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        return CropMaster.objects.all().prefetch_related('varieties', 'stages')
+
 
 class CropVarietyViewSet(viewsets.ModelViewSet):
     queryset = CropVariety.objects.all()
