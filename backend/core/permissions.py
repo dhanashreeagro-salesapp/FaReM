@@ -3,7 +3,14 @@ from .models import Role
 
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == Role.ADMIN)
+        if not (request.user and request.user.is_authenticated):
+            return False
+        return bool(
+            request.user.role in [Role.ADMIN, 'Admin', 'ADMIN', 'admin'] or
+            getattr(request.user, 'is_superuser', False) or
+            getattr(request.user, 'is_staff', False)
+        )
+
 
 class IsFieldStaff(permissions.BasePermission):
     def has_permission(self, request, view):

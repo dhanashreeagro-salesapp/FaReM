@@ -123,10 +123,27 @@ export default function TerritoryManagement() {
       setForm({ name: '', parent_territory: '' });
       fetchTerritories();
     } catch (err) {
-      const errMsg = err.error || err.detail || (err.parent_territory ? `Parent territory: ${err.parent_territory.join(', ')}` : null) || 'Failed to save territory';
+      let errMsg = 'Failed to save territory';
+      if (typeof err === 'string') {
+        errMsg = err;
+      } else if (err?.detail) {
+        errMsg = err.detail;
+      } else if (err?.error) {
+        errMsg = err.error;
+      } else if (err && typeof err === 'object') {
+        const details = [];
+        Object.keys(err).forEach(k => {
+          if (k !== 'status') {
+            const val = Array.isArray(err[k]) ? err[k].join(', ') : err[k];
+            details.push(`${k}: ${val}`);
+          }
+        });
+        if (details.length > 0) errMsg = details.join(' | ');
+      }
       alert(errMsg);
     }
   };
+
 
 
   // Generate mock coordinates for the map display if real coordinates don't exist
