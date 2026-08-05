@@ -229,10 +229,29 @@ class ApiClient {
   }
 
   // Territories
-  getTerritories() { return this.requestWithCache('/territories/', {}, 'cache_territories'); }
-  createTerritory(data) { return this.request('/territories/', { method: 'POST', body: JSON.stringify(data) }); }
-  updateTerritory(id, data) { return this.request(`/territories/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
-  deleteTerritory(id) { return this.request(`/territories/${id}/`, { method: 'DELETE' }); }
+  getTerritories(forceFresh = false) {
+    if (forceFresh) {
+      localStorage.removeItem('cache_territories');
+      return this.request('/territories/').then(data => {
+        if (data) localStorage.setItem('cache_territories', JSON.stringify(data));
+        return data;
+      });
+    }
+    return this.requestWithCache('/territories/', {}, 'cache_territories');
+  }
+  createTerritory(data) {
+    localStorage.removeItem('cache_territories');
+    return this.request('/territories/', { method: 'POST', body: JSON.stringify(data) });
+  }
+  updateTerritory(id, data) {
+    localStorage.removeItem('cache_territories');
+    return this.request(`/territories/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+  deleteTerritory(id) {
+    localStorage.removeItem('cache_territories');
+    return this.request(`/territories/${id}/`, { method: 'DELETE' });
+  }
+
 
   // Crops
   getCrops() { return this.requestWithCache('/crops/', {}, 'cache_crops'); }

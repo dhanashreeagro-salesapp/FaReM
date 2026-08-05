@@ -72,15 +72,16 @@ export default function TerritoryManagement() {
   const [viewMode, setViewMode] = useState('list');
 
 
-  const fetchTerritories = async () => {
+  const fetchTerritories = async (forceFresh = true) => {
     try {
-      const data = await api.getTerritories();
+      const data = await api.getTerritories(forceFresh);
       const list = Array.isArray(data) ? data : data.results || [];
       setAllTerritories(list);
       setTerritories(list.filter(t => !t.parent_territory));
     } catch { setTerritories([]); }
     setLoading(false);
   };
+
 
   useEffect(() => { fetchTerritories(); }, []);
 
@@ -209,8 +210,12 @@ export default function TerritoryManagement() {
               <select value={form.parent_territory} onChange={e => setForm({...form, parent_territory: e.target.value})}
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none">
                 <option value="">-- Root (Region) --</option>
-                {allTerritories.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {[...allTerritories]
+                  .filter(t => !editingId || t.id !== editingId)
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+
             </div>
             <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm btn-press">
               {editingId ? 'Update Territory' : 'Create Territory'}
