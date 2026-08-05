@@ -35,4 +35,5 @@ class IsManagerOrAdmin(permissions.BasePermission):
 
 class IsStaffOrManagerOrAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.ADMIN, Role.FIELD_STAFF, Role.TERRITORY_MANAGER, Role.ZONAL_MANAGER])
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.ADMIN, Role.FIELD_STAFF, Role.TERRITORY_MANAGER, Role.ZONAL_MANAGER, Role.CONTENT_TEAM])
+

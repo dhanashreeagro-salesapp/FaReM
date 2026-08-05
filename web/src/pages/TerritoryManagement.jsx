@@ -100,8 +100,10 @@ export default function TerritoryManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = { ...form };
-      if (!payload.parent_territory) delete payload.parent_territory;
+      const payload = {
+        name: form.name ? form.name.trim() : '',
+        parent_territory: form.parent_territory && form.parent_territory !== 'null' ? form.parent_territory : null
+      };
       
       if (editingId) {
         await api.updateTerritory(editingId, payload);
@@ -112,10 +114,12 @@ export default function TerritoryManagement() {
       setEditingId(null);
       setForm({ name: '', parent_territory: '' });
       fetchTerritories();
-    } catch (err) { 
-      alert(err.error || 'Failed to save territory');
+    } catch (err) {
+      const errMsg = err.error || err.detail || (err.parent_territory ? `Parent territory: ${err.parent_territory.join(', ')}` : null) || 'Failed to save territory';
+      alert(errMsg);
     }
   };
+
 
   // Generate mock coordinates for the map display if real coordinates don't exist
   // We place points randomly around a central location (e.g. India)

@@ -7,17 +7,24 @@ from .permissions import IsAdminUser, IsStaffOrManagerOrAdmin
 
 class TerritoryViewSet(viewsets.ModelViewSet):
     """
-    CRUD endpoint for Territories. List/Retrieve open to all authenticated roles.
+    CRUD endpoint for Territories. Accessible to managers, admins, and staff.
     """
     serializer_class = TerritorySerializer
-    
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            return [IsAuthenticated()]
-        return [IsAuthenticated(), IsAdminUser()]
+    permission_classes = [IsAuthenticated, IsStaffOrManagerOrAdmin]
 
     def get_queryset(self):
         return Territory.objects.all().select_related('parent_territory', 'manager')
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        SystemAuditLog.objects.create(
+            entity_type='Territory',
+            entity_id=str(instance.id),
+            action_type='Create',
+            new_value=f"Created territory {instance.name}",
+            user_id=str(self.request.user.id)
+        )
+
 
 
     def update(self, request, *args, **kwargs):
