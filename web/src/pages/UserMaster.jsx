@@ -4,7 +4,10 @@ import api from '../services/api';
 import { Plus, X, Edit2, Search, Upload } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
 
+import { useAuth } from '../components/AuthProvider';
+
 export default function UserMaster() {
+  const { isAdmin } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -14,6 +17,7 @@ export default function UserMaster() {
   const [territories, setTerritories] = useState([]);
   const [form, setForm] = useState({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
   const [error, setError] = useState('');
+
 
   const fetchUsers = async () => {
     try {
@@ -135,25 +139,30 @@ export default function UserMaster() {
               className="pl-9 pr-4 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none w-64"
             />
           </div>
-          <button 
-            onClick={() => setShowWizard(true)}
-            className="flex items-center gap-2 bg-accent hover:bg-accent-light text-white px-4 py-2 rounded-lg font-medium text-sm cursor-pointer btn-press transition-colors"
-          >
-            <Upload size={16} /> Bulk Import
-          </button>
-          <button id="add-user-btn" onClick={() => {
-            setEditingUser(null);
-            setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
-            setShowForm(!showForm);
-            setError('');
-          }}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
-            <Plus size={16} /> Add User
-          </button>
+          {isAdmin && (
+            <>
+              <button 
+                onClick={() => setShowWizard(true)}
+                className="flex items-center gap-2 bg-accent hover:bg-accent-light text-white px-4 py-2 rounded-lg font-medium text-sm cursor-pointer btn-press transition-colors"
+              >
+                <Upload size={16} /> Bulk Import
+              </button>
+              <button id="add-user-btn" onClick={() => {
+                setEditingUser(null);
+                setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
+                setShowForm(!showForm);
+                setError('');
+              }}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
+                <Plus size={16} /> Add User
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {showWizard && (
+      {isAdmin && showWizard && (
+
         <ImportWizard 
           resource="users"
           onClose={() => setShowWizard(false)} 
@@ -161,8 +170,9 @@ export default function UserMaster() {
         />
       )}
 
-      {showForm && (
+      {isAdmin && showForm && (
         <div className="card p-6 mb-6 animate-stagger-in border-2 border-primary/20">
+
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-heading font-semibold text-text">{editingUser ? 'Edit User' : 'New User'}</h3>
             <button onClick={() => setShowForm(false)} className="text-text-muted hover:text-text"><X size={18} /></button>
@@ -274,22 +284,27 @@ export default function UserMaster() {
                 <td className="text-sm">{user.territory_name || '—'}</td>
                 <td><span className={`badge ${user.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>{user.status}</span></td>
                 <td className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => handleEdit(user)} className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Edit">
-                      <Edit2 size={16} />
-                    </button>
-                    {user.status === 'Active' && (
-                      <button onClick={() => handleDisable(user.id)} className="text-xs text-danger hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded-lg transition-colors">
-                        Disable
+                  {isAdmin ? (
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => handleEdit(user)} className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Edit">
+                        <Edit2 size={16} />
                       </button>
-                    )}
-                    {user.status === 'Inactive' && (
-                      <button onClick={() => handleEnable(user.id)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 hover:bg-green-50 rounded-lg transition-colors">
-                        Enable
-                      </button>
-                    )}
-                  </div>
+                      {user.status === 'Active' && (
+                        <button onClick={() => handleDisable(user.id)} className="text-xs text-danger hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded-lg transition-colors">
+                          Disable
+                        </button>
+                      )}
+                      {user.status === 'Inactive' && (
+                        <button onClick={() => handleEnable(user.id)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 hover:bg-green-50 rounded-lg transition-colors">
+                          Enable
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-text-muted italic">View Only</span>
+                  )}
                 </td>
+
               </tr>
             ))}
           </tbody>

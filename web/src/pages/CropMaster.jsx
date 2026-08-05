@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Plus, X, ChevronDown, ChevronUp, Edit2, Trash2, Search, Upload } from 'lucide-react';
 
+import { useAuth } from '../components/AuthProvider';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const HOST_BASE = API_BASE.replace('/api', '');
 
 export default function CropMaster() {
+  const { isAdmin } = useAuth();
   const [crops, setCrops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
   
   // Crop UI State
   const [showForm, setShowForm] = useState(false);
@@ -195,20 +199,22 @@ export default function CropMaster() {
               className="pl-9 pr-4 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none w-64"
             />
           </div>
-          <button id="add-crop-btn" onClick={() => {
-            setEditingCrop(null);
-            setForm({ crop_name: '', crop_category: '', scientific_name: '' });
-            setImageFile(null);
-            setShowForm(!showForm);
-          }}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
-            <Plus size={16} /> Add Crop
-          </button>
+          {isAdmin && (
+            <button onClick={() => {
+              setEditingCrop(null);
+              setForm({ crop_name: '', crop_category: '', scientific_name: '' });
+              setImageFile(null);
+              setShowForm(!showForm);
+            }}
+              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press">
+              <Plus size={16} /> Add Crop
+            </button>
+          )}
         </div>
       </div>
 
       {/* Main Crop Form */}
-      {showForm && (
+      {isAdmin && showForm && (
         <div className="card p-6 mb-6 animate-stagger-in border-2 border-primary/20">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-heading font-semibold text-text">{editingCrop ? `Edit Crop: ${editingCrop.crop_name}` : 'New Crop'}</h3>
@@ -292,14 +298,16 @@ export default function CropMaster() {
                     <span className="text-[10px] uppercase">Varieties</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 border-r border-border pr-5">
-                  <button onClick={(e) => { e.stopPropagation(); handleEditCrop(crop); }} className="p-1.5 text-text-muted hover:text-primary transition-colors tooltip" data-tip="Edit Crop">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleDeleteCrop(crop); }} className="p-1.5 text-text-muted hover:text-danger transition-colors tooltip" data-tip="Delete Crop">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 border-r border-border pr-5">
+                    <button onClick={(e) => { e.stopPropagation(); handleEditCrop(crop); }} className="p-1.5 text-text-muted hover:text-primary transition-colors tooltip" data-tip="Edit Crop">
+                      <Edit2 size={16} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCrop(crop); }} className="p-1.5 text-text-muted hover:text-danger transition-colors tooltip" data-tip="Delete Crop">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
                 <button className="text-text-muted hover:text-primary transition-colors" onClick={() => setExpandedCrop(expandedCrop === crop.id ? null : crop.id)}>
                   {expandedCrop === crop.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>
@@ -316,10 +324,13 @@ export default function CropMaster() {
                     <h4 className="text-sm font-heading font-semibold text-text uppercase tracking-wide flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary"></div> Growth Stages
                     </h4>
-                    <button onClick={() => openNewStageForm(crop.id)} className="text-xs text-primary hover:text-primary-dark font-medium px-2 py-1 bg-primary/10 rounded">
-                      + Add Stage
-                    </button>
+                    {isAdmin && (
+                      <button onClick={() => openNewStageForm(crop.id)} className="text-xs text-primary hover:text-primary-dark font-medium px-2 py-1 bg-primary/10 rounded">
+                        + Add Stage
+                      </button>
+                    )}
                   </div>
+
 
                   {showStageForm === crop.id && (
                     <form onSubmit={handleCreateOrUpdateStage} className="bg-surface border border-primary/30 p-3 rounded-lg mb-3 shadow-sm animate-stagger-in">
@@ -350,10 +361,12 @@ export default function CropMaster() {
                             <span className="font-medium text-text">{stage.stage_name}</span>
                             <span className="text-text-muted text-xs bg-bg px-2 py-0.5 rounded-full">+{stage.days_from_previous_stage}d</span>
                           </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditStage(stage, crop.id)} className="p-1 hover:text-primary"><Edit2 size={14}/></button>
-                            <button onClick={() => handleDeleteStage(stage)} className="p-1 hover:text-danger"><Trash2 size={14}/></button>
-                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditStage(stage, crop.id)} className="p-1 hover:text-primary"><Edit2 size={14}/></button>
+                              <button onClick={() => handleDeleteStage(stage)} className="p-1 hover:text-danger"><Trash2 size={14}/></button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -366,10 +379,13 @@ export default function CropMaster() {
                     <h4 className="text-sm font-heading font-semibold text-text uppercase tracking-wide flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div> Varieties
                     </h4>
-                    <button onClick={() => openNewVarietyForm(crop.id)} className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 bg-amber-100 rounded">
-                      + Add Variety
-                    </button>
+                    {isAdmin && (
+                      <button onClick={() => openNewVarietyForm(crop.id)} className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 bg-amber-100 rounded">
+                        + Add Variety
+                      </button>
+                    )}
                   </div>
+
 
                   {showVarietyForm === crop.id && (
                     <form onSubmit={handleCreateOrUpdateVariety} className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-3 shadow-sm animate-stagger-in">
@@ -397,15 +413,18 @@ export default function CropMaster() {
                             <span className="text-sm font-medium text-text">{v.variety_name}</span>
                             {v.typical_duration_days && <span className="text-xs text-text-muted">{v.typical_duration_days} days</span>}
                           </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditVariety(v, crop.id)} className="p-1 hover:text-amber-600"><Edit2 size={14}/></button>
-                            <button onClick={() => handleDeleteVariety(v)} className="p-1 hover:text-danger"><Trash2 size={14}/></button>
-                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditVariety(v, crop.id)} className="p-1 hover:text-amber-600"><Edit2 size={14}/></button>
+                              <button onClick={() => handleDeleteVariety(v)} className="p-1 hover:text-danger"><Trash2 size={14}/></button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : !showVarietyForm && <p className="text-xs text-text-muted p-3 bg-surface rounded border border-dashed border-border">No varieties configured yet.</p>}
                 </div>
+
 
               </div>
             )}

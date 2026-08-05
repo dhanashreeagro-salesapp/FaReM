@@ -13,7 +13,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function TerritoryNode({ territory, depth = 0, onDelete, onEdit }) {
+import { useAuth } from '../components/AuthProvider';
+
+function TerritoryNode({ territory, depth = 0, onDelete, onEdit, isAdmin }) {
   const [expanded, setExpanded] = useState(depth < 2);
   const hasSubs = territory.sub_territories && territory.sub_territories.length > 0;
 
@@ -32,30 +34,35 @@ function TerritoryNode({ territory, depth = 0, onDelete, onEdit }) {
         <div className="flex items-center gap-3 text-xs text-text-muted">
           <span>{territory.farmer_count} farmers</span>
           <span className={`badge ${territory.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>{territory.status}</span>
-          <button 
-            onClick={() => onEdit(territory)}
-            className="p-1 hover:text-primary transition-colors cursor-pointer"
-            title="Edit Territory"
-          >
-            <Edit2 size={14} />
-          </button>
-          <button 
-            onClick={() => onDelete(territory)}
-            className="p-1 hover:text-danger transition-colors cursor-pointer"
-            title="Delete Territory"
-          >
-            <Trash2 size={14} />
-          </button>
+          {isAdmin && (
+            <>
+              <button 
+                onClick={() => onEdit(territory)}
+                className="p-1 hover:text-primary transition-colors cursor-pointer"
+                title="Edit Territory"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button 
+                onClick={() => onDelete(territory)}
+                className="p-1 hover:text-danger transition-colors cursor-pointer"
+                title="Delete Territory"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       </div>
       {expanded && hasSubs && territory.sub_territories.map(sub => (
-        <TerritoryNode key={sub.id} territory={sub} depth={depth + 1} onDelete={onDelete} onEdit={onEdit} />
+        <TerritoryNode key={sub.id} territory={sub} depth={depth + 1} onDelete={onDelete} onEdit={onEdit} isAdmin={isAdmin} />
       ))}
     </div>
   );
 }
 
 export default function TerritoryManagement() {
+  const { isAdmin } = useAuth();
   const [territories, setTerritories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -63,6 +70,7 @@ export default function TerritoryManagement() {
   const [form, setForm] = useState({ name: '', parent_territory: '' });
   const [allTerritories, setAllTerritories] = useState([]);
   const [viewMode, setViewMode] = useState('list');
+
 
   const fetchTerritories = async () => {
     try {
@@ -152,18 +160,20 @@ export default function TerritoryManagement() {
               <MapIcon size={16} />
             </button>
           </div>
-          <button onClick={() => {
-            setEditingId(null);
-            setForm({ name: '', parent_territory: '' });
-            setShowForm(!showForm);
-          }}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm btn-press transition-colors">
-            <Plus size={16} /> Add Territory
-          </button>
+          {isAdmin && (
+            <button onClick={() => {
+              setEditingId(null);
+              setForm({ name: '', parent_territory: '' });
+              setShowForm(!showForm);
+            }}
+              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm btn-press transition-colors">
+              <Plus size={16} /> Add Territory
+            </button>
+          )}
         </div>
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <div className="card p-6 mb-6 animate-stagger-in shadow-lg border-2 border-primary/20">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-heading font-semibold text-text">{editingId ? 'Edit Territory' : 'Create New Territory'}</h3>
@@ -199,14 +209,15 @@ export default function TerritoryManagement() {
         </div>
       ) : allTerritories.length === 0 ? (
         <div className="card p-12 text-center text-text-muted bg-bg/50 border-dashed">
-          No territories configured. Create your first region above to start building the hierarchy.
+          No territories configured. {isAdmin ? 'Create your first region above to start building the hierarchy.' : 'Contact an Admin user to set up territories.'}
         </div>
       ) : viewMode === 'list' ? (
         <div className="space-y-2">
           {territories.map(t => (
-            <TerritoryNode key={t.id} territory={t} onDelete={handleDelete} onEdit={handleEdit} />
+            <TerritoryNode key={t.id} territory={t} onDelete={handleDelete} onEdit={handleEdit} isAdmin={isAdmin} />
           ))}
         </div>
+
       ) : (
         <div className="card overflow-hidden h-[600px] border border-border relative z-0">
           <MapContainer center={mapCenter} zoom={5} style={{ height: '100%', width: '100%' }}>
