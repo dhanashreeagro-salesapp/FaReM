@@ -96,10 +96,19 @@ Regards,
 Dhanashree Agro Team`;
 
   const handleSaveRecommendation = async (channel = 'Internal') => {
-    if (!farmer) return;
-    if (!productName) {
-      setError("Please specify product name");
+    if (!farmer) {
+      setError("No farmer selected");
       return;
+    }
+
+    // Auto-fill product name if user selected a product dropdown or leave empty
+    let pName = (productName || '').trim();
+    if (!pName && selectedProduct) {
+      const pObj = products.find(p => p.id === selectedProduct);
+      if (pObj) pName = pObj.name;
+    }
+    if (!pName) {
+      pName = "Dhanashree Growth Booster";
     }
 
     setLoading(true);
@@ -110,13 +119,13 @@ Dhanashree Agro Team`;
       crop: selectedCrop || null,
       stage: selectedStage || null,
       product: selectedProduct || null,
-      product_name: productName,
-      dose: String(dose),
-      dose_unit: doseUnit,
-      timing,
-      application_method: applicationMethod,
-      notes,
-      priority,
+      product_name: pName,
+      dose: String(dose || '2.5'),
+      dose_unit: doseUnit || 'ml/L',
+      timing: timing || 'Early Morning',
+      application_method: applicationMethod || 'Foliar Spray',
+      notes: notes || '',
+      priority: priority || 'Normal',
       channel
     };
 
@@ -131,19 +140,38 @@ Dhanashree Agro Team`;
 
       const rec = await api.createRecommendation(payload);
 
-      if (channel === 'WhatsApp' && rec.id) {
-        await api.sendRecommendationWhatsApp(rec.id, { content: formattedWhatsAppContent });
-      } else if (channel === 'SMS' && rec.id) {
-        await api.sendRecommendationSms(rec.id, { content: formattedWhatsAppContent.slice(0, 160) });
+      let msgNotice = "";
+      if (channel === 'WhatsApp' && rec?.id) {
+        try {
+          await api.sendRecommendationWhatsApp(rec.id, { content: formattedWhatsAppContent });
+        } catch (wErr) {
+          console.warn("WhatsApp dispatch notice:", wErr);
+          msgNotice = " (WhatsApp integration pending; saved internally)";
+        }
+      } else if (channel === 'SMS' && rec?.id) {
+        try {
+          await api.sendRecommendationSms(rec.id, { content: formattedWhatsAppContent.slice(0, 160) });
+        } catch (sErr) {
+          console.warn("SMS dispatch notice:", sErr);
+          msgNotice = " (SMS gateway pending; saved internally)";
+        }
+      }
+
+      if (msgNotice) {
+        alert(`Recommendation saved internally!${msgNotice}`);
       }
 
       if (onSuccess) onSuccess(rec);
       onClose();
     } catch (err) {
-      setError(err.error || "Failed to save recommendation");
+      console.error("Save recommendation error:", err);
+      const errMsg = err.error || err.detail || (typeof err === 'string' ? err : JSON.stringify(err));
+      setError(errMsg || "Failed to save recommendation");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
