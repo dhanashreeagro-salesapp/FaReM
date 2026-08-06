@@ -180,7 +180,10 @@ class FarmerViewSet(viewsets.ModelViewSet):
         )
         
         from .tasks import validate_farmer_import
-        validate_farmer_import.delay(str(import_job.id))
+        try:
+            validate_farmer_import.delay(str(import_job.id))
+        except Exception:
+            validate_farmer_import(str(import_job.id))
         
         return Response({"message": "Validation started", "import_job_id": str(import_job.id)}, status=status.HTTP_202_ACCEPTED)
 
@@ -207,9 +210,13 @@ class FarmerViewSet(viewsets.ModelViewSet):
         job.save()
         
         from .tasks import commit_farmer_import
-        commit_farmer_import.delay(str(job.id))
+        try:
+            commit_farmer_import.delay(str(job.id))
+        except Exception:
+            commit_farmer_import(str(job.id))
         
         return Response({"message": "Import commit started", "import_job_id": str(job.id)})
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def request_disable(self, request, pk=None):

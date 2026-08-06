@@ -3,40 +3,52 @@ import pandas as pd
 from .models import Farmer, User, SystemAuditLog
 import io
 
+HEADER_ALIASES = {
+    'FullName': ['fullname', 'full name', 'farmer name', 'farmername', 'name of farmer', 'name', 'farmer_name', 'sr no'],
+    'PrimaryMobile': ['primarymobile', 'primary mobile', 'mobile no', 'mobile number', 'mobileno', 'mobile', 'contact no', 'phone', 'mobile_no'],
+    'Village': ['village', 'town', 'city'],
+    'Taluka': ['taluka', 'block', 'tehsil'],
+    'District': ['district'],
+    'State': ['state'],
+    'PinCode': ['pincode', 'pin code', 'zipcode', 'zip code', 'pin', 'pin_code'],
+    'StaffMobile': ['staffmobile', 'staff mobile', 'assigned staff id', 'assigned staff', 'responsible person', 'staff id', 'staff email', 'staff_mobile', 'staff'],
+    'AcquisitionDate': ['acquisitiondate', 'acquisition date', 'date of acquisition', 'date', 'acquisition_date'],
+    'Source': ['source']
+}
+
+
 def normalize_dataframe_headers(df, expected_columns):
-    req_lower = [c.lower() for c in expected_columns]
-    current_cols = [str(c).lower().strip() for c in df.columns]
+    def try_match_columns(cols):
+        mapping = {}
+        for raw_col in cols:
+            cl = str(raw_col).lower().strip()
+            for std_name, aliases in HEADER_ALIASES.items():
+                if cl in aliases or cl == std_name.lower():
+                    mapping[raw_col] = std_name
+                    break
+        return mapping
+
+    col_map = try_match_columns(df.columns)
     
-    header_found = False
-    # If at least 2 expected columns match, we assume we found the header
-    if sum([1 for r in req_lower if r in current_cols]) >= 2:
-        header_found = True
-    else:
-        # Search the first 20 rows
-        for index, row in df.head(20).iterrows():
-            row_values = [str(v).lower().strip() for v in row.values]
-            if sum([1 for r in req_lower if r in row_values]) >= 2:
+    # If essential columns not found in df.columns, search top 20 rows for header row
+    if 'FullName' not in col_map.values() and 'PrimaryMobile' not in col_map.values():
+        for idx, row in df.head(20).iterrows():
+            row_map = try_match_columns(row.values)
+            if len(row_map) >= 2:
                 df.columns = row.values
-                df = df.iloc[index+1:].reset_index(drop=True)
-                header_found = True
+                df = df.iloc[idx+1:].reset_index(drop=True)
+                col_map = try_match_columns(df.columns)
                 break
 
-    if header_found:
-        col_map = {}
-        for c in df.columns:
-            cl = str(c).lower().strip()
-            for r in expected_columns:
-                if cl == r.lower():
-                    col_map[c] = r
-                    break
-        df = df.rename(columns=col_map)
-        
+    df = df.rename(columns=col_map)
     df = df.dropna(how='all')
     return df
+
 
 @shared_task
 def validate_farmer_import(import_job_id):
     from .models import ImportJob, User
+    import re
     try:
         job = ImportJob.objects.get(id=import_job_id)
     except ImportJob.DoesNotExist:
@@ -56,8 +68,8 @@ def validate_farmer_import(import_job_id):
     duplicate_count = 0
     error_report = []
 
-    required_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile']
-    expected_columns = required_columns + ['AcquisitionDate', 'Source']
+    required_columns = ['FullName', 'PrimaryMobile', 'Village']
+    expected_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile', 'AcquisitionDate', 'Source']
     
     df = normalize_dataframe_headers(df, expected_columns)
     
@@ -74,14 +86,18 @@ def validate_farmer_import(import_job_id):
 
     for index, row in df.iterrows():
         try:
-            primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
+            raw_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
+            primary_mobile = re.sub(r'\D', '', raw_mobile)[-10:]
+            
             staff_raw = row.get('StaffMobile') or row.get('StaffEmail') or row.get('AssignedStaff')
             staff_val = str(staff_raw).split('.')[0].strip() if pd.notna(staff_raw) else ''
+            if staff_val:
+                staff_val = re.sub(r'\D', '', staff_val)[-10:] or staff_val
 
-            if len(primary_mobile) > 15 or len(primary_mobile) < 10:
-                raise ValueError("Invalid PrimaryMobile format")
+            if len(primary_mobile) != 10:
+                raise ValueError(f"Invalid PrimaryMobile format: {raw_mobile}")
 
-            # Check for duplicates in the file itself (optional) or in DB
+            # Check for duplicates in DB
             from .models import Farmer
             if Farmer.objects.filter(primary_mobile=primary_mobile).exists():
                 duplicate_count += 1
@@ -96,7 +112,8 @@ def validate_farmer_import(import_job_id):
                 if not staff_user:
                     staff_user = User.objects.filter(username__iexact=staff_val).first()
                 if not staff_user:
-                    raise ValueError(f"Staff with mobile/email '{staff_val}' not found")
+                    # Fallback to job.created_by if assigned staff not found
+                    pass
 
             valid_rows += 1
         except Exception as e:
@@ -108,7 +125,7 @@ def validate_farmer_import(import_job_id):
         with pd.ExcelWriter(job.filename, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
     except Exception as e:
-        pass # If we fail to write the status back, we can ignore it and continue
+        pass
 
     job.total_rows = total_rows
     job.valid_rows = valid_rows
@@ -123,27 +140,38 @@ def validate_farmer_import(import_job_id):
 @shared_task
 def commit_farmer_import(import_job_id):
     from .models import ImportJob, User, Farmer
+    import re
     try:
         job = ImportJob.objects.get(id=import_job_id)
     except ImportJob.DoesNotExist:
         return {"status": "failed", "error": "Job not found"}
 
     df = pd.read_excel(job.filename)
+    expected_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile', 'AcquisitionDate', 'Source']
+    df = normalize_dataframe_headers(df, expected_columns)
+    
     created_count = 0
     updated_count = 0
 
     for index, row in df.iterrows():
         try:
             full_name = str(row['FullName']).strip()
-            primary_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
+            raw_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
+            primary_mobile = re.sub(r'\D', '', raw_mobile)[-10:]
+            if len(primary_mobile) != 10:
+                continue
+
             village = str(row['Village']).strip()
-            taluka = str(row.get('Taluka', '')).strip()
-            district = str(row.get('District', '')).strip()
-            state = str(row.get('State', '')).strip()
-            pin_code = str(row.get('PinCode', '')).split('.')[0].strip()
+            taluka = str(row.get('Taluka', '')).strip() if pd.notna(row.get('Taluka')) else ''
+            district = str(row.get('District', '')).strip() if pd.notna(row.get('District')) else ''
+            state = str(row.get('State', '')).strip() if pd.notna(row.get('State')) else ''
+            raw_pin = str(row.get('PinCode', '')).split('.')[0].strip() if pd.notna(row.get('PinCode')) else ''
+            pin_code = raw_pin if raw_pin != 'nan' else ''
             
             staff_raw = row.get('StaffMobile') or row.get('StaffEmail') or row.get('AssignedStaff')
             staff_val = str(staff_raw).split('.')[0].strip() if pd.notna(staff_raw) else ''
+            if staff_val:
+                staff_val = re.sub(r'\D', '', staff_val)[-10:] or staff_val
             
             assigned_staff_user = None
             if staff_val:
@@ -156,12 +184,11 @@ def commit_farmer_import(import_job_id):
                 assigned_staff_user = job.created_by
 
             from django.utils import timezone
-            source = str(row.get('Source', '')).strip()
+            source = str(row.get('Source', '')).strip() if pd.notna(row.get('Source')) else ''
             if source == 'nan' or not source:
                 source = 'BulkImport'
                 
             acq_date_val = row.get('AcquisitionDate')
-
             if pd.isna(acq_date_val):
                 acquisition_date = timezone.now().date()
             else:
@@ -173,7 +200,6 @@ def commit_farmer_import(import_job_id):
             assigned_staff = assigned_staff_user
             
             farmer, created = Farmer.objects.update_or_create(
-
                 primary_mobile=primary_mobile,
                 defaults={
                     'full_name': full_name,
@@ -185,7 +211,7 @@ def commit_farmer_import(import_job_id):
                     'assigned_staff': assigned_staff,
                     'source': source,
                     'acquisition_date': acquisition_date,
-                    'territory': assigned_staff.territory
+                    'territory': assigned_staff.territory if assigned_staff else None
                 }
             )
 
@@ -193,18 +219,21 @@ def commit_farmer_import(import_job_id):
                 created_count += 1
             else:
                 updated_count += 1
-        except:
+        except Exception as e:
             continue
 
     job.status = 'Completed'
     job.save()
 
-    # Clean up file
     import os
     if os.path.exists(job.filename):
-        os.remove(job.filename)
+        try:
+            os.remove(job.filename)
+        except Exception:
+            pass
 
     return {"status": "import_complete", "created": created_count, "updated": updated_count}
+
 
 @shared_task
 def validate_user_import(import_job_id):
