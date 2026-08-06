@@ -34,17 +34,13 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
           api.getCrops(),
           api.getProducts()
         ]);
-        const crps = cList.results || cList || [];
-        const prods = pList.results || pList || [];
+        const crps = Array.isArray(cList) ? cList : (cList.results || []);
+        const prods = Array.isArray(pList) ? pList : (pList.results || []);
         setCrops(crps);
         setProducts(prods);
 
         if (crps.length > 0) {
           setSelectedCrop(crps[0].id);
-          const stgsRes = await api.getCropStages({ crop_id: crps[0].id });
-          const stgs = stgsRes.results || stgsRes || [];
-          setStages(stgs);
-          if (stgs.length > 0) setSelectedStage(stgs[0].id);
         }
       } catch (err) {
         console.error("Failed loading options:", err);
@@ -52,6 +48,31 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    async function loadCropStages() {
+      if (!selectedCrop) {
+        setStages([]);
+        setSelectedStage('');
+        return;
+      }
+      try {
+        const res = await api.getCropStages({ crop: selectedCrop, crop_id: selectedCrop });
+        const stgs = Array.isArray(res) ? res : (res.results || []);
+        setStages(stgs);
+        if (stgs.length > 0) {
+          setSelectedStage(stgs[0].id);
+        } else {
+          setSelectedStage('');
+        }
+      } catch (err) {
+        console.error("Failed loading crop stages:", err);
+        setStages([]);
+        setSelectedStage('');
+      }
+    }
+    loadCropStages();
+  }, [selectedCrop]);
 
   const fetchAiSuggestions = async () => {
     setLoadingSuggestions(true);
@@ -73,6 +94,7 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
       fetchAiSuggestions();
     }
   }, [selectedCrop, selectedStage]);
+
 
   const applySuggestion = (sugg) => {
     if (sugg.product_id) setSelectedProduct(sugg.product_id);

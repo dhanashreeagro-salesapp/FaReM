@@ -15,8 +15,10 @@ class RecommendationSerializer(serializers.ModelSerializer):
     stage_name = serializers.CharField(source='stage.stage_name', read_only=True, default=None)
     product_title = serializers.CharField(source='product.name', read_only=True, default=None)
     created_by_name = serializers.SerializerMethodField()
+    channel = serializers.CharField(required=False, default='Internal', allow_blank=True, allow_null=True)
 
     class Meta:
+
         model = Recommendation
         fields = [
             'id', 'farmer', 'farmer_name', 'farmer_mobile', 'plot', 'created_by_user', 'created_by_name',

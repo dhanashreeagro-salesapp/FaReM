@@ -41,6 +41,13 @@ class RecommendationViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         data['created_by_user'] = request.user.id
+        
+        # Sanitize channel
+        ch_val = str(data.get('channel', 'Internal')).strip()
+        if ch_val not in ['WhatsApp', 'SMS', 'Internal']:
+            ch_val = 'Internal'
+        data['channel'] = ch_val
+
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         rec = serializer.save()
@@ -120,45 +127,56 @@ class RecommendationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def send_whatsapp(self, request, pk=None):
-        rec = self.get_object()
-        content = request.data.get('content')
-        if not content:
-            content = f"Dear {rec.farmer.full_name},\n\nCrop: {rec.crop.crop_name if rec.crop else ''}\nStage: {rec.stage.stage_name if rec.stage else ''}\n\nRecommended Product: {rec.product_name}\nDose: {rec.dose} {rec.dose_unit or ''}\nMethod: {rec.application_method}\nTiming: {rec.timing}\nNotes: {rec.notes or ''}\n\nRegards,\n{request.user.first_name} {request.user.last_name} (Dhanashree Agro)"
+        try:
+            rec = self.get_object()
+            content = request.data.get('content')
+            crop_name = rec.crop.crop_name if rec.crop else ''
+            stage_name = rec.stage.stage_name if rec.stage else ''
+            farmer_name = rec.farmer.full_name if rec.farmer else 'Farmer'
+            if not content:
+                content = f"Dear {farmer_name},\n\nCrop: {crop_name}\nStage: {stage_name}\n\nRecommended Product: {rec.product_name}\nDose: {rec.dose} {rec.dose_unit or ''}\nMethod: {rec.application_method}\nTiming: {rec.timing}\nNotes: {rec.notes or ''}\n\nRegards,\n{request.user.first_name} {request.user.last_name} (AgriAmigo)"
 
-        msg = RecommendationMessage.objects.create(
-            recommendation=rec,
-            channel='WhatsApp',
-            status='Sent',
-            sent_time=timezone.now(),
-            content=content,
-            delivery_status='Delivered'
-        )
-        rec.channel = 'WhatsApp'
-        rec.send_status = 'Sent'
-        rec.save()
+            msg = RecommendationMessage.objects.create(
+                recommendation=rec,
+                channel='WhatsApp',
+                status='Sent',
+                sent_time=timezone.now(),
+                content=content,
+                delivery_status='Delivered'
+            )
+            rec.channel = 'WhatsApp'
+            rec.send_status = 'Sent'
+            rec.save()
 
-        return Response(RecommendationMessageSerializer(msg).data, status=status.HTTP_200_OK)
+            return Response(RecommendationMessageSerializer(msg).data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def send_sms(self, request, pk=None):
-        rec = self.get_object()
-        content = request.data.get('content')
-        if not content:
-            content = f"Dhanashree Agro: Recommended {rec.product_name} ({rec.dose}) for {rec.farmer.full_name}. Apply: {rec.application_method}."
+        try:
+            rec = self.get_object()
+            content = request.data.get('content')
+            farmer_name = rec.farmer.full_name if rec.farmer else 'Farmer'
+            if not content:
+                content = f"AgriAmigo: Recommended {rec.product_name} ({rec.dose}) for {farmer_name}. Apply: {rec.application_method}."
 
-        msg = RecommendationMessage.objects.create(
-            recommendation=rec,
-            channel='SMS',
-            status='Sent',
-            sent_time=timezone.now(),
-            content=content[:160], # Auto-shorten for SMS limit
-            delivery_status='Delivered'
-        )
-        rec.channel = 'SMS'
-        rec.send_status = 'Sent'
-        rec.save()
+            msg = RecommendationMessage.objects.create(
+                recommendation=rec,
+                channel='SMS',
+                status='Sent',
+                sent_time=timezone.now(),
+                content=content[:160], # Auto-shorten for SMS limit
+                delivery_status='Delivered'
+            )
+            rec.channel = 'SMS'
+            rec.send_status = 'Sent'
+            rec.save()
 
-        return Response(RecommendationMessageSerializer(msg).data, status=status.HTTP_200_OK)
+            return Response(RecommendationMessageSerializer(msg).data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def review(self, request, pk=None):
