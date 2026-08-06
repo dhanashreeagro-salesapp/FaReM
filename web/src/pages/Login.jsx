@@ -38,12 +38,11 @@ export default function Login() {
          }}>
       <div className="card p-8 w-full max-w-md animate-stagger-in">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-heading font-bold">D</span>
-          </div>
-          <h1 className="text-2xl font-heading font-bold text-text">FFMA Admin</h1>
-          <p className="text-text-muted mt-1 text-sm">Dhanashree Crop Solutions</p>
+          <img src="/agriamigo-logo.png" alt="AgriAmigo Logo" className="w-20 h-20 mx-auto mb-3 object-contain drop-shadow-md rounded-2xl" />
+          <h1 className="text-2xl font-heading font-bold text-emerald-800 tracking-tight">AgriAmigo</h1>
+          <p className="text-text-muted mt-1 text-sm font-medium">Farmer Relationship Management</p>
         </div>
+
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-danger rounded-lg px-4 py-3 mb-4 text-sm">

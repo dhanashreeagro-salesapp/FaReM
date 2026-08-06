@@ -28,24 +28,38 @@ export default function Sidebar() {
 
   return (
     <div className="w-64 bg-surface border-r border-border flex flex-col h-full">
-      {/* Top Left User Info */}
-      <div className="flex items-center h-16 px-4 border-b border-border bg-surface">
-        <div className="w-9 h-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center mr-3 font-heading font-bold text-sm shrink-0">
-          {user?.full_name?.[0]?.toUpperCase() || 'U'}
-        </div>
+      {/* Brand Header */}
+      <div className="flex items-center gap-3 h-16 px-4 border-b border-border bg-emerald-50/50">
+        <img src="/agriamigo-logo.png" alt="AgriAmigo Logo" className="w-10 h-10 object-contain shrink-0 rounded-lg shadow-sm" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-sm font-heading font-bold text-text truncate leading-tight">
-            {user?.full_name || 'User'}
+          <h1 className="text-base font-heading font-bold text-emerald-900 leading-tight tracking-tight">
+            AgriAmigo
           </h1>
-          {user?.territory_name ? (
-            <p className="text-xs text-primary font-medium truncate flex items-center gap-1 leading-tight mt-0.5">
-              <MapPin size={11} className="inline shrink-0" /> {user.territory_name}
-            </p>
-          ) : (
-            <p className="text-[11px] text-text-muted leading-tight mt-0.5">Dhanashree Crops</p>
-          )}
+          <p className="text-[10px] uppercase font-semibold text-emerald-700 tracking-wider">FRM Platform</p>
         </div>
       </div>
+
+      {/* User Info Card */}
+      <div className="px-4 py-3 border-b border-border bg-surface">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center font-heading font-bold text-xs shrink-0 border border-primary/20">
+            {user?.full_name?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-heading font-bold text-text truncate leading-tight">
+              {user?.full_name || user?.email || 'User'}
+            </p>
+            {user?.territory_name ? (
+              <p className="text-[11px] text-primary font-medium truncate flex items-center gap-1 leading-tight mt-0.5">
+                <MapPin size={10} className="inline shrink-0" /> {user.territory_name}
+              </p>
+            ) : (
+              <p className="text-[11px] text-text-muted leading-tight mt-0.5">{user?.role || 'User'}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-3">
