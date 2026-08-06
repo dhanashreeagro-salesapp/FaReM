@@ -19,9 +19,9 @@ export default function UserMaster() {
   const [error, setError] = useState('');
 
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (forceFresh = true) => {
     try {
-      const data = await api.getUsers();
+      const data = await api.getUsers(forceFresh);
       setUsers(Array.isArray(data) ? data : data.results || []);
     } catch { setUsers([]); }
     setLoading(false);
@@ -65,7 +65,7 @@ export default function UserMaster() {
       setShowForm(false);
       setEditingUser(null);
       setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
-      fetchUsers();
+      await fetchUsers(true);
     } catch (err) {
       setError(err.error || err.mobile_number?.[0] || err.detail || 'Failed to save user');
     }
@@ -92,17 +92,22 @@ export default function UserMaster() {
     if (!confirm('Disable this user? They will not be able to log in.')) return;
     try {
       await api.deleteUser(id);
-      fetchUsers();
-    } catch { /* already handled */ }
+      await fetchUsers(true);
+    } catch (err) {
+      alert(err.error || err.detail || 'Failed to disable user');
+    }
   };
 
   const handleEnable = async (id) => {
     if (!confirm('Enable this user? They will be able to log in again.')) return;
     try {
       await api.enableUser(id);
-      fetchUsers();
-    } catch { /* already handled */ }
+      await fetchUsers(true);
+    } catch (err) {
+      alert(err.error || err.detail || 'Failed to enable user');
+    }
   };
+
 
   const filteredUsers = users.filter(user => {
     const searchLow = searchTerm.toLowerCase();

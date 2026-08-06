@@ -174,12 +174,34 @@ class ApiClient {
   }
 
   // Users
-  getUsers() { return this.requestWithCache('/users/', {}, 'cache_users'); }
+  getUsers(forceFresh = false) {
+    if (forceFresh) {
+      localStorage.removeItem('cache_users');
+      return this.request('/users/').then(data => {
+        if (data) localStorage.setItem('cache_users', JSON.stringify(data));
+        return data;
+      });
+    }
+    return this.requestWithCache('/users/', {}, 'cache_users');
+  }
   getUser(id) { return this.request(`/users/${id}/`); }
-  createUser(data) { return this.request('/users/', { method: 'POST', body: JSON.stringify(data) }); }
-  updateUser(id, data) { return this.request(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
-  deleteUser(id) { return this.request(`/users/${id}/`, { method: 'DELETE' }); }
-  enableUser(id) { return this.request(`/users/${id}/enable/`, { method: 'PATCH' }); }
+  createUser(data) {
+    localStorage.removeItem('cache_users');
+    return this.request('/users/', { method: 'POST', body: JSON.stringify(data) });
+  }
+  updateUser(id, data) {
+    localStorage.removeItem('cache_users');
+    return this.request(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+  deleteUser(id) {
+    localStorage.removeItem('cache_users');
+    return this.request(`/users/${id}/`, { method: 'DELETE' });
+  }
+  enableUser(id) {
+    localStorage.removeItem('cache_users');
+    return this.request(`/users/${id}/enable/`, { method: 'PATCH' });
+  }
+
   uploadUsersForValidation(file) {
     const formData = new FormData();
     formData.append('file', file);
