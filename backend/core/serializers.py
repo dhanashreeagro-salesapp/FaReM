@@ -18,3 +18,12 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.reporting_manager:
             return f"{obj.reporting_manager.first_name} {obj.reporting_manager.last_name}".strip()
         return None
+
+    def validate_mobile_number(self, value):
+        import re
+        if value:
+            clean = re.sub(r'\D', '', str(value))[-10:]
+            if len(clean) == 10:
+                return clean
+        return value
+
