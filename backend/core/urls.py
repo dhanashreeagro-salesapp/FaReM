@@ -48,14 +48,16 @@ urlpatterns = [
     path('auth/me/', views.me_view, name='auth_me'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/invalidate-session/', views.invalidate_session, name='invalidate_session'),
-    path('dashboard/', views_dashboard.DashboardAPIView.as_view(), name='dashboard'),
     path('dashboard/active_crops/', views_dashboard.ActiveCropsAPIView.as_view(), name='dashboard_active_crops'),
     path('dashboard/farmer_plots/', views_dashboard.FarmerPlotsAPIView.as_view(), name='dashboard_farmer_plots'),
     path('dashboard/hierarchy/', views_dashboard.HierarchyAPIView.as_view(), name='dashboard_hierarchy'),
+    path('hierarchy/', views_dashboard.HierarchyAPIView.as_view(), name='hierarchy_alias'),
+    path('dashboard/', views_dashboard.DashboardAPIView.as_view(), name='dashboard'),
     path('export-report/', views_dashboard.ExportReportAPIView.as_view(), name='export_report'),
     path('config/', views_config.AppConfigurationView.as_view(), name='app_config'),
     path('farmers/<uuid:farmer_id>/timeline/', views_timeline.farmer_timeline_view, name='farmer_timeline'),
     path('sync/offline_batch/', views_sync.offline_batch_sync_view, name='offline_batch_sync'),
     path('', include(router.urls)),
 ]
+
 

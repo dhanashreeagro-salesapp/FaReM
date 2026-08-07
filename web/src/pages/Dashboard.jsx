@@ -163,9 +163,9 @@ export default function Dashboard() {
     setModalLoading(false);
   };
 
-  const handleLoadHierarchy = async () => {
+  const handleLoadHierarchy = async (force = false) => {
     setActiveTab('hierarchy');
-    if (hierarchyData.length > 0) return;
+    if (!force && hierarchyData.length > 0) return;
     setModalLoading(true);
     try {
       const res = await api.getHierarchy();
@@ -175,6 +175,7 @@ export default function Dashboard() {
     }
     setModalLoading(false);
   };
+
 
   const handleExport = async (type) => {
     try {
