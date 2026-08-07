@@ -174,7 +174,16 @@ export default function FarmerManagement() {
     setFilterTerritory('');
     setFilterStaff('');
     setPage(1);
+    api.getFarmers({ page: 1, page_size: PAGE_SIZE }).then(data => {
+      if (data && data.results) {
+        setFarmers(data.results);
+        setTotalCount(data.count || 0);
+        setHasNext(!!data.next);
+        setHasPrev(!!data.previous);
+      }
+    }).catch(err => console.error("Clear filters error:", err));
   };
+
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
@@ -529,6 +538,7 @@ export default function FarmerManagement() {
               <th>Village / Taluka</th>
               <th>District / PIN</th>
               <th>Assigned Staff</th>
+              <th>Created On</th>
               <th>Source</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
@@ -537,7 +547,7 @@ export default function FarmerManagement() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" className="text-center py-10 text-text-muted">
+                <td colSpan="10" className="text-center py-10 text-text-muted">
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     Loading farmers...
@@ -545,7 +555,7 @@ export default function FarmerManagement() {
                 </td>
               </tr>
             ) : farmers.length === 0 ? (
-              <tr><td colSpan="9" className="text-center py-10 text-text-muted">No farmers found matching filters.</td></tr>
+              <tr><td colSpan="10" className="text-center py-10 text-text-muted">No farmers found matching filters.</td></tr>
             ) : farmers.map((farmer, i) => (
               <tr key={farmer.id} className="animate-stagger-in" style={{ animationDelay: `${i * 15}ms` }}>
                 <td>
@@ -576,11 +586,15 @@ export default function FarmerManagement() {
                     <span className="text-xs text-text-muted italic">Unassigned</span>
                   )}
                 </td>
+                <td className="text-xs font-mono text-text-muted">
+                  {farmer.date_added ? new Date(farmer.date_added).toLocaleDateString('en-IN') : '—'}
+                </td>
                 <td>
                   <span className={`badge ${farmer.source === 'BulkImport' ? 'bg-blue-50 text-blue-700' : farmer.source === 'InApp' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                     {farmer.source || '—'}
                   </span>
                 </td>
+
                 <td>
                   <span className={`badge ${farmer.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
                     {farmer.status}

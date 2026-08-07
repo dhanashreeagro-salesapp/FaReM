@@ -421,7 +421,11 @@ class ApiClient {
 
   // Dashboard & Reports
   getDashboard() { return this.request('/dashboard/'); }
+  getActiveCrops() { return this.request('/dashboard/active_crops/'); }
+  getFarmerPlots() { return this.request('/dashboard/farmer_plots/'); }
+  getHierarchy() { return this.request('/dashboard/hierarchy/'); }
   exportReport(type = 'excel') { return this.request(`/export-report/?type=${type}`); }
+
 
   // Planner
   getDailyPlan(params = {}) {

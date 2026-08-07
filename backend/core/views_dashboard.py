@@ -165,6 +165,156 @@ class DashboardAPIView(APIView):
         cache.set(cache_key, data, 60 * 15) # Cache for 15 minutes
         return Response(data)
 
+class ActiveCropsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        farmers = Farmer.objects.filter(status='Active')
+        
+        if user.role == Role.TERRITORY_MANAGER:
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            farmers = farmers.filter(territory__in=list(set(territories)))
+        elif user.role == Role.FIELD_STAFF:
+            farmers = farmers.filter(assigned_staff=user)
+
+        from django.db.models import Subquery, OuterRef
+        last_visit_subq = ActivityLog.objects.filter(
+            farmer=OuterRef('plot__farmer__id'), activity_type='Visit'
+        ).order_by('-date').values('date')[:1]
+
+        active_seasons = CropSeason.objects.filter(
+            plot__farmer__in=farmers, plot__is_active=True, status='Active'
+        ).select_related('crop', 'current_stage', 'plot', 'plot__farmer').annotate(
+            last_visit_date=Subquery(last_visit_subq)
+        ).order_by('-sowing_date')
+
+        results = []
+        for season in active_seasons[:500]:
+            farmer = season.plot.farmer
+            rec_count = Recommendation.objects.filter(farmer=farmer).count()
+            results.append({
+                'id': str(season.id),
+                'crop_name': season.crop.crop_name if season.crop else 'General Crop',
+                'stage_name': season.current_stage.stage_name if season.current_stage else 'Growth Stage',
+                'area_acres': float(season.area_acres or season.plot.area_acres or 0),
+                'farmer_id': str(farmer.id),
+                'farmer_name': farmer.full_name,
+                'village': farmer.village,
+                'plot_name': season.plot.plot_name,
+                'mobile_number': farmer.primary_mobile,
+                'last_visit_date': str(season.last_visit_date) if hasattr(season, 'last_visit_date') and season.last_visit_date else 'No Visits',
+                'recommendation_count': rec_count
+            })
+
+        return Response(results)
+
+class FarmerPlotsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        farmers = Farmer.objects.filter(status='Active')
+        
+        if user.role == Role.TERRITORY_MANAGER:
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            farmers = farmers.filter(territory__in=list(set(territories)))
+        elif user.role == Role.FIELD_STAFF:
+            farmers = farmers.filter(assigned_staff=user)
+
+        from .models import Plot
+        plots = Plot.objects.filter(farmer__in=farmers, is_active=True).select_related('farmer').order_by('-id')
+
+        results = []
+        for p in plots[:500]:
+            crop_count = p.seasons.filter(status='Active').count()
+            results.append({
+                'id': str(p.id),
+                'plot_name': p.plot_name,
+                'area_acres': float(p.area_acres or 0),
+                'soil_type': p.soil_type or 'Normal',
+                'irrigation_source': p.irrigation_source or 'Borewell',
+                'farmer_id': str(p.farmer.id),
+                'farmer_name': p.farmer.full_name,
+                'village': p.farmer.village,
+                'district': p.farmer.district,
+                'active_crops_count': crop_count
+            })
+
+        return Response(results)
+
+class HierarchyAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role not in [Role.ADMIN, Role.ZONAL_MANAGER, Role.TERRITORY_MANAGER]:
+            return Response({"error": "Hierarchy tab restricted to Managers and Admin"}, status=status.HTTP_403_FORBIDDEN)
+
+        from django.utils import timezone
+        current_year = timezone.now().year
+
+        def build_user_tree(u):
+            subordinates = list(User.objects.filter(reporting_manager=u, status='Active'))
+            sub_nodes = [build_user_tree(sub) for sub in subordinates]
+
+            assigned_farmers = Farmer.objects.filter(assigned_staff=u, status='Active')
+            farmer_count = assigned_farmers.count()
+            plot_count = Plot.objects.filter(farmer__in=assigned_farmers, is_active=True).count()
+            crop_count = CropSeason.objects.filter(plot__farmer__in=assigned_farmers, status='Active').count()
+            farmers_this_year = assigned_farmers.filter(date_added__year=current_year).count()
+
+            recs_count = Recommendation.objects.filter(created_by_user=u).count()
+            visits_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Visit').count()
+            calls_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Call').count()
+            whatsapp_count = Recommendation.objects.filter(created_by_user=u, channel='WhatsApp').count()
+
+            # Target completion percentage benchmark
+            norm = 50
+            perf_pct = min(100, round((visits_count / max(1, norm)) * 100, 1))
+
+            first_n = u.first_name or ''
+            last_n = u.last_name or ''
+            full_name = f"{first_n} {last_n}".strip() if (first_n or last_n) else u.email
+
+            return {
+                'id': str(u.id),
+                'full_name': full_name,
+                'email': u.email,
+                'role': u.role,
+                'territory_name': u.territory.name if u.territory else 'General Region',
+                'farmer_count': farmer_count,
+                'plot_count': plot_count,
+                'crop_count': crop_count,
+                'farmers_added_this_year': farmers_this_year,
+                'recommendations_count': recs_count,
+                'visits_count': visits_count,
+                'calls_count': calls_count,
+                'whatsapp_count': whatsapp_count,
+                'performance_pct': perf_pct,
+                'last_sync': u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Active Today',
+                'subordinates': sub_nodes
+            }
+
+        # Find top roots (Users with no reporting manager or top Admin/ZonalManager)
+        if user.role == Role.ADMIN:
+            top_users = list(User.objects.filter(reporting_manager__isnull=True, status='Active')[:10])
+            if not top_users:
+                top_users = [user]
+        else:
+            top_users = [user]
+
+        tree_data = [build_user_tree(tu) for tu in top_users]
+        return Response(tree_data)
+
 class ExportReportAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -196,3 +346,4 @@ class ExportReportAPIView(APIView):
             return response
             
         return Response({'error': 'Invalid type'}, status=status.HTTP_400_BAD_REQUEST)
+

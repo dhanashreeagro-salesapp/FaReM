@@ -195,6 +195,35 @@ Dhanashree Agro Team`;
   };
 
 
+  const [farmerPlots, setFarmerPlots] = useState([]);
+  const [expandedPlotId, setExpandedPlotId] = useState(null);
+
+  useEffect(() => {
+    async function loadFarmerPlots() {
+      if (!farmer?.id) return;
+      try {
+        const res = await api.getPlots({ farmer_id: farmer.id });
+        const plotsList = Array.isArray(res) ? res : (res.results || []);
+        setFarmerPlots(plotsList);
+        if (plotsList.length > 0) {
+          setExpandedPlotId(plotsList[0].id);
+        }
+      } catch (err) {
+        console.warn("Could not load farmer plots:", err);
+      }
+    }
+    loadFarmerPlots();
+  }, [farmer]);
+
+  const handleSelectHierarchyCrop = (plot, season) => {
+    if (season?.crop) {
+      setSelectedCrop(season.crop.id || season.crop);
+      if (season.current_stage) {
+        setSelectedStage(season.current_stage.id || season.current_stage);
+      }
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
@@ -202,12 +231,12 @@ Dhanashree Agro Team`;
         {/* Header */}
         <div className="flex justify-between items-center border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
               <Award size={22} />
             </div>
             <div>
-              <h3 className="text-lg font-heading font-bold text-text">Create Advisory Recommendation</h3>
-              <p className="text-xs text-text-muted">Farmer: {farmer?.full_name} ({farmer?.village || 'No Village'})</p>
+              <h3 className="text-lg font-heading font-bold text-text">AgriAmigo Advisory Recommendation</h3>
+              <p className="text-xs text-text-muted">Farmer: <span className="font-semibold text-text">{farmer?.full_name}</span> ({farmer?.village || 'No Village'})</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-bg">
@@ -219,6 +248,57 @@ Dhanashree Agro Team`;
           <div className="p-3 bg-red-50 border border-red-200 text-danger text-xs rounded-xl flex items-center gap-2">
             <AlertTriangle size={16} />
             <span>{error}</span>
+          </div>
+        )}
+
+        {/* Streamlined Hierarchy Selector: Farmer -> Plot -> Crop */}
+        {farmerPlots.length > 0 ? (
+          <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-heading font-bold text-emerald-900">
+              <span className="flex items-center gap-1.5"><Info size={14} className="text-emerald-600" /> Tap Crop to Auto-Populate Advisory Details</span>
+              <span className="text-[11px] font-medium text-emerald-700">{farmerPlots.length} Registered Plot(s)</span>
+            </div>
+
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {farmerPlots.map(plot => (
+                <div key={plot.id} className="border border-border rounded-xl bg-surface overflow-hidden text-xs">
+                  <div 
+                    onClick={() => setExpandedPlotId(expandedPlotId === plot.id ? null : plot.id)}
+                    className="p-2.5 bg-bg/80 flex items-center justify-between cursor-pointer font-bold text-text hover:bg-bg"
+                  >
+                    <span>📍 Plot: {plot.plot_name} ({plot.area_acres || '0'} Acres — {plot.soil_type || 'Normal Soil'})</span>
+                    <span className="text-[11px] text-primary">{expandedPlotId === plot.id ? 'Collapse ▲' : 'Expand ▼'}</span>
+                  </div>
+
+                  {expandedPlotId === plot.id && (
+                    <div className="p-2 space-y-1 bg-surface border-t border-border">
+                      {plot.seasons && plot.seasons.length > 0 ? (
+                        plot.seasons.map(season => (
+                          <div 
+                            key={season.id} 
+                            onClick={() => handleSelectHierarchyCrop(plot, season)}
+                            className={`p-2 rounded-lg flex items-center justify-between cursor-pointer border transition-all ${selectedCrop === (season.crop?.id || season.crop) ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'border-border hover:border-emerald-300'}`}
+                          >
+                            <div>
+                              <span className="font-semibold">{season.crop_name || season.crop?.crop_name || 'Crop'}</span>
+                              <span className="text-[11px] text-text-muted ml-2">Stage: {season.stage_name || season.current_stage?.stage_name || 'Growth Stage'}</span>
+                            </div>
+                            <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">Tap to Select</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-text-muted italic text-[11px]">No active season on this plot. Select crop manually below.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+            <Info size={15} className="text-amber-600 shrink-0" />
+            <span>No plots recorded for this farmer — Manual entry mode active.</span>
           </div>
         )}
 
@@ -286,7 +366,7 @@ Dhanashree Agro Team`;
           </div>
 
           <div>
-            <label className="block mb-1">Growth Stage</label>
+            <label className="block mb-1">Growth Stage (Filtered by Crop)</label>
             <select
               value={selectedStage}
               onChange={(e) => setSelectedStage(e.target.value)}
@@ -299,6 +379,7 @@ Dhanashree Agro Team`;
             </select>
           </div>
         </div>
+
 
         <div className="grid grid-cols-3 gap-3 text-xs font-semibold text-text">
           <div className="col-span-2">
