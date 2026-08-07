@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.core.cache import cache
-from .models import Farmer, User, ActivityLog, Role
+from .models import Farmer, User, ActivityLog, Role, Plot, CropSeason, Recommendation
+
 from django.http import HttpResponse
 
 class DashboardAPIView(APIView):
