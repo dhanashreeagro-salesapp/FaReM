@@ -24,10 +24,10 @@ class FarmerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Farmer.objects.all()
-        if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
+        if user.role in [Role.ADMIN, Role.CONTENT_TEAM]:
             queryset = Farmer.objects.all()
-        elif user.role in [Role.TERRITORY_MANAGER, Role.FIELD_STAFF]:
+        else:
+            team_users = user.get_team_users()
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
@@ -35,15 +35,13 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
             
-            if user.role == Role.TERRITORY_MANAGER:
-                queryset = Farmer.objects.filter(Q(territory__in=territories) | Q(assigned_staff=user))
-            else: # FIELD_STAFF
-                if territories:
-                    queryset = Farmer.objects.filter(Q(assigned_staff=user) | Q(territory__in=territories))
-                else:
-                    queryset = Farmer.objects.filter(assigned_staff=user)
+            if territories:
+                queryset = Farmer.objects.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            else:
+                queryset = Farmer.objects.filter(assigned_staff__in=team_users)
 
         queryset = queryset.select_related('assigned_staff', 'territory')
+
 
 
         # Filters for location and assignment

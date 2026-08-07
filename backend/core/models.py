@@ -43,6 +43,25 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'mobile_number']
 
+    def get_all_subordinates(self):
+        """Recursively retrieve all subordinates reporting directly or indirectly to this user."""
+        subs = list(self.subordinates.all())
+        all_subs = []
+        visited = {self.id}
+        while subs:
+            curr = subs.pop(0)
+            if curr.id in visited:
+                continue
+            visited.add(curr.id)
+            all_subs.append(curr)
+            subs.extend(list(curr.subordinates.all()))
+        return all_subs
+
+    def get_team_users(self):
+        """Get self plus all direct and indirect subordinates."""
+        return [self] + self.get_all_subordinates()
+
+
 class Territory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)

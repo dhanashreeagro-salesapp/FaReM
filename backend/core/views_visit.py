@@ -32,17 +32,21 @@ class FieldVisitViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
+        if user.role in [Role.ADMIN, Role.CONTENT_TEAM]:
             qs = FieldVisit.objects.all()
-        elif user.role == Role.TERRITORY_MANAGER:
+        else:
+            team_users = user.get_team_users()
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for mt in user.managed_territories.all():
                 territories.extend(mt.get_all_sub_territories())
-            qs = FieldVisit.objects.filter(farmer__territory__in=list(set(territories)))
-        else:
-            qs = FieldVisit.objects.filter(staff=user)
+            territories = list(set(territories))
+            if territories:
+                qs = FieldVisit.objects.filter(Q(staff__in=team_users) | Q(farmer__assigned_staff__in=team_users) | Q(farmer__territory__in=territories))
+            else:
+                qs = FieldVisit.objects.filter(Q(staff__in=team_users) | Q(farmer__assigned_staff__in=team_users))
+
 
         farmer_id = self.request.query_params.get('farmer_id')
         if farmer_id:

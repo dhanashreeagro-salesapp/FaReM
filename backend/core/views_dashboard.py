@@ -26,18 +26,22 @@ class DashboardAPIView(APIView):
         farmers = Farmer.objects.filter(status='Active')
         activities = ActivityLog.objects.all()
         
-        if user.role == Role.TERRITORY_MANAGER:
+        if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
+            team_users = user.get_team_users()
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
-            farmers = farmers.filter(territory__in=territories)
-            activities = activities.filter(farmer__territory__in=territories)
-        elif user.role == Role.FIELD_STAFF:
-            farmers = farmers.filter(assigned_staff=user)
-            activities = activities.filter(farmer__assigned_staff=user)
+            
+            if territories:
+                farmers = farmers.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            else:
+                farmers = farmers.filter(assigned_staff__in=team_users)
+                
+            activities = activities.filter(farmer__in=farmers)
+
             
         data['total_farmers'] = farmers.count()
         data['total_visits'] = activities.filter(activity_type='Visit').count()
@@ -173,15 +177,19 @@ class ActiveCropsAPIView(APIView):
         user = request.user
         farmers = Farmer.objects.filter(status='Active')
         
-        if user.role == Role.TERRITORY_MANAGER:
+        if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
+            team_users = user.get_team_users()
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
-            farmers = farmers.filter(territory__in=list(set(territories)))
-        elif user.role == Role.FIELD_STAFF:
-            farmers = farmers.filter(assigned_staff=user)
+            territories = list(set(territories))
+            if territories:
+                farmers = farmers.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            else:
+                farmers = farmers.filter(assigned_staff__in=team_users)
+
 
         from django.db.models import Subquery, OuterRef
         last_visit_subq = ActivityLog.objects.filter(
@@ -221,15 +229,19 @@ class FarmerPlotsAPIView(APIView):
         user = request.user
         farmers = Farmer.objects.filter(status='Active')
         
-        if user.role == Role.TERRITORY_MANAGER:
+        if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
+            team_users = user.get_team_users()
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
-            farmers = farmers.filter(territory__in=list(set(territories)))
-        elif user.role == Role.FIELD_STAFF:
-            farmers = farmers.filter(assigned_staff=user)
+            territories = list(set(territories))
+            if territories:
+                farmers = farmers.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            else:
+                farmers = farmers.filter(assigned_staff__in=team_users)
+
 
         from .models import Plot
         plots = Plot.objects.filter(farmer__in=farmers, is_active=True).select_related('farmer').order_by('-id')
