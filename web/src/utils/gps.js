@@ -16,39 +16,89 @@ export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
+let cachedPosition = null;
+let cachedPositionTimestamp = 0;
+
 /**
  * Get staff's current GPS position via Browser Geolocation API.
+ * Supports caching position for 30s and aborting ongoing request via signal/timeout.
  */
-export function getCurrentGpsPosition() {
+export function getCurrentGpsPosition(options = {}) {
+  const { timeout = 12000, maxAge = 30000, forceRefresh = false, signal } = options;
+
+  const now = Date.now();
+  if (!forceRefresh && cachedPosition && (now - cachedPositionTimestamp < maxAge)) {
+    return Promise.resolve(cachedPosition);
+  }
+
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Geolocation is not supported by your browser"));
+      const fallback = { latitude: 18.5204, longitude: 73.8567, accuracy: 50, isFallback: true, error: "Geolocation not supported" };
+      resolve(fallback);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    let isSettled = false;
+    let watchId = null;
+
+    const timer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        const fallback = { latitude: 18.5204, longitude: 73.8567, accuracy: 50, isFallback: true, error: "GPS request timed out" };
+        resolve(fallback);
+      }
+    }, timeout);
+
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timer);
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          reject(new DOMException('Aborted by user', 'AbortError'));
+        }
+      });
+    }
+
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy || 10,
-          timestamp: position.timestamp
-        });
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timer);
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+          const result = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy || 10,
+            timestamp: position.timestamp
+          };
+          cachedPosition = result;
+          cachedPositionTimestamp = Date.now();
+          resolve(result);
+        }
       },
       (error) => {
-        // Fallback default position (e.g. Maharashtra region center) if denied/unavailable
-        resolve({
-          latitude: 18.5204,
-          longitude: 73.8567,
-          accuracy: 50,
-          isFallback: true,
-          error: error.message
-        });
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timer);
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+          const fallback = {
+            latitude: 18.5204,
+            longitude: 73.8567,
+            accuracy: 50,
+            isFallback: true,
+            error: error.message
+          };
+          resolve(fallback);
+        }
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000
+        timeout,
+        maximumAge: maxAge
       }
     );
   });

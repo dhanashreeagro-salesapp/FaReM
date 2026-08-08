@@ -35,19 +35,27 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
     'Other'
   ];
 
+  const [statusMessage, setStatusMessage] = useState('Getting location...');
+  const abortControllerRef = React.useRef(null);
+
   useEffect(() => {
+    let isMounted = true;
+    abortControllerRef.current = new AbortController();
+
     async function init() {
       setGpsLoading(true);
+      setStatusMessage('Getting location...');
       try {
-        const pos = await getCurrentGpsPosition();
-        setGps(pos);
+        const sysConfig = await api.getConfig().catch(() => ({ visit_radius_meters: 150, gps_validation_mode: 'Warning' }));
+        if (isMounted && sysConfig) setConfig(sysConfig);
 
-        // Fetch config
-        const sysConfig = await api.getConfig();
-        if (sysConfig) setConfig(sysConfig);
+        const pos = await getCurrentGpsPosition({ timeout: 12000, signal: abortControllerRef.current.signal });
+        if (isMounted) {
+          setGps(pos);
+          setStatusMessage('Checking distance...');
+        }
 
-        // Fetch farmers if not provided
-        if (!initialFarmer) {
+        if (isMounted && !initialFarmer) {
           const resp = await api.getFarmers();
           const list = resp.results || resp || [];
           const sorted = sortFarmersByDistance(list, pos.latitude, pos.longitude);
@@ -55,12 +63,28 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
           if (sorted.length > 0) setSelectedFarmer(sorted[0]);
         }
       } catch (err) {
-        console.error("GPS Init Error:", err);
+        if (err.name !== 'AbortError' && isMounted) {
+          console.error("GPS Init Error:", err);
+          setError("Unable to obtain location. Check Location Services.");
+        }
       }
-      setGpsLoading(false);
+      if (isMounted) setGpsLoading(false);
     }
+
     init();
+
+    return () => {
+      isMounted = false;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, [initialFarmer]);
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (selectedFarmer) {
@@ -86,6 +110,24 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
     setLoading(false);
   };
 
+  const calculateDistance = () => {
+    if (!gps || !selectedPlot || !selectedPlot.location) return null;
+    const plotLat = selectedPlot.location.y || selectedPlot.location.latitude;
+    const plotLng = selectedPlot.location.x || selectedPlot.location.longitude;
+    if (!plotLat || !plotLng) return null;
+    return calculateHaversineDistance(
+      gps.latitude,
+      gps.longitude,
+      plotLat,
+      plotLng
+    );
+  };
+
+  const currentDistance = calculateDistance();
+  const radiusLimit = config.visit_radius_meters || 150;
+  const validationMode = config.gps_validation_mode || 'Warning';
+  const isOutside = validationMode !== 'Disabled' && currentDistance !== null && currentDistance > radiusLimit;
+
   const handleLogVisit = async () => {
     if (!selectedFarmer) {
       setError("Please select a farmer");
@@ -96,7 +138,13 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
       return;
     }
 
+    if (validationMode === 'Strict' && isOutside) {
+      setError(`Cannot save visit: You are ${currentDistance}m away from the plot (configured limit is ${radiusLimit}m).`);
+      return;
+    }
+
     setLoading(true);
+    setStatusMessage('Saving visit...');
     setError(null);
 
     const lat = gps?.latitude || 18.5204;
@@ -128,7 +176,6 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
       // Upload photos if any
       if (photos.length > 0 && res.id) {
         for (const photoFile of photos) {
-          // Mock upload or blob url storage
           const fakeUrl = URL.createObjectURL(photoFile);
           await api.uploadVisitPhoto(res.id, { photo_url: fakeUrl });
         }
@@ -141,20 +188,6 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
     }
     setLoading(false);
   };
-
-  const calculateDistance = () => {
-    if (!gps || !selectedPlot || !selectedPlot.location) return null;
-    return calculateHaversineDistance(
-      gps.latitude,
-      gps.longitude,
-      selectedPlot.location.y,
-      selectedPlot.location.x
-    );
-  };
-
-  const currentDistance = calculateDistance();
-  const radiusLimit = config.visit_radius_meters || 150;
-  const isOutside = currentDistance !== null && currentDistance > radiusLimit;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -309,7 +342,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
         <div className="pt-3 border-t border-border flex justify-end gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCancel}
             className="px-4 py-2.5 border border-border text-text-muted hover:bg-bg rounded-xl text-xs font-semibold"
           >
             Cancel

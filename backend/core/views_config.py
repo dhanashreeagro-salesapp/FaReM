@@ -9,14 +9,18 @@ from .permissions import IsAdminUser
 class AppConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppConfiguration
-        fields = ['visit_frequency_norm_days', 'planner_refresh_hour',
+        fields = ['visit_frequency_norm_days', 'planner_refresh_hour', 'visit_radius_meters', 'gps_validation_mode',
                   'msg91_auth_key', 'interakt_api_key', 'cloudinary_url', 'updated_at']
         read_only_fields = ['updated_at']
 
 
 class AppConfigurationView(APIView):
     """Singleton configuration endpoint — GET to read, PUT to update."""
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
 
     def get(self, request):
         config = AppConfiguration.get_config()

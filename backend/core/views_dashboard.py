@@ -334,8 +334,10 @@ class HierarchyAPIView(APIView):
         tree_data = [build_user_tree(tu) for tu in top_users]
         return Response(tree_data)
 
+from .permissions import IsAdminUser
+
 class ExportReportAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
         user = request.user

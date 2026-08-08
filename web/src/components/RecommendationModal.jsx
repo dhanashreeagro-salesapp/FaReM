@@ -224,6 +224,30 @@ Dhanashree Agro Team`;
     }
   };
 
+  const [selectedPlotId, setSelectedPlotId] = useState('');
+
+  const handlePlotChange = (plotId) => {
+    setSelectedPlotId(plotId);
+    if (!plotId) {
+      return;
+    }
+    const targetPlot = farmerPlots.find(p => p.id === plotId);
+    if (targetPlot && targetPlot.seasons && targetPlot.seasons.length > 0) {
+      const activeSeason = targetPlot.seasons.find(s => s.status === 'Active') || targetPlot.seasons[0];
+      if (activeSeason?.crop) {
+        setSelectedCrop(activeSeason.crop.id || activeSeason.crop);
+        if (activeSeason.current_stage) {
+          setSelectedStage(activeSeason.current_stage.id || activeSeason.current_stage);
+        }
+      }
+    }
+  };
+
+  const handleCropChange = (cropId) => {
+    setSelectedCrop(cropId);
+    setSelectedStage('');
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
@@ -263,7 +287,10 @@ Dhanashree Agro Team`;
               {farmerPlots.map(plot => (
                 <div key={plot.id} className="border border-border rounded-xl bg-surface overflow-hidden text-xs">
                   <div 
-                    onClick={() => setExpandedPlotId(expandedPlotId === plot.id ? null : plot.id)}
+                    onClick={() => {
+                      setExpandedPlotId(expandedPlotId === plot.id ? null : plot.id);
+                      handlePlotChange(plot.id);
+                    }}
                     className="p-2.5 bg-bg/80 flex items-center justify-between cursor-pointer font-bold text-text hover:bg-bg"
                   >
                     <span>📍 Plot: {plot.plot_name} ({plot.area_acres || '0'} Acres — {plot.soil_type || 'Normal Soil'})</span>
@@ -350,12 +377,26 @@ Dhanashree Agro Team`;
         </div>
 
         {/* Manual Recommendation Form */}
-        <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-text">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-semibold text-text">
+          <div>
+            <label className="block mb-1">Select Plot</label>
+            <select
+              value={selectedPlotId}
+              onChange={(e) => handlePlotChange(e.target.value)}
+              className="w-full px-3 py-2 bg-bg border border-border rounded-xl font-medium text-text outline-none"
+            >
+              <option value="">-- All Plots --</option>
+              {farmerPlots.map(p => (
+                <option key={p.id} value={p.id}>{p.plot_name} ({p.area_acres || 0} acres)</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block mb-1">Crop</label>
             <select
               value={selectedCrop}
-              onChange={(e) => setSelectedCrop(e.target.value)}
+              onChange={(e) => handleCropChange(e.target.value)}
               className="w-full px-3 py-2 bg-bg border border-border rounded-xl font-medium text-text outline-none"
             >
               <option value="">-- Select Crop --</option>
@@ -366,7 +407,7 @@ Dhanashree Agro Team`;
           </div>
 
           <div>
-            <label className="block mb-1">Growth Stage (Filtered by Crop)</label>
+            <label className="block mb-1">Growth Stage</label>
             <select
               value={selectedStage}
               onChange={(e) => setSelectedStage(e.target.value)}

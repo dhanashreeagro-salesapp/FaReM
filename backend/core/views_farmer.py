@@ -20,6 +20,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
     pagination_class = FarmerPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['full_name', 'primary_mobile', 'village', 'taluka', 'district', 'pin_code', 'assigned_staff__mobile_number', 'assigned_staff__email', 'assigned_staff__first_name', 'assigned_staff__last_name']
+    ordering_fields = ['full_name', 'village', 'taluka', 'district', 'pin_code', 'primary_mobile', 'assigned_staff__first_name', 'acquisition_date']
     ordering = ['full_name']
 
     def get_queryset(self):
@@ -41,8 +42,6 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 queryset = Farmer.objects.filter(assigned_staff__in=team_users)
 
         queryset = queryset.select_related('assigned_staff', 'territory')
-
-
 
         # Filters for location and assignment
         pin_code = self.request.query_params.get('pin_code')
@@ -110,6 +109,18 @@ class FarmerViewSet(viewsets.ModelViewSet):
 
 
     def create(self, request, *args, **kwargs):
+        # Validate acquisition_date if provided
+        acquisition_date_str = request.data.get('acquisition_date')
+        if acquisition_date_str:
+            from django.utils import timezone
+            import datetime
+            try:
+                acq_date = datetime.datetime.strptime(str(acquisition_date_str)[:10], '%Y-%m-%d').date()
+                if acq_date > timezone.now().date():
+                    return Response({"acquisition_date": ["Created On date cannot be in the future"]}, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                pass
+
         primary_mobile = str(request.data.get('primary_mobile', '')).strip()
         
         # If farmer with this mobile number already exists, update details and assign to current user
@@ -117,7 +128,8 @@ class FarmerViewSet(viewsets.ModelViewSet):
         if existing_farmer:
             serializer = self.get_serializer(existing_farmer, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-            serializer.save(assigned_staff=request.user)
+            assigned = request.user if request.user.role != Role.ADMIN else (existing_farmer.assigned_staff or request.user)
+            serializer.save(assigned_staff=assigned)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         # Create new farmer and default assigned_staff to requesting user if not provided
@@ -135,7 +147,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
             instance.status = 'Inactive'
             instance.save()
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
     def download_template(self, request):
         import pandas as pd
         from django.http import HttpResponse
@@ -153,7 +165,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = 'attachment; filename="farmers_import_template.xlsx"'
         return response
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def upload_for_validation(self, request):
         if 'file' not in request.FILES:
             return Response({"error": "excel file is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -185,7 +197,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
         
         return Response({"message": "Validation started", "import_job_id": str(import_job.id)}, status=status.HTTP_202_ACCEPTED)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def commit_import(self, request):
 
         import_job_id = request.data.get('import_job_id')
