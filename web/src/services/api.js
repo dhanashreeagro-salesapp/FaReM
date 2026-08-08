@@ -421,8 +421,12 @@ class ApiClient {
 
   // Dashboard & Reports
   getDashboard() { return this.request('/dashboard/'); }
-  getActiveCrops() { return this.request('/dashboard/active_crops/'); }
-  getFarmerPlots() { return this.request('/dashboard/farmer_plots/'); }
+  getActiveCrops() {
+    return this.request('/dashboard/active_crops/').catch(() => this.request('/active-crops/'));
+  }
+  getFarmerPlots() {
+    return this.request('/dashboard/farmer_plots/').catch(() => this.request('/farmer-plots/'));
+  }
   getHierarchy() { return this.request('/dashboard/hierarchy/'); }
   exportReport(type = 'excel') { return this.request(`/export-report/?type=${type}`); }
 
