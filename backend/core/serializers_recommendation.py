@@ -16,9 +16,9 @@ class RecommendationSerializer(serializers.ModelSerializer):
     product_title = serializers.CharField(source='product.name', read_only=True, default=None)
     created_by_name = serializers.SerializerMethodField()
     channel = serializers.CharField(required=False, default='Internal', allow_blank=True, allow_null=True)
+    dose = serializers.CharField(required=False, default='2.5', allow_blank=True)
 
     class Meta:
-
         model = Recommendation
         fields = [
             'id', 'farmer', 'farmer_name', 'farmer_mobile', 'plot', 'created_by_user', 'created_by_name',
@@ -27,6 +27,32 @@ class RecommendationSerializer(serializers.ModelSerializer):
             'manager_comment', 'channel', 'send_status', 'timestamp', 'updated_at', 'messages'
         ]
         read_only_fields = ['id', 'timestamp', 'updated_at']
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'dict'):
+            data = data.dict()
+        else:
+            data = dict(data)
+        
+        # Support payload field aliases from frontend
+        if 'dosage' in data and not data.get('dose'):
+            data['dose'] = data['dosage']
+        if not data.get('dose'):
+            data['dose'] = '2.5'
+
+        if 'recommendation_text' in data and not data.get('notes'):
+            data['notes'] = data['recommendation_text']
+
+        if 'growth_stage' in data and not data.get('stage'):
+            data['stage'] = data['growth_stage']
+
+        ch = str(data.get('channel', 'Internal')).strip()
+        if ch not in ['WhatsApp', 'SMS', 'Internal']:
+            data['channel'] = 'Internal'
+        else:
+            data['channel'] = ch
+
+        return super().to_internal_value(data)
 
     def get_created_by_name(self, obj):
         if obj.created_by_user:

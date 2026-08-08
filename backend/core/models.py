@@ -180,6 +180,35 @@ class CropSeason(models.Model):
     total_income_rs = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     total_expenses_rs = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
+    def compute_and_set_current_stage(self):
+        if not self.crop_id or not self.sowing_date:
+            return None
+        from django.utils import timezone
+        today = timezone.now().date()
+        days_since_sowing = max(0, (today - self.sowing_date).days)
+
+        stages = list(CropStage.objects.filter(crop_id=self.crop_id).order_by('sequence_number'))
+        if not stages:
+            return None
+
+        cumulative_days = 0
+        selected_stage = stages[0]
+
+        for stage in stages:
+            cumulative_days += stage.days_from_previous_stage
+            if days_since_sowing <= cumulative_days:
+                selected_stage = stage
+                break
+            selected_stage = stage
+
+        self.current_stage = selected_stage
+        return selected_stage
+
+    def save(self, *args, **kwargs):
+        if not self.current_stage and self.crop_id and self.sowing_date:
+            self.compute_and_set_current_stage()
+        super().save(*args, **kwargs)
+
 class StageChangeLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     season = models.ForeignKey(CropSeason, on_delete=models.CASCADE, related_name='stage_changes')

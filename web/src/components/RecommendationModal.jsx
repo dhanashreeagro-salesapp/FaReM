@@ -73,18 +73,26 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
 
   const updateCropsForPlot = (plot, masterCrops = allCrops) => {
     if (!plot) {
-      setAvailableCrops(masterCrops);
+      // If no plot selected, restrict to crops active across all farmer's plots if available
+      const allFarmerCropIds = setOfIds(
+        farmerPlots.flatMap(p => (p.seasons || []).filter(s => s.status === 'Active').map(s => s.crop?.id || s.crop))
+      );
+      const farmerCrops = masterCrops.filter(c => allFarmerCropIds.has(String(c.id)));
+      setAvailableCrops(farmerCrops.length > 0 ? farmerCrops : masterCrops);
       return;
     }
 
-    if (plot.seasons && plot.seasons.length > 0) {
-      const activeSeasons = plot.seasons.filter(s => s.status === 'Active');
-      const plotCropIds = setOfIds(activeSeasons.map(s => s.crop?.id || s.crop));
-      
-      const filtered = masterCrops.filter(c => plotCropIds.has(c.id));
-      setAvailableCrops(filtered.length > 0 ? filtered : masterCrops);
+    const seasons = plot.seasons || [];
+    const activeSeasons = seasons.filter(s => s.status === 'Active');
+    const targetSeasons = activeSeasons.length > 0 ? activeSeasons : seasons;
 
-      const activeSeason = activeSeasons[0] || plot.seasons[0];
+    const plotCropIds = setOfIds(targetSeasons.map(s => s.crop?.id || s.crop));
+    const filtered = masterCrops.filter(c => plotCropIds.has(String(c.id)));
+    
+    setAvailableCrops(filtered.length > 0 ? filtered : []);
+
+    if (targetSeasons.length > 0) {
+      const activeSeason = targetSeasons[0];
       if (activeSeason?.crop) {
         const cropId = activeSeason.crop.id || activeSeason.crop;
         setSelectedCrop(cropId);
@@ -93,7 +101,8 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
         }
       }
     } else {
-      setAvailableCrops(masterCrops);
+      setSelectedCrop('');
+      setSelectedStage('');
     }
   };
 
@@ -102,7 +111,7 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
   const handlePlotChange = (plotId) => {
     setSelectedPlotId(plotId);
     if (!plotId) {
-      setAvailableCrops(allCrops);
+      updateCropsForPlot(null, allCrops);
       return;
     }
     const targetPlot = farmerPlots.find(p => p.id === plotId);
@@ -184,19 +193,27 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
     setLoading(true);
     setError(null);
 
+    const targetChannel = channel === 'WhatsApp' ? 'WhatsApp' : channel === 'SMS' ? 'SMS' : 'Internal';
+    const doseVal = String(dose || '2.5');
+    const noteText = notes || `Apply ${productName || 'Dhanashree Product'} at ${doseVal} ${doseUnit} via ${applicationMethod}`;
+
     const payload = {
       farmer: farmer.id,
       plot: selectedPlotId || null,
       crop: selectedCrop,
+      stage: selectedStage || null,
       growth_stage: selectedStage || null,
       product: selectedProduct || null,
       product_name: productName || 'General Recommendation',
-      dosage: `${dose} ${doseUnit}`,
+      dose: doseVal,
+      dosage: `${doseVal} ${doseUnit}`,
+      dose_unit: doseUnit || 'ml/L',
       timing,
       application_method: applicationMethod,
-      recommendation_text: notes || `Apply ${productName} at ${dose} ${doseUnit} via ${applicationMethod}`,
+      notes: noteText,
+      recommendation_text: noteText,
       priority,
-      channel
+      channel: targetChannel
     };
 
     try {
