@@ -15,10 +15,13 @@ class DashboardAPIView(APIView):
     def get(self, request):
         user = request.user
         
-        cache_key = f'dashboard_api_data_{user.id}'
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
+        force_refresh = request.query_params.get('refresh') == 'true'
+        cache_key = f'dashboard_api_data_v2_{user.id}'
+        if not force_refresh:
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                return Response(cached_data)
+
             
         # Basic aggregate data
         data = {}
@@ -167,8 +170,9 @@ class DashboardAPIView(APIView):
                 })
         data['market_trends'] = market_trends
 
-        cache.set(cache_key, data, 60 * 15) # Cache for 15 minutes
+        cache.set(cache_key, data, 60) # Cache for 60 seconds
         return Response(data)
+
 
 class ActiveCropsAPIView(APIView):
     permission_classes = [IsAuthenticated]
