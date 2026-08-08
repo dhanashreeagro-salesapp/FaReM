@@ -87,9 +87,10 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
   };
 
   useEffect(() => {
-    if (selectedFarmer) {
-      api.getPlots({ farmer_id: selectedFarmer.id }).then(res => {
-        const list = res.results || res || [];
+    if (selectedFarmer?.id) {
+      api.getPlots({ farmer: selectedFarmer.id, farmer_id: selectedFarmer.id }).then(res => {
+        const raw = res.results || res || [];
+        const list = raw.filter(p => String(p.farmer?.id || p.farmer) === String(selectedFarmer.id));
         setPlots(list);
         if (list.length > 0) setSelectedPlot(list[0]);
         else setSelectedPlot(null);
@@ -420,7 +421,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
           <button
             type="button"
             disabled={loading || notes.length < 10}
-            onClick={handleLogVisit}
+            onClick={handleSaveVisit}
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}

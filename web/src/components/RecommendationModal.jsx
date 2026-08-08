@@ -55,14 +55,19 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
     async function loadFarmerPlots() {
       if (!farmer?.id) return;
       try {
-        const res = await api.getPlots({ farmer_id: farmer.id });
-        const plotsList = Array.isArray(res) ? res : (res.results || []);
+        const res = await api.getPlots({ farmer: farmer.id, farmer_id: farmer.id });
+        const raw = Array.isArray(res) ? res : (res.results || []);
+        const plotsList = raw.filter(p => String(p.farmer?.id || p.farmer) === String(farmer.id));
         setFarmerPlots(plotsList);
 
         if (plotsList.length > 0) {
           const firstPlot = plotsList[0];
           setSelectedPlotId(firstPlot.id);
           updateCropsForPlot(firstPlot, allCrops);
+        } else {
+          setFarmerPlots([]);
+          setSelectedPlotId('');
+          updateCropsForPlot(null, allCrops);
         }
       } catch (err) {
         console.warn("Could not load farmer plots:", err);
