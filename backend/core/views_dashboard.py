@@ -16,8 +16,10 @@ class DashboardAPIView(APIView):
         user = request.user
         
         force_refresh = request.query_params.get('refresh') == 'true'
-        cache_key = f'dashboard_api_data_v2_{user.id}'
-        if not force_refresh:
+        cache_key = f'dashboard_api_data_v3_{user.id}'
+        if force_refresh:
+            cache.delete(cache_key)
+        else:
             cached_data = cache.get(cache_key)
             if cached_data:
                 return Response(cached_data)
