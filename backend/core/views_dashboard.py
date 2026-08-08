@@ -315,19 +315,27 @@ class HierarchyAPIView(APIView):
             sub_nodes = [build_user_tree(sub) for sub in subordinates]
 
             assigned_farmers = Farmer.objects.filter(assigned_staff=u, status='Active')
-            farmer_count = assigned_farmers.count()
-            plot_count = Plot.objects.filter(farmer__in=assigned_farmers, is_active=True).count()
-            crop_count = CropSeason.objects.filter(plot__farmer__in=assigned_farmers, status='Active').count()
-            farmers_this_year = assigned_farmers.filter(date_added__year=current_year).count()
+            direct_farmer_count = assigned_farmers.count()
+            direct_plot_count = Plot.objects.filter(farmer__in=assigned_farmers, is_active=True).count()
+            direct_crop_count = CropSeason.objects.filter(plot__farmer__in=assigned_farmers, status='Active').count()
+            direct_farmers_this_year = assigned_farmers.filter(date_added__year=current_year).count()
 
             recs_count = Recommendation.objects.filter(created_by_user=u).count()
             visits_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Visit').count()
             calls_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Call').count()
             whatsapp_count = Recommendation.objects.filter(created_by_user=u, channel='WhatsApp').count()
 
-            # Target completion percentage benchmark
+            total_farmers = direct_farmer_count + sum(sub['farmer_count'] for sub in sub_nodes)
+            total_plots = direct_plot_count + sum(sub['plot_count'] for sub in sub_nodes)
+            total_crops = direct_crop_count + sum(sub['crop_count'] for sub in sub_nodes)
+            total_added_ytd = direct_farmers_this_year + sum(sub['farmers_added_this_year'] for sub in sub_nodes)
+            total_visits = visits_count + sum(sub['visits_count'] for sub in sub_nodes)
+            total_calls = calls_count + sum(sub['calls_count'] for sub in sub_nodes)
+            total_recs = recs_count + sum(sub['recommendations_count'] for sub in sub_nodes)
+            total_wa = whatsapp_count + sum(sub['whatsapp_count'] for sub in sub_nodes)
+
             norm = 50
-            perf_pct = min(100, round((visits_count / max(1, norm)) * 100, 1))
+            perf_pct = min(100, round((total_visits / max(1, norm)) * 100, 1))
 
             first_n = u.first_name or ''
             last_n = u.last_name or ''
@@ -335,21 +343,26 @@ class HierarchyAPIView(APIView):
 
             return {
                 'id': str(u.id),
+                'name': full_name,
                 'full_name': full_name,
                 'email': u.email,
                 'role': u.role,
                 'territory_name': u.territory.name if u.territory else 'General Region',
-                'farmer_count': farmer_count,
-                'plot_count': plot_count,
-                'crop_count': crop_count,
-                'farmers_added_this_year': farmers_this_year,
-                'recommendations_count': recs_count,
-                'visits_count': visits_count,
-                'calls_count': calls_count,
-                'whatsapp_count': whatsapp_count,
+                'farmer_count': total_farmers,
+                'farmers_count': total_farmers,
+                'plot_count': total_plots,
+                'plots_count': total_plots,
+                'crop_count': total_crops,
+                'active_crops_count': total_crops,
+                'farmers_added_this_year': total_added_ytd,
+                'recommendations_count': total_recs,
+                'visits_count': total_visits,
+                'calls_count': total_calls,
+                'whatsapp_count': total_wa,
                 'performance_pct': perf_pct,
                 'last_sync': u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Active Today',
-                'subordinates': sub_nodes
+                'subordinates': sub_nodes,
+                'subordinates_count': len(sub_nodes)
             }
 
         # Find top roots (Users with no reporting manager or top Admin/ZonalManager)

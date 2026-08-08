@@ -51,7 +51,7 @@ function HierarchyNode({ node, level = 0 }) {
               </button>
             )}
             <div>
-              <h4 className="font-heading font-bold text-sm leading-tight">{node.full_name}</h4>
+              <h4 className="font-heading font-bold text-sm leading-tight">{node.full_name || node.name}</h4>
               <p className="text-[11px] opacity-80 font-semibold">{node.role} • {node.territory_name}</p>
             </div>
           </div>
@@ -68,35 +68,35 @@ function HierarchyNode({ node, level = 0 }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-3 text-center text-xs">
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Farmers</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.farmer_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.farmer_count ?? node.farmers_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Plots</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.plot_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.plot_count ?? node.plots_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Crops</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.crop_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.crop_count ?? node.active_crops_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Added YTD</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.farmers_added_this_year}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.farmers_added_this_year ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Visits</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.visits_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.visits_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Calls</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.calls_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.calls_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">Advisories</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.recommendations_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.recommendations_count ?? 0}</p>
           </div>
           <div className="p-1.5 rounded-lg bg-black/5">
             <p className="text-[10px] opacity-70 uppercase font-semibold">WhatsApp</p>
-            <p className="font-bold text-sm font-mono mt-0.5">{node.whatsapp_count}</p>
+            <p className="font-bold text-sm font-mono mt-0.5">{node.whatsapp_count ?? 0}</p>
           </div>
         </div>
       </div>
@@ -258,7 +258,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard icon={Users} label="Total Active Farmers" value={data?.total_farmers?.toLocaleString()} color="bg-emerald-50 text-emerald-700" delay={0} to="/farmers" />
             <StatCard icon={MapPin} label="Total Plots (Click)" value={data?.total_plots?.toLocaleString()} color="bg-blue-50 text-blue-700" delay={30} onClick={handleOpenPlotsModal} />
-            <StatCard icon={TrendingUp} label="Active Crops (Click)" value={data?.active_crop_seasons?.toLocaleString()} color="bg-amber-50 text-amber-700" delay={60} onClick={handleOpenActiveCropsModal} />
+            <StatCard icon={TrendingUp} label="Active Crops (Click)" value={(data?.active_crops ?? data?.active_crop_seasons)?.toLocaleString()} color="bg-amber-50 text-amber-700" delay={60} onClick={handleOpenActiveCropsModal} />
             <StatCard icon={MapPin} label="Total Visits" value={data?.total_visits?.toLocaleString()} color="bg-purple-50 text-purple-700" delay={90} />
             <StatCard icon={Phone} label="Total Calls" value={data?.total_calls?.toLocaleString()} color="bg-sky-50 text-sky-700" delay={120} />
             <StatCard icon={AlertTriangle} label="Overdue Visits" value={data?.overdue_visits?.toLocaleString()} color="bg-red-50 text-danger" delay={150} />

@@ -5,7 +5,7 @@ import { compressImage } from '../utils/imageCompressor';
 import { offlineQueue } from '../utils/offlineQueue';
 import { MapPin, Camera, Clock, AlertTriangle, CheckCircle2, X, Loader2, Navigation, FileText } from 'lucide-react';
 
-export default function LogVisitModal({ farmer: initialFarmer, onClose, onSuccess, onCreatePlot }) {
+function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCreatePlot }) {
   const [farmers, setFarmers] = useState([]);
   const [selectedFarmer, setSelectedFarmer] = useState(initialFarmer || null);
   const [plots, setPlots] = useState([]);
@@ -170,7 +170,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
   const validationMode = config.gps_validation_mode || 'Warning';
 
   const handleSaveVisit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!selectedFarmer) {
       setError("Please select a farmer");
       return;
@@ -219,14 +219,14 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
       if (photos.length > 0 && res.id) {
         for (const photoFile of photos) {
           const fakeUrl = URL.createObjectURL(photoFile);
-          await api.uploadVisitPhoto(res.id, { photo_url: fakeUrl });
+          await api.uploadVisitPhoto(res.id, { photo_url: fakeUrl }).catch(() => {});
         }
       }
 
       if (onSuccess) onSuccess(res);
       onClose();
     } catch (err) {
-      setError(err.error || "Failed to log visit");
+      setError(err.error || err.detail || "Failed to log visit");
     }
     setLoading(false);
   };
@@ -422,7 +422,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
             type="button"
             disabled={loading || notes.length < 10}
             onClick={handleSaveVisit}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all cursor-pointer"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
             <span>Save & Log Visit</span>
@@ -431,5 +431,67 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
 
       </div>
     </div>
+  );
+}
+
+class LogVisitErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("LogVisitModal ErrorBoundary caught exception:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600 font-bold font-heading text-base">
+              <AlertTriangle size={24} />
+              <span>We couldn't open the Field Visit form</span>
+            </div>
+            <p className="text-xs text-text-muted">An unexpected error occurred while loading the visit workflow.</p>
+            <div className="p-3 bg-red-50 border border-red-200 text-danger text-[11px] font-mono rounded-xl max-h-24 overflow-y-auto">
+              {this.state.error?.toString()}
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  if (this.props.onClose) this.props.onClose();
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-text text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary/90 cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function LogVisitModal(props) {
+  return (
+    <LogVisitErrorBoundary onClose={props.onClose}>
+      <LogVisitModalContent {...props} />
+    </LogVisitErrorBoundary>
   );
 }
