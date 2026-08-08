@@ -1,5 +1,5 @@
 import pandas as pd
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Max
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -196,22 +196,38 @@ class ActiveCropsAPIView(APIView):
             else:
                 farmers = farmers.filter(assigned_staff__in=team_users)
 
-
-        from django.db.models import Subquery, OuterRef
-        last_visit_subq = ActivityLog.objects.filter(
-            farmer=OuterRef('plot__farmer__id'), activity_type='Visit'
-        ).order_by('-date').values('date')[:1]
-
         active_seasons = CropSeason.objects.filter(
             plot__farmer__in=farmers, plot__is_active=True, status='Active'
-        ).select_related('crop', 'current_stage', 'plot', 'plot__farmer').annotate(
-            last_visit_date=Subquery(last_visit_subq)
-        ).order_by('-sowing_date')
+        ).select_related('crop', 'current_stage', 'plot', 'plot__farmer').order_by('-sowing_date')[:500]
+
+        season_list = list(active_seasons)
+        if not season_list:
+            return Response([])
+
+        farmer_ids = set(s.plot.farmer.id for s in season_list)
+
+        # Bulk count recommendations per farmer in 1 query
+        rec_counts = dict(
+            Recommendation.objects.filter(farmer_id__in=farmer_ids)
+            .values('farmer_id')
+            .annotate(cnt=Count('id'))
+            .values_list('farmer_id', 'cnt')
+        )
+
+        # Bulk fetch last visit date per farmer in 1 query
+        last_visits = dict(
+            ActivityLog.objects.filter(farmer_id__in=farmer_ids, activity_type='Visit')
+            .values('farmer_id')
+            .annotate(max_date=Max('date'))
+            .values_list('farmer_id', 'max_date')
+        )
 
         results = []
-        for season in active_seasons[:500]:
+        for season in season_list:
             farmer = season.plot.farmer
-            rec_count = Recommendation.objects.filter(farmer=farmer).count()
+            rec_count = rec_counts.get(farmer.id, 0)
+            last_visit = last_visits.get(farmer.id)
+
             results.append({
                 'id': str(season.id),
                 'crop_name': season.crop.crop_name if season.crop else 'General Crop',
@@ -222,11 +238,12 @@ class ActiveCropsAPIView(APIView):
                 'village': farmer.village,
                 'plot_name': season.plot.plot_name,
                 'mobile_number': farmer.primary_mobile,
-                'last_visit_date': str(season.last_visit_date) if hasattr(season, 'last_visit_date') and season.last_visit_date else 'No Visits',
+                'last_visit_date': last_visit.strftime('%Y-%m-%d') if last_visit else 'No Visits',
                 'recommendation_count': rec_count
             })
 
         return Response(results)
+
 
 class FarmerPlotsAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -248,13 +265,25 @@ class FarmerPlotsAPIView(APIView):
             else:
                 farmers = farmers.filter(assigned_staff__in=team_users)
 
-
         from .models import Plot
-        plots = Plot.objects.filter(farmer__in=farmers, is_active=True).select_related('farmer').order_by('-id')
+        plots = Plot.objects.filter(farmer__in=farmers, is_active=True).select_related('farmer').order_by('-id')[:500]
+        plot_list = list(plots)
+        if not plot_list:
+            return Response([])
+
+        plot_ids = [p.id for p in plot_list]
+
+        # Bulk count active crops per plot in 1 query
+        crop_counts = dict(
+            CropSeason.objects.filter(plot_id__in=plot_ids, status='Active')
+            .values('plot_id')
+            .annotate(cnt=Count('id'))
+            .values_list('plot_id', 'cnt')
+        )
 
         results = []
-        for p in plots[:500]:
-            crop_count = p.seasons.filter(status='Active').count()
+        for p in plot_list:
+            crop_count = crop_counts.get(p.id, 0)
             results.append({
                 'id': str(p.id),
                 'plot_name': p.plot_name,
