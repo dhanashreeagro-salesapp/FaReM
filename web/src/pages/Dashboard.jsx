@@ -126,18 +126,29 @@ export default function Dashboard() {
   const [showPlotsModal, setShowPlotsModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const d = await api.getDashboard({ refresh: 'true' });
+  const fetchDashboard = async (force = false) => {
+    setLoading(true);
+    try {
+      const d = await api.getDashboard({ refresh: 'true' });
+      if (d) {
         setData(d);
-      } catch (err) {
-        console.error("Dashboard load error:", err);
       }
-      setLoading(false);
-    };
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchDashboard();
-  }, []);
+    // Auto-retry after 3s if initial fetch returned empty/null
+    const timer = setTimeout(() => {
+      if (!data || data.total_farmers === undefined) {
+        fetchDashboard(true);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [user?.email]);
 
   const handleOpenActiveCropsModal = async () => {
     setShowActiveCropsModal(true);
@@ -173,7 +184,8 @@ export default function Dashboard() {
     setModalLoading(true);
     try {
       const res = await api.getHierarchy();
-      setHierarchyData(res || []);
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      setHierarchyData(list);
     } catch (err) {
       console.error("Failed loading hierarchy:", err);
     }
