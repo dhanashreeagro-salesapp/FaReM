@@ -139,7 +139,8 @@ def validate_farmer_import(import_job_id):
 
 @shared_task
 def commit_farmer_import(import_job_id):
-    from .models import ImportJob, User, Farmer
+    from .models import ImportJob, User, Farmer, Territory
+    from django.db.models import Q
     import re
     try:
         job = ImportJob.objects.get(id=import_job_id)
@@ -147,7 +148,7 @@ def commit_farmer_import(import_job_id):
         return {"status": "failed", "error": "Job not found"}
 
     df = pd.read_excel(job.filename)
-    expected_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile', 'AcquisitionDate', 'Source']
+    expected_columns = ['FullName', 'PrimaryMobile', 'Village', 'Taluka', 'District', 'State', 'PinCode', 'StaffMobile', 'Territory', 'AcquisitionDate', 'Source']
     df = normalize_dataframe_headers(df, expected_columns)
     
     created_count = 0
@@ -170,18 +171,42 @@ def commit_farmer_import(import_job_id):
             
             staff_raw = row.get('StaffMobile') or row.get('StaffEmail') or row.get('AssignedStaff')
             staff_val = str(staff_raw).split('.')[0].strip() if pd.notna(staff_raw) else ''
-            if staff_val:
-                staff_val = re.sub(r'\D', '', staff_val)[-10:] or staff_val
             
             assigned_staff_user = None
             if staff_val:
-                assigned_staff_user = User.objects.filter(mobile_number=staff_val).first()
+                digits_only = re.sub(r'\D', '', staff_val)[-10:]
+                if digits_only and len(digits_only) == 10:
+                    assigned_staff_user = User.objects.filter(mobile_number=digits_only).first()
                 if not assigned_staff_user:
                     assigned_staff_user = User.objects.filter(email__iexact=staff_val).first()
                 if not assigned_staff_user:
                     assigned_staff_user = User.objects.filter(username__iexact=staff_val).first()
+                if not assigned_staff_user:
+                    parts = staff_val.split()
+                    if len(parts) >= 2:
+                        assigned_staff_user = User.objects.filter(first_name__iexact=parts[0], last_name__iexact=parts[-1]).first()
+
             if not assigned_staff_user:
                 assigned_staff_user = job.created_by
+
+            # Territory Resolution Logic
+            territory_obj = None
+            terr_raw = row.get('Territory')
+            if pd.notna(terr_raw) and str(terr_raw).strip():
+                terr_name = str(terr_raw).strip()
+                territory_obj = Territory.objects.filter(name__iexact=terr_name).first()
+
+            if not territory_obj and assigned_staff_user and assigned_staff_user.territory:
+                territory_obj = assigned_staff_user.territory
+
+            if not territory_obj and job.created_by and job.created_by.territory:
+                territory_obj = job.created_by.territory
+
+            if not territory_obj:
+                if village:
+                    territory_obj = Territory.objects.filter(name__iexact=village).first()
+                if not territory_obj and district:
+                    territory_obj = Territory.objects.filter(name__iexact=district).first()
 
             from django.utils import timezone
             source = str(row.get('Source', '')).strip() if pd.notna(row.get('Source')) else ''
@@ -211,7 +236,7 @@ def commit_farmer_import(import_job_id):
                     'assigned_staff': assigned_staff,
                     'source': source,
                     'acquisition_date': acquisition_date,
-                    'territory': assigned_staff.territory if assigned_staff else None
+                    'territory': territory_obj
                 }
             )
 
