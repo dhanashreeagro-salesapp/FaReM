@@ -112,12 +112,35 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
   };
 
   const calculateDistance = () => {
-    if (!gps || !selectedPlot || !selectedPlot.location) return null;
+    if (!gps || !selectedPlot) return null;
     try {
       let plotLat = null, plotLng = null;
-      const loc = selectedPlot.location;
+      let loc = selectedPlot.location;
+      if (typeof loc === 'string') {
+        try { loc = JSON.parse(loc); } catch { loc = null; }
+      }
+      if (!loc && selectedPlot.location_geojson) {
+        try { loc = typeof selectedPlot.location_geojson === 'string' ? JSON.parse(selectedPlot.location_geojson) : selectedPlot.location_geojson; } catch { loc = null; }
+      }
+
       if (typeof loc === 'object' && loc !== null) {
-        if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+        if (loc.type === 'Polygon' && Array.isArray(loc.coordinates) && loc.coordinates[0]?.length > 0) {
+          // Polygon ring: array of [lng, lat]
+          const ring = loc.coordinates[0];
+          let sumLat = 0, sumLng = 0;
+          let count = 0;
+          for (const pt of ring) {
+            if (Array.isArray(pt) && pt.length >= 2) {
+              sumLng += Number(pt[0]);
+              sumLat += Number(pt[1]);
+              count++;
+            }
+          }
+          if (count > 0) {
+            plotLng = sumLng / count;
+            plotLat = sumLat / count;
+          }
+        } else if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 && typeof loc.coordinates[0] === 'number') {
           plotLng = Number(loc.coordinates[0]);
           plotLat = Number(loc.coordinates[1]);
         } else if (loc.latitude != null && loc.longitude != null) {
@@ -128,6 +151,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
           plotLng = Number(loc.x);
         }
       }
+
       if (plotLat !== null && plotLng !== null && !isNaN(plotLat) && !isNaN(plotLng) && gps?.latitude && gps?.longitude) {
         const d = calculateHaversineDistance(gps.latitude, gps.longitude, plotLat, plotLng);
         return (d !== null && !isNaN(d)) ? Math.round(d) : null;

@@ -28,7 +28,7 @@ class PlotViewSet(viewsets.ModelViewSet):
         elif user.role == Role.FIELD_STAFF:
             queryset = Plot.objects.filter(farmer__assigned_staff=user)
             
-        farmer_id = self.request.query_params.get('farmer')
+        farmer_id = self.request.query_params.get('farmer') or self.request.query_params.get('farmer_id')
         if farmer_id:
             queryset = queryset.filter(farmer_id=farmer_id)
         return queryset
