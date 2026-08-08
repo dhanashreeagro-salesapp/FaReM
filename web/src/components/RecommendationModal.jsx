@@ -3,10 +3,14 @@ import api from '../services/api';
 import { offlineQueue } from '../utils/offlineQueue';
 import { Sparkles, Award, Send, MessageSquare, CheckCircle2, AlertTriangle, X, Loader2, Info } from 'lucide-react';
 
-export default function RecommendationModal({ farmer, onClose, onSuccess }) {
-  const [crops, setCrops] = useState([]);
+export default function RecommendationModal({ farmer, onClose, onSuccess, onCreatePlot }) {
+  const [allCrops, setAllCrops] = useState([]);
   const [stages, setStages] = useState([]);
   const [products, setProducts] = useState([]);
+
+  const [farmerPlots, setFarmerPlots] = useState([]);
+  const [selectedPlotId, setSelectedPlotId] = useState('');
+  const [availableCrops, setAvailableCrops] = useState([]);
 
   const [selectedCrop, setSelectedCrop] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
@@ -21,12 +25,12 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
 
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [previewChannel, setPreviewChannel] = useState('WhatsApp');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Load All Master Crops & Products
   useEffect(() => {
     async function loadData() {
       try {
@@ -36,12 +40,9 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
         ]);
         const crps = Array.isArray(cList) ? cList : (cList.results || []);
         const prods = Array.isArray(pList) ? pList : (pList.results || []);
-        setCrops(crps);
+        setAllCrops(crps);
+        setAvailableCrops(crps);
         setProducts(prods);
-
-        if (crps.length > 0) {
-          setSelectedCrop(crps[0].id);
-        }
       } catch (err) {
         console.error("Failed loading options:", err);
       }
@@ -49,6 +50,68 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
     loadData();
   }, []);
 
+  // Load Farmer Plots
+  useEffect(() => {
+    async function loadFarmerPlots() {
+      if (!farmer?.id) return;
+      try {
+        const res = await api.getPlots({ farmer_id: farmer.id });
+        const plotsList = Array.isArray(res) ? res : (res.results || []);
+        setFarmerPlots(plotsList);
+
+        if (plotsList.length > 0) {
+          const firstPlot = plotsList[0];
+          setSelectedPlotId(firstPlot.id);
+          updateCropsForPlot(firstPlot, allCrops);
+        }
+      } catch (err) {
+        console.warn("Could not load farmer plots:", err);
+      }
+    }
+    loadFarmerPlots();
+  }, [farmer]);
+
+  const updateCropsForPlot = (plot, masterCrops = allCrops) => {
+    if (!plot) {
+      setAvailableCrops(masterCrops);
+      return;
+    }
+
+    if (plot.seasons && plot.seasons.length > 0) {
+      const activeSeasons = plot.seasons.filter(s => s.status === 'Active');
+      const plotCropIds = setOfIds(activeSeasons.map(s => s.crop?.id || s.crop));
+      
+      const filtered = masterCrops.filter(c => plotCropIds.has(c.id));
+      setAvailableCrops(filtered.length > 0 ? filtered : masterCrops);
+
+      const activeSeason = activeSeasons[0] || plot.seasons[0];
+      if (activeSeason?.crop) {
+        const cropId = activeSeason.crop.id || activeSeason.crop;
+        setSelectedCrop(cropId);
+        if (activeSeason.current_stage) {
+          setSelectedStage(activeSeason.current_stage.id || activeSeason.current_stage);
+        }
+      }
+    } else {
+      setAvailableCrops(masterCrops);
+    }
+  };
+
+  const setOfIds = (arr) => new Set(arr.filter(Boolean).map(x => String(x)));
+
+  const handlePlotChange = (plotId) => {
+    setSelectedPlotId(plotId);
+    if (!plotId) {
+      setAvailableCrops(allCrops);
+      return;
+    }
+    const targetPlot = farmerPlots.find(p => p.id === plotId);
+    if (targetPlot) {
+      updateCropsForPlot(targetPlot, allCrops);
+    }
+  };
+
+  // Load Growth Stages specific to selectedCrop
   useEffect(() => {
     async function loadCropStages() {
       if (!selectedCrop) {
@@ -60,10 +123,8 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
         const res = await api.getCropStages({ crop: selectedCrop, crop_id: selectedCrop });
         const stgs = Array.isArray(res) ? res : (res.results || []);
         setStages(stgs);
-        if (stgs.length > 0) {
+        if (stgs.length > 0 && !selectedStage) {
           setSelectedStage(stgs[0].id);
-        } else {
-          setSelectedStage('');
         }
       } catch (err) {
         console.error("Failed loading crop stages:", err);
@@ -73,6 +134,11 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
     }
     loadCropStages();
   }, [selectedCrop]);
+
+  const handleCropChange = (cropId) => {
+    setSelectedCrop(cropId);
+    setSelectedStage('');
+  };
 
   const fetchAiSuggestions = async () => {
     setLoadingSuggestions(true);
@@ -95,42 +161,24 @@ export default function RecommendationModal({ farmer, onClose, onSuccess }) {
     }
   }, [selectedCrop, selectedStage]);
 
-
   const applySuggestion = (sugg) => {
     if (sugg.product_id) setSelectedProduct(sugg.product_id);
     setProductName(sugg.product_name);
-    setDose(sugg.dose.split(' ')[0] || '2.5');
+    setDose(sugg.dose ? sugg.dose.split(' ')[0] : '2.5');
     setDoseUnit(sugg.dose_unit || 'ml/L');
-    setTiming(sugg.timing);
-    setApplicationMethod(sugg.application_method);
-    setNotes(sugg.notes);
+    setTiming(sugg.timing || 'Early Morning');
+    setApplicationMethod(sugg.application_method || 'Foliar Spray');
+    setNotes(sugg.notes || '');
   };
 
-  const formattedWhatsAppContent = `Dear ${farmer?.full_name || 'Farmer'},
-
-Recommended Product: ${productName || 'Dhanashree Growth Booster'}
-Dose: ${dose} ${doseUnit}
-Application Method: ${applicationMethod}
-Timing: ${timing}
-Notes: ${notes}
-
-Regards,
-Dhanashree Agro Team`;
-
   const handleSaveRecommendation = async (channel = 'Internal') => {
-    if (!farmer) {
+    if (!farmer?.id) {
       setError("No farmer selected");
       return;
     }
-
-    // Auto-fill product name if user selected a product dropdown or leave empty
-    let pName = (productName || '').trim();
-    if (!pName && selectedProduct) {
-      const pObj = products.find(p => p.id === selectedProduct);
-      if (pObj) pName = pObj.name;
-    }
-    if (!pName) {
-      pName = "Dhanashree Growth Booster";
+    if (!selectedCrop) {
+      setError("Please select a crop");
+      return;
     }
 
     setLoading(true);
@@ -138,45 +186,31 @@ Dhanashree Agro Team`;
 
     const payload = {
       farmer: farmer.id,
-      crop: selectedCrop || null,
-      stage: selectedStage || null,
+      plot: selectedPlotId || null,
+      crop: selectedCrop,
+      growth_stage: selectedStage || null,
       product: selectedProduct || null,
-      product_name: pName,
-      dose: String(dose || '2.5'),
-      dose_unit: doseUnit || 'ml/L',
-      timing: timing || 'Early Morning',
-      application_method: applicationMethod || 'Foliar Spray',
-      notes: notes || '',
-      priority: priority || 'Normal',
+      product_name: productName || 'General Recommendation',
+      dosage: `${dose} ${doseUnit}`,
+      timing,
+      application_method: applicationMethod,
+      recommendation_text: notes || `Apply ${productName} at ${dose} ${doseUnit} via ${applicationMethod}`,
+      priority,
       channel
     };
 
     try {
-      if (!navigator.onLine) {
-        offlineQueue.saveRecommendation(payload);
-        alert("Offline mode: Recommendation saved locally and will auto-sync on reconnection!");
-        if (onSuccess) onSuccess();
-        onClose();
-        return;
-      }
-
       const rec = await api.createRecommendation(payload);
 
-      let msgNotice = "";
-      if (channel === 'WhatsApp' && rec?.id) {
-        try {
-          await api.sendRecommendationWhatsApp(rec.id, { content: formattedWhatsAppContent });
-        } catch (wErr) {
-          console.warn("WhatsApp dispatch notice:", wErr);
-          msgNotice = " (WhatsApp integration pending; saved internally)";
-        }
-      } else if (channel === 'SMS' && rec?.id) {
-        try {
-          await api.sendRecommendationSms(rec.id, { content: formattedWhatsAppContent.slice(0, 160) });
-        } catch (sErr) {
-          console.warn("SMS dispatch notice:", sErr);
-          msgNotice = " (SMS gateway pending; saved internally)";
-        }
+      let msgNotice = '';
+      if (channel === 'WhatsApp') {
+        await api.sendRecommendationWhatsApp(rec.id).catch(err => {
+          msgNotice = ` (WhatsApp send info: ${err.detail || err.error || 'Saved internally'})`;
+        });
+      } else if (channel === 'SMS') {
+        await api.sendRecommendationSms(rec.id).catch(err => {
+          msgNotice = ` (SMS send info: ${err.detail || err.error || 'Saved internally'})`;
+        });
       }
 
       if (msgNotice) {
@@ -194,60 +228,6 @@ Dhanashree Agro Team`;
     }
   };
 
-
-  const [farmerPlots, setFarmerPlots] = useState([]);
-  const [expandedPlotId, setExpandedPlotId] = useState(null);
-
-  useEffect(() => {
-    async function loadFarmerPlots() {
-      if (!farmer?.id) return;
-      try {
-        const res = await api.getPlots({ farmer_id: farmer.id });
-        const plotsList = Array.isArray(res) ? res : (res.results || []);
-        setFarmerPlots(plotsList);
-        if (plotsList.length > 0) {
-          setExpandedPlotId(plotsList[0].id);
-        }
-      } catch (err) {
-        console.warn("Could not load farmer plots:", err);
-      }
-    }
-    loadFarmerPlots();
-  }, [farmer]);
-
-  const handleSelectHierarchyCrop = (plot, season) => {
-    if (season?.crop) {
-      setSelectedCrop(season.crop.id || season.crop);
-      if (season.current_stage) {
-        setSelectedStage(season.current_stage.id || season.current_stage);
-      }
-    }
-  };
-
-  const [selectedPlotId, setSelectedPlotId] = useState('');
-
-  const handlePlotChange = (plotId) => {
-    setSelectedPlotId(plotId);
-    if (!plotId) {
-      return;
-    }
-    const targetPlot = farmerPlots.find(p => p.id === plotId);
-    if (targetPlot && targetPlot.seasons && targetPlot.seasons.length > 0) {
-      const activeSeason = targetPlot.seasons.find(s => s.status === 'Active') || targetPlot.seasons[0];
-      if (activeSeason?.crop) {
-        setSelectedCrop(activeSeason.crop.id || activeSeason.crop);
-        if (activeSeason.current_stage) {
-          setSelectedStage(activeSeason.current_stage.id || activeSeason.current_stage);
-        }
-      }
-    }
-  };
-
-  const handleCropChange = (cropId) => {
-    setSelectedCrop(cropId);
-    setSelectedStage('');
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
@@ -260,7 +240,7 @@ Dhanashree Agro Team`;
             </div>
             <div>
               <h3 className="text-lg font-heading font-bold text-text">AgriAmigo Advisory Recommendation</h3>
-              <p className="text-xs text-text-muted">Farmer: <span className="font-semibold text-text">{farmer?.full_name}</span> ({farmer?.village || 'No Village'})</p>
+              <p className="text-xs text-text-muted">Farmer: <span className="font-semibold text-emerald-950 font-bold">{farmer?.full_name}</span> ({farmer?.village || 'No Village'} • Mobile: {farmer?.primary_mobile || 'N/A'})</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-bg">
@@ -275,57 +255,28 @@ Dhanashree Agro Team`;
           </div>
         )}
 
-        {/* Streamlined Hierarchy Selector: Farmer -> Plot -> Crop */}
-        {farmerPlots.length > 0 ? (
-          <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-heading font-bold text-emerald-900">
-              <span className="flex items-center gap-1.5"><Info size={14} className="text-emerald-600" /> Tap Crop to Auto-Populate Advisory Details</span>
-              <span className="text-[11px] font-medium text-emerald-700">{farmerPlots.length} Registered Plot(s)</span>
+        {/* Farmer Plots / No Plot Prompt */}
+        {farmerPlots.length === 0 ? (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-xs space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+              <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+              <span>No plot or active crop season defined for {farmer?.full_name}.</span>
             </div>
-
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              {farmerPlots.map(plot => (
-                <div key={plot.id} className="border border-border rounded-xl bg-surface overflow-hidden text-xs">
-                  <div 
-                    onClick={() => {
-                      setExpandedPlotId(expandedPlotId === plot.id ? null : plot.id);
-                      handlePlotChange(plot.id);
-                    }}
-                    className="p-2.5 bg-bg/80 flex items-center justify-between cursor-pointer font-bold text-text hover:bg-bg"
-                  >
-                    <span>📍 Plot: {plot.plot_name} ({plot.area_acres || '0'} Acres — {plot.soil_type || 'Normal Soil'})</span>
-                    <span className="text-[11px] text-primary">{expandedPlotId === plot.id ? 'Collapse ▲' : 'Expand ▼'}</span>
-                  </div>
-
-                  {expandedPlotId === plot.id && (
-                    <div className="p-2 space-y-1 bg-surface border-t border-border">
-                      {plot.seasons && plot.seasons.length > 0 ? (
-                        plot.seasons.map(season => (
-                          <div 
-                            key={season.id} 
-                            onClick={() => handleSelectHierarchyCrop(plot, season)}
-                            className={`p-2 rounded-lg flex items-center justify-between cursor-pointer border transition-all ${selectedCrop === (season.crop?.id || season.crop) ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold' : 'border-border hover:border-emerald-300'}`}
-                          >
-                            <div>
-                              <span className="font-semibold">{season.crop_name || season.crop?.crop_name || 'Crop'}</span>
-                              <span className="text-[11px] text-text-muted ml-2">Stage: {season.stage_name || season.current_stage?.stage_name || 'Growth Stage'}</span>
-                            </div>
-                            <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">Tap to Select</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-2 text-text-muted italic text-[11px]">No active season on this plot. Select crop manually below.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <p className="text-text-muted text-xs">A registered plot and crop season are required to generate plot-specific advisory recommendations.</p>
+            {onCreatePlot && farmer && (
+              <button
+                type="button"
+                onClick={() => onCreatePlot(farmer)}
+                className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-md"
+              >
+                + Create Plot & Crop Season for {farmer.full_name}
+              </button>
+            )}
           </div>
         ) : (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 flex items-center gap-2">
-            <Info size={15} className="text-amber-600 shrink-0" />
-            <span>No plots recorded for this farmer — Manual entry mode active.</span>
+          <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs">
+            <span className="font-semibold text-emerald-950">📍 Registered Plots ({farmerPlots.length}): </span>
+            <span className="text-text-muted font-medium">Select a plot below to filter associated crops & stages</span>
           </div>
         )}
 
@@ -400,7 +351,7 @@ Dhanashree Agro Team`;
               className="w-full px-3 py-2 bg-bg border border-border rounded-xl font-medium text-text outline-none"
             >
               <option value="">-- Select Crop --</option>
-              {crops.map(c => (
+              {availableCrops.map(c => (
                 <option key={c.id} value={c.id}>{c.crop_name}</option>
               ))}
             </select>

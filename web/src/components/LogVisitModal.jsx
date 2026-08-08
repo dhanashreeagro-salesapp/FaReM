@@ -5,7 +5,7 @@ import { compressImage } from '../utils/imageCompressor';
 import { offlineQueue } from '../utils/offlineQueue';
 import { MapPin, Camera, Clock, AlertTriangle, CheckCircle2, X, Loader2, Navigation, FileText } from 'lucide-react';
 
-export default function LogVisitModal({ farmer: initialFarmer, onClose, onSuccess }) {
+export default function LogVisitModal({ farmer: initialFarmer, onClose, onSuccess, onCreatePlot }) {
   const [farmers, setFarmers] = useState([]);
   const [selectedFarmer, setSelectedFarmer] = useState(initialFarmer || null);
   const [plots, setPlots] = useState([]);
@@ -99,42 +99,48 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
 
   const handlePhotoAdd = async (e) => {
     const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setLoading(true);
-    try {
-      const compressedFiles = await Promise.all(files.map(f => compressImage(f)));
-      setPhotos(prev => [...prev, ...compressedFiles]);
-    } catch (err) {
-      console.error("Image compression error:", err);
+    const compressedList = [];
+    for (const f of files) {
+      try {
+        const c = await compressImage(f);
+        compressedList.push(c);
+      } catch {
+        compressedList.push(f);
+      }
     }
-    setLoading(false);
+    setPhotos(prev => [...prev, ...compressedList]);
   };
 
   const calculateDistance = () => {
-    if (!gps || !selectedPlot || !selectedPlot.location) return null;
-    const plotLat = selectedPlot.location.y || selectedPlot.location.latitude;
-    const plotLng = selectedPlot.location.x || selectedPlot.location.longitude;
-    if (!plotLat || !plotLng) return null;
-    return calculateHaversineDistance(
-      gps.latitude,
-      gps.longitude,
-      plotLat,
-      plotLng
-    );
+    if (!gps || !selectedPlot?.location) return null;
+    try {
+      const coords = selectedPlot.location.coordinates || selectedPlot.location;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        // [longitude, latitude]
+        return calculateHaversineDistance(
+          gps.latitude, gps.longitude,
+          coords[1], coords[0]
+        );
+      }
+    } catch {
+      return null;
+    }
+    return null;
   };
 
   const currentDistance = calculateDistance();
   const radiusLimit = config.visit_radius_meters || 150;
+  const isOutside = currentDistance !== null && currentDistance > radiusLimit;
   const validationMode = config.gps_validation_mode || 'Warning';
-  const isOutside = validationMode !== 'Disabled' && currentDistance !== null && currentDistance > radiusLimit;
 
-  const handleLogVisit = async () => {
+  const handleSaveVisit = async (e) => {
+    e.preventDefault();
     if (!selectedFarmer) {
       setError("Please select a farmer");
       return;
     }
-    if (notes.length < 10) {
-      setError("Visit notes must be at least 10 characters long");
+    if (!notes || notes.trim().length < 10) {
+      setError("Please enter detailed visit notes (at least 10 characters)");
       return;
     }
 
@@ -216,6 +222,18 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
           </div>
         )}
 
+        {/* Selected Farmer Info Card */}
+        {selectedFarmer && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Farmer Name</span>
+              <h4 className="font-heading font-bold text-sm text-emerald-950">{selectedFarmer.full_name}</h4>
+              <p className="text-text-muted text-[11px]">{selectedFarmer.village || 'No Village'} • Mobile: {selectedFarmer.primary_mobile || 'N/A'}</p>
+            </div>
+            <span className="px-2.5 py-1 bg-emerald-700 text-white rounded-lg font-bold text-[11px]">Selected</span>
+          </div>
+        )}
+
         {/* GPS Badge */}
         <div className="p-3.5 bg-bg border border-border rounded-xl flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -238,7 +256,7 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
           )}
         </div>
 
-        {/* Farmer Picker */}
+        {/* Farmer Picker for general visits */}
         {!initialFarmer && (
           <div>
             <label className="block text-xs font-semibold text-text mb-1.5">Select Farmer (Sorted by Proximity)</label>
@@ -260,22 +278,39 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
         )}
 
         {/* Plot Picker */}
-        {plots.length > 0 && (
+        {plots.length > 0 ? (
           <div>
-            <label className="block text-xs font-semibold text-text mb-1.5">Associated Plot (Optional)</label>
+            <label className="block text-xs font-semibold text-text mb-1.5">Associated Plot (Belonging to {selectedFarmer?.full_name})</label>
             <select
               value={selectedPlot?.id || ''}
               onChange={(e) => {
                 const p = plots.find(item => item.id === e.target.value);
                 setSelectedPlot(p);
               }}
-              className="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-sm font-medium text-text focus:ring-2 focus:ring-primary/20 outline-none"
+              className="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-sm font-medium text-text focus:ring-2 focus:ring-primary/20 outline-none font-medium"
             >
-              <option value="">-- No specific plot (General Visit) --</option>
+              <option value="">-- General Visit (No Specific Plot) --</option>
               {plots.map(p => (
-                <option key={p.id} value={p.id}>{p.plot_name} ({p.total_area_acres} Acres)</option>
+                <option key={p.id} value={p.id}>{p.plot_name} ({p.area_acres || p.total_area_acres || 0} Acres — {p.soil_type || 'Normal Soil'})</option>
               ))}
             </select>
+          </div>
+        ) : (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-semibold">
+              <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+              <span>No plots registered for {selectedFarmer?.full_name || 'this farmer'} yet.</span>
+            </div>
+            <p className="text-text-muted text-[11px]">You can log a general visit, or create a plot and crop season for this farmer now.</p>
+            {onCreatePlot && selectedFarmer && (
+              <button
+                type="button"
+                onClick={() => onCreatePlot(selectedFarmer)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-sm"
+              >
+                + Create Plot & Crop Season for {selectedFarmer.full_name}
+              </button>
+            )}
           </div>
         )}
 
