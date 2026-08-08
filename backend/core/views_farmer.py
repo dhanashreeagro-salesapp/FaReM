@@ -134,13 +134,22 @@ class FarmerViewSet(viewsets.ModelViewSet):
 
         # Create new farmer and default assigned_staff to requesting user if not provided
         data = request.data.copy()
-        if not data.get('assigned_staff'):
+        assigned_val = data.get('assigned_staff')
+        if not assigned_val or str(assigned_val).strip() in ['', 'null', 'undefined']:
             data['assigned_staff'] = str(request.user.id)
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        saved_assigned = serializer.validated_data.get('assigned_staff') or request.user
+        farmer_obj = serializer.save(assigned_staff=saved_assigned)
+
+        # Invalidate cached dashboard stats across nodes
+        try:
+            cache.clear()
+        except Exception:
+            pass
+
+        return Response(self.get_serializer(farmer_obj).data, status=status.HTTP_201_CREATED)
 
     def perform_destroy(self, instance):
         if self.request.user.role == Role.ADMIN:

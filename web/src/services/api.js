@@ -420,7 +420,10 @@ class ApiClient {
   rejectBulkSend(id) { return this.request(`/bulk-sends/${id}/reject/`, { method: 'POST' }); }
 
   // Dashboard & Reports
-  getDashboard() { return this.request('/dashboard/'); }
+  getDashboard(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/dashboard/${qs ? `?${qs}` : ''}`);
+  }
   getActiveCrops() {
     return this.request('/dashboard/active_crops/').catch(() => this.request('/active-crops/'));
   }
