@@ -234,6 +234,7 @@ export default function FarmerManagement() {
   };
 
   const handleEdit = (farmer) => {
+    setEditingId(farmer.id);
     setForm({
       full_name: farmer.full_name || '',
       primary_mobile: farmer.primary_mobile || '',
@@ -243,10 +244,10 @@ export default function FarmerManagement() {
       district: farmer.district || '',
       taluka: farmer.taluka || '',
       state: farmer.state || '',
-      assigned_staff: farmer.assigned_staff || ''
+      assigned_staff: farmer.assigned_staff || '',
+      acquisition_date: farmer.acquisition_date || (farmer.date_added ? farmer.date_added.split('T')[0] : new Date().toISOString().split('T')[0])
     });
-    setVillages([]);
-    setEditingId(farmer.id);
+    setVillages(farmer.village ? [farmer.village] : []);
     setShowForm(true);
   };
 
@@ -263,7 +264,7 @@ export default function FarmerManagement() {
       }
       setShowForm(false);
       setEditingId(null);
-      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: '', assigned_staff: '' });
+      setForm({ full_name: '', primary_mobile: '', village: '', district: '', taluka: '', state: '', pin_code: '', assigned_staff: '', acquisition_date: new Date().toISOString().split('T')[0] });
       fetchFarmers(page);
     } catch (e) {
       console.error(e);
@@ -307,7 +308,7 @@ export default function FarmerManagement() {
           <button
             onClick={() => {
               setEditingId(null);
-              setForm({ full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: '', assigned_staff: '' });
+              setForm({ full_name: '', primary_mobile: '', pin_code: '', email: '', village: '', district: '', taluka: '', state: '', assigned_staff: '', acquisition_date: new Date().toISOString().split('T')[0] });
               setVillages([]);
               setShowForm(true);
             }}
@@ -367,6 +368,16 @@ export default function FarmerManagement() {
             <div>
               <label className="block text-xs font-semibold text-text-muted mb-1">State *</label>
               <input required placeholder="State..." value={form.state} onChange={e => setForm({...form, state: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Created / Acquisition Date *</label>
+              <input 
+                type="date" 
+                required
+                value={form.acquisition_date || ''} 
+                onChange={e => setForm({...form, acquisition_date: e.target.value})} 
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" 
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-text-muted mb-1">Assigned Field Staff</label>
