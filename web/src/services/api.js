@@ -430,7 +430,9 @@ class ApiClient {
   getFarmerPlots() {
     return this.request('/dashboard/farmer_plots/').catch(() => this.request('/farmer-plots/'));
   }
-  getHierarchy() { return this.request('/dashboard/hierarchy/'); }
+  getHierarchy() {
+    return this.request('/hierarchy/').catch(() => this.request('/dashboard/hierarchy/')).catch(() => this.request('/hierarchy'));
+  }
   exportReport(type = 'excel') { return this.request(`/export-report/?type=${type}`); }
 
 
