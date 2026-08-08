@@ -15,30 +15,13 @@ class DashboardAPIView(APIView):
     def get(self, request):
         user = request.user
         
-        force_refresh = request.query_params.get('refresh') == 'true'
-        cache_key = f'dashboard_api_data_v3_{user.id}'
-        if force_refresh:
-            cache.delete(cache_key)
-        else:
-            cached_data = cache.get(cache_key)
-            if cached_data:
-                return Response(cached_data)
-
-            
-        # Basic aggregate data
+        # Always calculate real-time aggregate metrics
         data = {}
-        import django.db
-        data['db_host'] = django.db.connection.settings_dict.get('HOST')
-        data['db_name'] = django.db.connection.settings_dict.get('NAME')
-        data['db_total_farmers'] = Farmer.objects.count()
-
-        farmers = Farmer.objects.filter(status='Active')
+        farmers = Farmer.objects.exclude(status__iexact='Inactive')
         activities = ActivityLog.objects.all()
         
         if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
             team_users = user.get_team_users()
-            data['debug_team_users'] = [u.email for u in team_users]
-            data['debug_team_user_ids'] = [str(u.id) for u in team_users]
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
@@ -46,11 +29,11 @@ class DashboardAPIView(APIView):
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
             
+            q_filter = Q(assigned_staff__in=team_users)
             if territories:
-                farmers = farmers.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
-            else:
-                farmers = farmers.filter(assigned_staff__in=team_users)
-                
+                q_filter |= Q(territory__in=territories)
+
+            farmers = farmers.filter(q_filter)
             activities = activities.filter(farmer__in=farmers)
 
             
@@ -317,10 +300,10 @@ class HierarchyAPIView(APIView):
         current_year = timezone.now().year
 
         def build_user_tree(u):
-            subordinates = list(User.objects.filter(reporting_manager=u, status='Active'))
+            subordinates = list(User.objects.filter(reporting_manager=u).exclude(status__iexact='Inactive'))
             sub_nodes = [build_user_tree(sub) for sub in subordinates]
 
-            assigned_farmers = Farmer.objects.filter(assigned_staff=u, status='Active')
+            assigned_farmers = Farmer.objects.filter(assigned_staff=u).exclude(status__iexact='Inactive')
             direct_farmer_count = assigned_farmers.count()
             direct_plot_count = Plot.objects.filter(farmer__in=assigned_farmers, is_active=True).count()
             direct_crop_count = CropSeason.objects.filter(plot__farmer__in=assigned_farmers, status='Active').count()
