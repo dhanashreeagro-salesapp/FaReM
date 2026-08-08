@@ -27,7 +27,11 @@ class DashboardAPIView(APIView):
             
         # Basic aggregate data
         data = {}
-        
+        import django.db
+        data['db_host'] = django.db.connection.settings_dict.get('HOST')
+        data['db_name'] = django.db.connection.settings_dict.get('NAME')
+        data['db_total_farmers'] = Farmer.objects.count()
+
         farmers = Farmer.objects.filter(status='Active')
         activities = ActivityLog.objects.all()
         
