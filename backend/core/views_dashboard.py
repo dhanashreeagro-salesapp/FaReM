@@ -37,6 +37,8 @@ class DashboardAPIView(APIView):
         
         if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
             team_users = user.get_team_users()
+            data['debug_team_users'] = [u.email for u in team_users]
+            data['debug_team_user_ids'] = [str(u.id) for u in team_users]
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
