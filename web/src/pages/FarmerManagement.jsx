@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../components/AuthProvider';
 import { getCurrentGpsPosition, sortFarmersByDistance } from '../utils/gps';
 import { Plus, Upload, Search, Download, Edit2, Trash2, X, Map, ChevronLeft, ChevronRight, MessageSquare, UserCheck, Filter, RotateCcw, MapPin, PhoneCall, Award, History, BarChart2, Layers, Navigation, ArrowUpDown, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
@@ -20,7 +21,9 @@ export default function FarmerManagement() {
   const [searchParams] = useSearchParams();
   
   // User Role
-  const currentUser = api.getStoredUser ? api.getStoredUser() : null;
+  const { user } = useAuth();
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUser = user || storedUser;
   const isAdmin = currentUser?.role === 'Admin';
   const isFieldStaff = currentUser?.role === 'FieldStaff';
 

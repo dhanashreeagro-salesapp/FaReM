@@ -487,6 +487,14 @@ class ApiClient {
   // Offline Sync
   syncOfflineBatch(data) { return this.request('/sync/offline_batch/', { method: 'POST', body: JSON.stringify(data) }); }
 
+  getStoredUser() {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  }
+
 }
 
 const api = new ApiClient();
