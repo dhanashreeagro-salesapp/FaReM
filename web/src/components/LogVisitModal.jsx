@@ -112,17 +112,28 @@ export default function LogVisitModal({ farmer: initialFarmer, onClose, onSucces
   };
 
   const calculateDistance = () => {
-    if (!gps || !selectedPlot?.location) return null;
+    if (!gps || !selectedPlot || !selectedPlot.location) return null;
     try {
-      const coords = selectedPlot.location.coordinates || selectedPlot.location;
-      if (Array.isArray(coords) && coords.length >= 2) {
-        // [longitude, latitude]
-        return calculateHaversineDistance(
-          gps.latitude, gps.longitude,
-          coords[1], coords[0]
-        );
+      let plotLat = null, plotLng = null;
+      const loc = selectedPlot.location;
+      if (typeof loc === 'object' && loc !== null) {
+        if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+          plotLng = Number(loc.coordinates[0]);
+          plotLat = Number(loc.coordinates[1]);
+        } else if (loc.latitude != null && loc.longitude != null) {
+          plotLat = Number(loc.latitude);
+          plotLng = Number(loc.longitude);
+        } else if (loc.y != null && loc.x != null) {
+          plotLat = Number(loc.y);
+          plotLng = Number(loc.x);
+        }
       }
-    } catch {
+      if (plotLat !== null && plotLng !== null && !isNaN(plotLat) && !isNaN(plotLng) && gps?.latitude && gps?.longitude) {
+        const d = calculateHaversineDistance(gps.latitude, gps.longitude, plotLat, plotLng);
+        return (d !== null && !isNaN(d)) ? Math.round(d) : null;
+      }
+    } catch (e) {
+      console.warn("Distance calculation error:", e);
       return null;
     }
     return null;

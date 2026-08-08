@@ -1063,6 +1063,10 @@ export default function FarmerManagement() {
             setSelectedFarmerForVisit(null);
             fetchFarmers(page);
           }}
+          onCreatePlot={(farmerObj) => {
+            setSelectedFarmerForVisit(null);
+            setSelectedFarmerForPlots(farmerObj);
+          }}
         />
       )}
 
@@ -1079,6 +1083,10 @@ export default function FarmerManagement() {
           farmer={selectedFarmerForRecommend}
           onClose={() => setSelectedFarmerForRecommend(null)}
           onSuccess={() => setSelectedFarmerForRecommend(null)}
+          onCreatePlot={(farmerObj) => {
+            setSelectedFarmerForRecommend(null);
+            setSelectedFarmerForPlots(farmerObj);
+          }}
         />
       )}
 
