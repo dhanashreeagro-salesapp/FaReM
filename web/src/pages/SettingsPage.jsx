@@ -64,6 +64,43 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* GPS & Location Validation Settings */}
+        <div className="card p-6 animate-stagger-in" style={{ animationDelay: '30ms' }}>
+          <h3 className="font-heading font-semibold text-text mb-4">GPS Proximity & Visit Validation Settings</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">Visit Validation Radius (meters)</label>
+              <select
+                value={config.visit_radius_meters || 150}
+                onChange={e => setConfig({...config, visit_radius_meters: parseInt(e.target.value)})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+              >
+                <option value={50}>50 metres</option>
+                <option value={100}>100 metres</option>
+                <option value={150}>150 metres (Default)</option>
+                <option value={250}>250 metres</option>
+                <option value={500}>500 metres</option>
+                <option value={1000}>1000 metres (1 km)</option>
+              </select>
+              <p className="text-xs text-text-muted mt-1">Maximum allowed distance between staff GPS location and plot location during field visits.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">GPS Validation Mode</label>
+              <select
+                value={config.gps_validation_mode || 'Warning'}
+                onChange={e => setConfig({...config, gps_validation_mode: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none font-semibold"
+              >
+                <option value="Strict">Strict (Block save if outside radius)</option>
+                <option value="Warning">Warning (Flag outside radius but permit save)</option>
+                <option value="Disabled">Disabled (No distance check for testing)</option>
+              </select>
+              <p className="text-xs text-text-muted mt-1">Control whether distance validation strictly blocks field visit saves or only logs warning flags.</p>
+            </div>
+          </div>
+        </div>
+
         {/* Gateway Config */}
         <div className="card p-6 animate-stagger-in" style={{ animationDelay: '60ms' }}>
           <h3 className="font-heading font-semibold text-text mb-4">Gateway Credentials</h3>
