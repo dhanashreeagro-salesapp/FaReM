@@ -144,9 +144,11 @@ export default function Dashboard() {
     setModalLoading(true);
     try {
       const res = await api.getActiveCrops();
-      setActiveCropsList(res || []);
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      setActiveCropsList(list);
     } catch (err) {
       console.error("Failed loading active crops:", err);
+      setActiveCropsList([]);
     }
     setModalLoading(false);
   };
@@ -156,9 +158,11 @@ export default function Dashboard() {
     setModalLoading(true);
     try {
       const res = await api.getFarmerPlots();
-      setFarmerPlotsList(res || []);
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      setFarmerPlotsList(list);
     } catch (err) {
       console.error("Failed loading farmer plots:", err);
+      setFarmerPlotsList([]);
     }
     setModalLoading(false);
   };
@@ -378,19 +382,27 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {activeCropsList.map(c => (
-                      <tr key={c.id} className="hover:bg-bg/50">
-                        <td className="p-3 font-bold text-text">{c.crop_name}</td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded-full font-semibold">{c.stage_name}</span></td>
-                        <td className="p-3 font-mono font-semibold">{c.area_acres}</td>
-                        <td className="p-3 font-medium text-text">{c.farmer_name}</td>
-                        <td className="p-3">{c.village}</td>
-                        <td className="p-3 text-text-muted">{c.plot_name}</td>
-                        <td className="p-3 font-mono">{c.mobile_number}</td>
-                        <td className="p-3 font-mono text-[11px] text-text-muted">{c.last_visit_date}</td>
-                        <td className="p-3 text-right font-mono font-bold">{c.recommendation_count}</td>
+                    {activeCropsList.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="p-8 text-center text-text-muted italic">
+                          No active crop seasons found for your team hierarchy.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      activeCropsList.map(c => (
+                        <tr key={c.id} className="hover:bg-bg/50">
+                          <td className="p-3 font-bold text-text">{c.crop_name}</td>
+                          <td className="p-3"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded-full font-semibold">{c.stage_name}</span></td>
+                          <td className="p-3 font-mono font-semibold">{c.area_acres}</td>
+                          <td className="p-3 font-medium text-text">{c.farmer_name}</td>
+                          <td className="p-3">{c.village}</td>
+                          <td className="p-3 text-text-muted">{c.plot_name}</td>
+                          <td className="p-3 font-mono">{c.mobile_number}</td>
+                          <td className="p-3 font-mono text-[11px] text-text-muted">{c.last_visit_date}</td>
+                          <td className="p-3 text-right font-mono font-bold">{c.recommendation_count}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -431,18 +443,26 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {farmerPlotsList.map(p => (
-                      <tr key={p.id} className="hover:bg-bg/50">
-                        <td className="p-3 font-bold text-text">{p.plot_name}</td>
-                        <td className="p-3 font-mono font-semibold">{p.area_acres}</td>
-                        <td className="p-3">{p.soil_type}</td>
-                        <td className="p-3 text-text-muted">{p.irrigation_source}</td>
-                        <td className="p-3 font-medium text-text">{p.farmer_name}</td>
-                        <td className="p-3">{p.village}</td>
-                        <td className="p-3">{p.district}</td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-700">{p.active_crops_count}</td>
+                    {farmerPlotsList.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-text-muted italic">
+                          No plot listings found for your team hierarchy.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      farmerPlotsList.map(p => (
+                        <tr key={p.id} className="hover:bg-bg/50">
+                          <td className="p-3 font-bold text-text">{p.plot_name}</td>
+                          <td className="p-3 font-mono font-semibold">{p.area_acres}</td>
+                          <td className="p-3">{p.soil_type}</td>
+                          <td className="p-3 text-text-muted">{p.irrigation_source}</td>
+                          <td className="p-3 font-medium text-text">{p.farmer_name}</td>
+                          <td className="p-3">{p.village}</td>
+                          <td className="p-3">{p.district}</td>
+                          <td className="p-3 text-right font-mono font-bold text-emerald-700">{p.active_crops_count}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
