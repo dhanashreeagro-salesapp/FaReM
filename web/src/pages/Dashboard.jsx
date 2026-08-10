@@ -258,10 +258,32 @@ export default function Dashboard() {
           )}
 
           <button onClick={() => handleExport('excel')} className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border border-white/20">
-            <Download size={14} /> Export Excel
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={() => handleExport('pdf')} className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border border-white/20">
+            <Download size={14} /> PDF
           </button>
         </div>
       </div>
+
+      {/* Dev-only Diagnostic Trace Drawer Banner */}
+      {(window.location.search.includes('debug=true') || data?.debug_trace) && (
+        <details className="bg-slate-900 text-slate-100 p-4 rounded-xl border border-slate-700 text-xs font-mono" open>
+          <summary className="font-bold cursor-pointer text-emerald-400">
+            🔍 DIAGNOSTIC DATA TRACE DRAWER (Dev Mode) — Auth: {user?.email} [{user?.role}]
+          </summary>
+          <div className="mt-3 space-y-1.5 text-[11px] border-t border-slate-800 pt-2.5">
+            <p><strong>Auth User Email:</strong> {user?.email}</p>
+            <p><strong>Auth User Role:</strong> {user?.role}</p>
+            <p><strong>API Endpoint Data Object Keys:</strong> {data ? Object.keys(data).join(', ') : 'NONE (null)'}</p>
+            <p><strong>DB Total Farmers (Raw):</strong> {data?.debug_trace?.db_total_farmers_all ?? 'N/A'}</p>
+            <p><strong>DB Active Farmers (Raw):</strong> {data?.debug_trace?.db_active_farmers_all ?? 'N/A'}</p>
+            <p><strong>Team Users Count:</strong> {data?.debug_trace?.team_users_count ?? 'N/A'}</p>
+            <p><strong>Filtered Farmers Count (API):</strong> {data?.debug_trace?.filtered_farmers_count ?? data?.total_farmers ?? 'N/A'}</p>
+            <p><strong>Rendered Cards Snapshot:</strong> Active Farmers: {data?.total_farmers ?? 0} | Total Plots: {data?.total_plots ?? 0} | Active Crops: {data?.active_crop_seasons ?? 0} | Visits: {data?.total_visits ?? 0} | Calls: {data?.total_calls ?? 0}</p>
+          </div>
+        </details>
+      )}
 
       {/* Main Content Area */}
       {activeTab === 'overview' ? (

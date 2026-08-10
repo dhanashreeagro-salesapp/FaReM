@@ -419,10 +419,21 @@ class ApiClient {
   approveBulkSend(id) { return this.request(`/bulk-sends/${id}/approve/`, { method: 'POST' }); }
   rejectBulkSend(id) { return this.request(`/bulk-sends/${id}/reject/`, { method: 'POST' }); }
 
-  // Dashboard & Reports
-  getDashboard(params = {}) {
+  async getDashboard(params = {}) {
     const qs = new URLSearchParams(params).toString();
-    return this.request(`/dashboard/${qs ? `?${qs}` : ''}`);
+    const res = await this.request(`/dashboard/${qs ? `?${qs}` : ''}`);
+    if (typeof window !== 'undefined') {
+      console.log('🔍 [DIAGNOSTIC TRACE] API getDashboard Response:', {
+        url: `/dashboard/${qs ? `?${qs}` : ''}`,
+        received_total_farmers: res?.total_farmers,
+        received_total_plots: res?.total_plots,
+        received_active_crop_seasons: res?.active_crop_seasons,
+        received_total_visits: res?.total_visits,
+        received_total_calls: res?.total_calls,
+        debug_trace: res?.debug_trace
+      });
+    }
+    return res;
   }
   getActiveCrops() {
     return this.request('/dashboard/active_crops/').catch(() => this.request('/active-crops/'));

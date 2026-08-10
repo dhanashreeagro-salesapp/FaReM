@@ -43,6 +43,18 @@ class DashboardAPIView(APIView):
 
             farmers = farmers.filter(q_filter)
             activities = activities.filter(farmer__in=farmers)
+        else:
+            team_users = User.objects.all()
+
+        data['debug_trace'] = {
+            'user_id': str(user.id),
+            'email': user.email,
+            'role': user.role,
+            'db_total_farmers_all': Farmer.objects.count(),
+            'db_active_farmers_all': Farmer.objects.exclude(status__iexact='Inactive').count(),
+            'team_users_count': len(team_users) if user.role not in [Role.ADMIN, Role.CONTENT_TEAM] else 'ALL',
+            'filtered_farmers_count': farmers.count(),
+        }
 
             
         data['total_farmers'] = farmers.count()
