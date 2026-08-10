@@ -180,7 +180,8 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
       return;
     }
 
-    if (validationMode === 'Strict' && isOutside) {
+    const isStrict = String(validationMode).trim().toLowerCase() === 'strict';
+    if (isStrict && isOutside) {
       setError(`Cannot save visit: You are ${currentDistance}m away from the plot (configured limit is ${radiusLimit}m).`);
       return;
     }

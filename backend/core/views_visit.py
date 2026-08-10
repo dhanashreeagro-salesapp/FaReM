@@ -77,7 +77,9 @@ class FieldVisitViewSet(viewsets.ModelViewSet):
             try:
                 plot = Plot.objects.get(id=plot_id)
                 if plot.location:
-                    distance_from_plot = calculate_haversine_distance(lat, lon, plot.location.y, plot.location.x)
+                    plat = plot.location.centroid.y if hasattr(plot.location, 'centroid') else getattr(plot.location, 'y', 0.0)
+                    plon = plot.location.centroid.x if hasattr(plot.location, 'centroid') else getattr(plot.location, 'x', 0.0)
+                    distance_from_plot = calculate_haversine_distance(lat, lon, plat, plon)
             except Exception:
                 pass
 
@@ -87,7 +89,7 @@ class FieldVisitViewSet(viewsets.ModelViewSet):
         if is_check_in:
             visit_status = 'Pending Check-Out'
 
-        if mode == 'Strict' and not inside_radius and not is_check_in:
+        if str(mode).strip().lower() == 'strict' and not inside_radius and not is_check_in:
             return Response({
                 "error": f"Visit location is {distance_from_plot}m away from plot, exceeding the allowed {radius_limit}m limit (Strict Mode enabled)."
             }, status=status.HTTP_400_BAD_REQUEST)
