@@ -135,13 +135,17 @@ class FarmerViewSet(viewsets.ModelViewSet):
         # Create new farmer and default assigned_staff to requesting user if not provided
         data = request.data.copy()
         assigned_val = data.get('assigned_staff')
-        if not assigned_val or str(assigned_val).strip() in ['', 'null', 'undefined']:
+        if not assigned_val or str(assigned_val).strip() in ['', 'null', 'undefined', 'none', 'unassigned']:
             data['assigned_staff'] = str(request.user.id)
+
+        if not data.get('territory') and request.user.territory:
+            data['territory'] = str(request.user.territory.id)
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         saved_assigned = serializer.validated_data.get('assigned_staff') or request.user
-        farmer_obj = serializer.save(assigned_staff=saved_assigned)
+        saved_territory = serializer.validated_data.get('territory') or getattr(saved_assigned, 'territory', None) or request.user.territory
+        farmer_obj = serializer.save(assigned_staff=saved_assigned, territory=saved_territory)
 
         # Invalidate cached dashboard stats across nodes
         try:
