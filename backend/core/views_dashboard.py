@@ -119,30 +119,35 @@ class DashboardAPIView(APIView):
 
         stage_breakup = {}
         for season in active_seasons:
-            if not season.crop: continue
-            crop_name = season.crop.crop_name
-            
-            # Use already-assigned current_stage if available, else infer from days
-            if season.current_stage:
-                stage_name = season.current_stage.stage_name
-            else:
-                days_since_sowing = (today_date - season.sowing_date).days
-                stage_name = 'Unknown'
-                if days_since_sowing >= 0:
-                    accumulated_days = 0
-                    stages = sorted(season.crop.stages.all(), key=lambda s: s.sequence_number)
-                    for stage in stages:
-                        accumulated_days += stage.days_from_previous_stage
-                        if days_since_sowing <= accumulated_days:
-                            stage_name = stage.stage_name
-                            break
-                    else:
-                        if stages:
-                            stage_name = stages[-1].stage_name
-                            
-            if crop_name not in stage_breakup:
-                stage_breakup[crop_name] = {}
-            stage_breakup[crop_name][stage_name] = stage_breakup[crop_name].get(stage_name, 0) + 1
+            try:
+                if not season.crop: continue
+                crop_name = season.crop.crop_name
+                
+                # Use already-assigned current_stage if available, else infer from days
+                if season.current_stage:
+                    stage_name = season.current_stage.stage_name
+                elif season.sowing_date:
+                    days_since_sowing = (today_date - season.sowing_date).days
+                    stage_name = 'Unknown'
+                    if days_since_sowing >= 0:
+                        accumulated_days = 0
+                        stages = sorted(season.crop.stages.all(), key=lambda s: s.sequence_number)
+                        for stage in stages:
+                            accumulated_days += stage.days_from_previous_stage
+                            if days_since_sowing <= accumulated_days:
+                                stage_name = stage.stage_name
+                                break
+                        else:
+                            if stages:
+                                stage_name = stages[-1].stage_name
+                else:
+                    stage_name = 'Active'
+                                
+                if crop_name not in stage_breakup:
+                    stage_breakup[crop_name] = {}
+                stage_breakup[crop_name][stage_name] = stage_breakup[crop_name].get(stage_name, 0) + 1
+            except Exception:
+                pass
         
         data['crop_stage_breakup'] = stage_breakup
 
