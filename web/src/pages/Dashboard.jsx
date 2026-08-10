@@ -38,7 +38,8 @@ function StatCard({ icon: Icon, label, value, color, delay, onClick, to }) {
 
 function HierarchyNode({ node, level = 0 }) {
   const [expanded, setExpanded] = useState(true);
-  const hasSub = node.subordinates && node.subordinates.length > 0;
+  const subs = node.children || node.subordinates || [];
+  const hasSub = subs.length > 0;
 
   return (
     <div className="space-y-3">
@@ -52,15 +53,15 @@ function HierarchyNode({ node, level = 0 }) {
             )}
             <div>
               <h4 className="font-heading font-bold text-sm leading-tight">{node.full_name || node.name}</h4>
-              <p className="text-[11px] opacity-80 font-semibold">{node.role} • {node.territory_name}</p>
+              <p className="text-[11px] opacity-80 font-semibold">{node.role} • {node.territory_name || node.territory || 'Territory'}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono font-bold">
             <span className="px-2.5 py-1 rounded-full bg-black/10 text-current border border-current/20">
-              Perf: {node.performance_pct}%
+              Perf: {node.performance_pct ?? 100}%
             </span>
-            <span className="text-[10px] opacity-75">{node.last_sync}</span>
+            <span className="text-[10px] opacity-75">{node.last_sync || 'Live'}</span>
           </div>
         </div>
 
@@ -103,7 +104,7 @@ function HierarchyNode({ node, level = 0 }) {
 
       {hasSub && expanded && (
         <div className="pl-4 sm:pl-6 border-l-2 border-emerald-500/30 space-y-3">
-          {node.subordinates.map(sub => (
+          {subs.map(sub => (
             <HierarchyNode key={sub.id} node={sub} level={level + 1} />
           ))}
         </div>
@@ -184,10 +185,16 @@ export default function Dashboard() {
     setModalLoading(true);
     try {
       const res = await api.getHierarchy();
-      const list = Array.isArray(res) ? res : (res?.results || []);
+      let list = [];
+      if (Array.isArray(res)) {
+        list = res;
+      } else if (res && typeof res === 'object') {
+        list = res.results ? res.results : [res];
+      }
       setHierarchyData(list);
     } catch (err) {
       console.error("Failed loading hierarchy:", err);
+      setHierarchyData([]);
     }
     setModalLoading(false);
   };

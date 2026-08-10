@@ -412,7 +412,7 @@ class BulkSendBatch(models.Model):
     filter_criteria = models.JSONField(default=dict)
     farmer_ids = models.JSONField(default=list)
     recipient_count = models.IntegerField(default=0)
-    channel = models.CharField(max_length=20, choices=[('WhatsApp', 'WhatsApp'), ('SMS', 'SMS')])
+    channel = models.CharField(max_length=20, choices=[('WhatsApp', 'WhatsApp'), ('SMS', 'SMS'), ('Internal', 'Internal')], default='Internal')
     approval_status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     approved_by_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_batches')
     approval_timestamp = models.DateTimeField(null=True, blank=True)
