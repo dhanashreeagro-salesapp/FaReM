@@ -24,6 +24,7 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Copy the rest of the application
+ENV REBUILD_TRIGGER_TIMESTAMP=20260810_102700
 COPY . /app/
 
 # Collect static files (optional, depending on if you serve them from Django)
