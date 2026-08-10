@@ -4,14 +4,14 @@ from .models import Farmer, User, SystemAuditLog
 import io
 
 HEADER_ALIASES = {
-    'FullName': ['fullname', 'full name', 'farmer name', 'farmername', 'name of farmer', 'name', 'farmer_name', 'sr no'],
-    'PrimaryMobile': ['primarymobile', 'primary mobile', 'mobile no', 'mobile number', 'mobileno', 'mobile', 'contact no', 'phone', 'mobile_no'],
-    'Village': ['village', 'town', 'city'],
-    'Taluka': ['taluka', 'block', 'tehsil'],
-    'District': ['district'],
-    'State': ['state'],
+    'FullName': ['fullname', 'full name', 'farmer name', 'farmername', 'name of farmer', 'name', 'farmer_name', 'sr no', 'farmer', 'farmer_full_name', 'farmer_name_marathi', 'name_of_farmer'],
+    'PrimaryMobile': ['primarymobile', 'primary mobile', 'mobile no', 'mobile number', 'mobileno', 'mobile', 'contact no', 'phone', 'mobile_no', 'primary_mobile', 'contact_number', 'contact', 'mobile_number', 'phone_number', 'phone_no'],
+    'Village': ['village', 'town', 'city', 'village_name', 'village name', 'gaon'],
+    'Taluka': ['taluka', 'block', 'tehsil', 'taluka_name', 'taluka name'],
+    'District': ['district', 'district_name', 'district name'],
+    'State': ['state', 'state_name', 'state name'],
     'PinCode': ['pincode', 'pin code', 'zipcode', 'zip code', 'pin', 'pin_code'],
-    'StaffMobile': ['staffmobile', 'staff mobile', 'assigned staff id', 'assigned staff', 'responsible person', 'staff id', 'staff email', 'staff_mobile', 'staff'],
+    'StaffMobile': ['staffmobile', 'staff mobile', 'assigned staff id', 'assigned staff', 'responsible person', 'staff id', 'staff email', 'staff_mobile', 'staff', 'assigned_staff', 'staff_name', 'officer', 'staff_phone'],
     'AcquisitionDate': ['acquisitiondate', 'acquisition date', 'date of acquisition', 'date', 'acquisition_date'],
     'Source': ['source']
 }
@@ -21,7 +21,7 @@ def normalize_dataframe_headers(df, expected_columns):
     def try_match_columns(cols):
         mapping = {}
         for raw_col in cols:
-            cl = str(raw_col).lower().strip()
+            cl = str(raw_col).replace('\xa0', ' ').lower().strip()
             for std_name, aliases in HEADER_ALIASES.items():
                 if cl in aliases or cl == std_name.lower():
                     mapping[raw_col] = std_name
@@ -185,6 +185,10 @@ def commit_farmer_import(import_job_id):
                     parts = staff_val.split()
                     if len(parts) >= 2:
                         assigned_staff_user = User.objects.filter(first_name__iexact=parts[0], last_name__iexact=parts[-1]).first()
+                if not assigned_staff_user:
+                    assigned_staff_user = User.objects.filter(first_name__icontains=staff_val).first()
+                if not assigned_staff_user:
+                    assigned_staff_user = User.objects.filter(last_name__icontains=staff_val).first()
 
             if not assigned_staff_user:
                 assigned_staff_user = job.created_by

@@ -167,14 +167,18 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
 
           {step === 3 && jobData && (
             <div className="space-y-6">
-              {jobData.status === 'Failed' ? (
-                <div className="bg-danger/10 p-4 rounded-lg flex gap-3 text-danger overflow-y-auto max-h-60">
-                  <AlertTriangle size={20} className="shrink-0" />
-                  <div className="text-sm">
+              {jobData.status === 'Failed' || (jobData.error_report && jobData.error_report.length > 0 && jobData.valid_rows === 0) ? (
+                <div className="bg-danger/10 p-4 rounded-lg flex gap-3 text-danger overflow-y-auto max-h-60 border border-danger/20">
+                  <AlertTriangle size={20} className="shrink-0 mt-0.5" />
+                  <div className="text-sm w-full">
                     <p className="font-bold mb-1">Validation Failed</p>
-                    {jobData.error_report?.map((err, i) => (
-                      <p key={i} className="mb-1">Row {err.row || 'N/A'}: {err.error}</p>
-                    )) || <p>Unknown error</p>}
+                    <div className="space-y-1 my-2">
+                      {jobData.error_report?.map((err, i) => (
+                        <p key={i} className="text-xs font-mono bg-white/80 p-2 rounded border border-danger/30 text-danger">
+                          {typeof err === 'string' ? err : `${err.row ? `Row ${err.row}: ` : ''}${err.error || JSON.stringify(err)}`}
+                        </p>
+                      )) || <p className="text-xs">Unknown error during validation</p>}
+                    </div>
                     
                     <button 
                       onClick={() => api.downloadImportJobResults(jobId)} 
@@ -204,6 +208,20 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
                       <div className="text-xl font-heading font-bold text-accent">{jobData.duplicate_count}</div>
                     </div>
                   </div>
+
+                  {jobData.error_report && jobData.error_report.length > 0 && (
+                    <div className="bg-danger/5 p-3 rounded-lg border border-danger/20 text-xs max-h-40 overflow-y-auto">
+                      <p className="font-bold text-danger mb-1">Row Error Details ({jobData.error_report.length}):</p>
+                      {jobData.error_report.slice(0, 10).map((err, i) => (
+                        <p key={i} className="text-[11px] text-danger/90 font-mono py-0.5">
+                          {typeof err === 'string' ? err : `${err.row ? `Row ${err.row}: ` : ''}${err.error || JSON.stringify(err)}`}
+                        </p>
+                      ))}
+                      {jobData.error_report.length > 10 && (
+                        <p className="text-[10px] text-text-muted mt-1 italic">...and {jobData.error_report.length - 10} more errors.</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex justify-end">
                      <button 
