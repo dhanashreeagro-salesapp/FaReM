@@ -181,7 +181,8 @@ class DashboardAPIView(APIView):
                 })
         data['market_trends'] = market_trends
 
-        cache.set(cache_key, data, 60) # Cache for 60 seconds
+        cache_key = f"dashboard_data_{user.id}"
+        cache.set(cache_key, data, 60)
         return Response(data)
 
 

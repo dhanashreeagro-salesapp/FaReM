@@ -45,27 +45,35 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
     async function init() {
       setGpsLoading(true);
       setStatusMessage('Getting location...');
-      try {
-        const sysConfig = await api.getConfig().catch(() => ({ visit_radius_meters: 150, gps_validation_mode: 'Warning' }));
-        if (isMounted && sysConfig) setConfig(sysConfig);
 
-        const pos = await getCurrentGpsPosition({ timeout: 12000, signal: abortControllerRef.current.signal });
+      // 1. Fetch system config and farmers immediately in parallel without blocking
+      api.getConfig().then(sysConfig => {
+        if (isMounted && sysConfig) setConfig(sysConfig);
+      }).catch(() => {});
+
+      if (!initialFarmer) {
+        api.getFarmers().then(resp => {
+          if (!isMounted) return;
+          const list = resp.results || resp || [];
+          setFarmers(list);
+          if (list.length > 0 && !selectedFarmer) setSelectedFarmer(list[0]);
+        }).catch(() => {});
+      }
+
+      // 2. Fetch GPS fix concurrently with fast 4s timeout
+      try {
+        const pos = await getCurrentGpsPosition({ timeout: 4000, signal: abortControllerRef.current.signal });
         if (isMounted) {
           setGps(pos);
           setStatusMessage('Checking distance...');
-        }
-
-        if (isMounted && !initialFarmer) {
-          const resp = await api.getFarmers();
-          const list = resp.results || resp || [];
-          const sorted = sortFarmersByDistance(list, pos.latitude, pos.longitude);
-          setFarmers(sorted);
-          if (sorted.length > 0) setSelectedFarmer(sorted[0]);
+          // Re-sort farmers by distance once GPS acquired
+          if (!initialFarmer) {
+            setFarmers(prev => sortFarmersByDistance(prev, pos.latitude, pos.longitude));
+          }
         }
       } catch (err) {
         if (err.name !== 'AbortError' && isMounted) {
-          console.error("GPS Init Error:", err);
-          setError("Unable to obtain location. Check Location Services.");
+          console.warn("GPS Background Fetch Warning:", err);
         }
       }
       if (isMounted) setGpsLoading(false);

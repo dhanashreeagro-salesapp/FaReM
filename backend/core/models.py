@@ -74,12 +74,20 @@ class Territory(models.Model):
         return self.name
 
     def get_all_sub_territories(self):
-        """Recursively get all sub-territories for this territory."""
-        territories = [self]
-        sub_territories = list(self.sub_territories.all())
-        while sub_territories:
-            territories.extend(sub_territories)
-            sub_territories = list(Territory.objects.filter(parent_territory__in=sub_territories))
+        """Recursively get all sub-territories for this territory safely without infinite cycles."""
+        visited = set()
+        territories = []
+        curr = [self]
+        while curr:
+            next_curr = []
+            for item in curr:
+                if item.id in visited:
+                    continue
+                visited.add(item.id)
+                territories.append(item)
+                children = list(item.sub_territories.all())
+                next_curr.extend(children)
+            curr = next_curr
         return territories
 
 class Farmer(models.Model):

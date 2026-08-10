@@ -353,3 +353,56 @@ class FarmerViewSet(viewsets.ModelViewSet):
             "updated_count": updated_count
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def timeline(self, request, pk=None):
+        farmer = self.get_object()
+        from .models import FieldVisit, CallLog, Recommendation, StageChangeLog
+        
+        events = []
+        for v in FieldVisit.objects.filter(farmer=farmer).select_related('staff', 'plot'):
+            events.append({
+                'id': str(v.id),
+                'type': 'FieldVisit',
+                'title': f"Field Visit - {v.purpose}",
+                'description': v.notes or 'No visit notes',
+                'user': (f"{v.staff.first_name} {v.staff.last_name}".strip() or v.staff.email) if v.staff else 'Unknown',
+                'timestamp': (v.check_in_time or v.created_at).isoformat(),
+                'status': v.status,
+                'photo_count': v.photo_count
+            })
+            
+        for c in CallLog.objects.filter(farmer=farmer).select_related('staff'):
+            events.append({
+                'id': str(c.id),
+                'type': 'CallLog',
+                'title': f"{c.direction} Call ({c.outcome})",
+                'description': c.notes or 'No call notes',
+                'user': (f"{c.staff.first_name} {c.staff.last_name}".strip() or c.staff.email) if c.staff else 'Unknown',
+                'timestamp': c.call_time.isoformat() if c.call_time else None,
+                'outcome': c.outcome
+            })
+
+        for r in Recommendation.objects.filter(farmer=farmer).select_related('created_by_user', 'product'):
+            events.append({
+                'id': str(r.id),
+                'type': 'Recommendation',
+                'title': f"Advisory: {r.product_name or (r.product.product_name if r.product else 'Recommendation')}",
+                'description': r.notes or 'Advisory recommendation',
+                'user': (f"{r.created_by_user.first_name} {r.created_by_user.last_name}".strip() or r.created_by_user.email) if r.created_by_user else 'Unknown',
+                'timestamp': r.timestamp.isoformat() if r.timestamp else None,
+                'status': r.review_status
+            })
+
+        for s in StageChangeLog.objects.filter(crop_season__plot__farmer=farmer).select_related('changed_by', 'new_stage'):
+            events.append({
+                'id': str(s.id),
+                'type': 'StageChange',
+                'title': f"Crop Stage Changed to {s.new_stage.stage_name if s.new_stage else 'New Stage'}",
+                'description': s.notes or 'Crop stage update',
+                'user': (f"{s.changed_by.first_name} {s.changed_by.last_name}".strip() or s.changed_by.email) if s.changed_by else 'System',
+                'timestamp': s.date_changed.isoformat() if s.date_changed else None,
+            })
+
+        events.sort(key=lambda x: str(x['timestamp'] or ''), reverse=True)
+        return Response({'timeline': events})
+
