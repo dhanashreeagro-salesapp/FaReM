@@ -158,7 +158,12 @@ class ApiClient {
   }
 
   getMe() {
-    return this.request('/auth/me/');
+    return this.request('/auth/me/').catch(() => ({
+      email: localStorage.getItem('ffma_email'),
+      role: localStorage.getItem('ffma_role'),
+      full_name: localStorage.getItem('ffma_full_name'),
+      territory_name: localStorage.getItem('ffma_territory_name')
+    }));
   }
 
 
