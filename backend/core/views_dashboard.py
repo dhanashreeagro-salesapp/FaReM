@@ -14,6 +14,7 @@ class DashboardAPIView(APIView):
 
     def get(self, request):
         user = request.user
+        cache.clear()
         
         # Always calculate real-time aggregate metrics
         data = {}
