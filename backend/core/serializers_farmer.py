@@ -15,7 +15,9 @@ class FarmerSerializer(serializers.ModelSerializer):
 
     def get_assigned_staff_name(self, obj):
         if obj.assigned_staff:
-            name = f"{obj.assigned_staff.first_name} {obj.assigned_staff.last_name}".strip()
-            return name if name else obj.assigned_staff.email
+            fn = (obj.assigned_staff.first_name or '').strip()
+            ln = (obj.assigned_staff.last_name or '').strip()
+            full = f"{fn} {ln}".strip()
+            return full if full else (obj.assigned_staff.email or str(obj.assigned_staff))
         return None
 

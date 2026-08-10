@@ -881,10 +881,10 @@ export default function FarmerManagement() {
                     </td>
                     {!isFieldStaff && (
                       <td>
-                        {farmer.assigned_staff_name ? (
+                        {(farmer.assigned_staff_name || farmer.assigned_staff_email || farmer.assigned_staff) ? (
                           <div>
-                            <div className="text-xs font-medium text-text">{farmer.assigned_staff_name}</div>
-                            <div className="text-[11px] text-text-muted">{farmer.assigned_staff_mobile || farmer.assigned_staff_email}</div>
+                            <div className="text-xs font-medium text-text">{farmer.assigned_staff_name || farmer.assigned_staff_email || 'Assigned Staff'}</div>
+                            <div className="text-[11px] text-text-muted">{farmer.assigned_staff_mobile || farmer.assigned_staff_email || ''}</div>
                           </div>
                         ) : (
                           <span className="text-xs text-text-muted italic">Unassigned</span>
