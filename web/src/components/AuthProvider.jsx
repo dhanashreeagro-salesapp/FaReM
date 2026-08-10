@@ -32,11 +32,13 @@ export function AuthProvider({ children }) {
           }
         } catch (err) {
           console.error("Failed to fetch fresh user profile:", err);
-          api.clearTokens();
-          localStorage.removeItem('ffma_full_name');
-          localStorage.removeItem('ffma_email');
-          localStorage.removeItem('ffma_territory_name');
-          setUser(null);
+          if (err?.status === 401) {
+            api.clearTokens();
+            localStorage.removeItem('ffma_full_name');
+            localStorage.removeItem('ffma_email');
+            localStorage.removeItem('ffma_territory_name');
+            setUser(null);
+          }
         }
       }
       setLoading(false);

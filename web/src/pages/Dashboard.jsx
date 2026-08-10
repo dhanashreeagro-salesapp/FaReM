@@ -127,7 +127,6 @@ export default function Dashboard() {
   const [modalLoading, setModalLoading] = useState(false);
 
   const fetchDashboard = async () => {
-    if (!user) return;
     setLoading(true);
     setError(null);
     try {

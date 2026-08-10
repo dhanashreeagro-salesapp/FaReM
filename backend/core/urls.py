@@ -46,6 +46,7 @@ from . import views_dashboard
 urlpatterns = [
     path('auth/login/', views.login_view, name='login'),
     path('auth/me/', views.me_view, name='auth_me'),
+    path('auth/me', views.me_view),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/invalidate-session/', views.invalidate_session, name='invalidate_session'),
     path('dashboard/active_crops/', views_dashboard.ActiveCropsAPIView.as_view(), name='dashboard_active_crops'),
