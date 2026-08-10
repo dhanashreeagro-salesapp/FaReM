@@ -299,8 +299,8 @@ class FieldVisit(models.Model):
 class VisitPhoto(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     visit = models.ForeignKey(FieldVisit, on_delete=models.CASCADE, related_name='photos')
-    photo_url = models.URLField(max_length=500)
-    thumbnail_url = models.URLField(max_length=500, null=True, blank=True)
+    photo_url = models.TextField(blank=True, default='')
+    thumbnail_url = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
 class CallLog(models.Model):

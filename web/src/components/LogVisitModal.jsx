@@ -218,15 +218,30 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
       // Upload photos if any
       if (photos.length > 0 && res.id) {
         for (const photoFile of photos) {
-          const fakeUrl = URL.createObjectURL(photoFile);
-          await api.uploadVisitPhoto(res.id, { photo_url: fakeUrl }).catch(() => {});
+          try {
+            const dataUrl = await compressImage(photoFile, 800, 800, 0.7).catch(() => null);
+            const finalUrl = dataUrl || URL.createObjectURL(photoFile);
+            await api.uploadVisitPhoto(res.id, { photo_url: finalUrl }).catch((pErr) => {
+              console.warn("Photo upload error:", pErr);
+            });
+          } catch (pEx) {
+            console.warn("Photo compression error:", pEx);
+          }
         }
       }
 
       if (onSuccess) onSuccess(res);
       onClose();
     } catch (err) {
-      setError(err.error || err.detail || "Failed to log visit");
+      let msg = err.error || err.detail;
+      if (!msg && typeof err === 'object') {
+        const keys = Object.keys(err);
+        if (keys.length > 0) {
+          const val = err[keys[0]];
+          msg = Array.isArray(val) ? `${keys[0]}: ${val.join(', ')}` : `${keys[0]}: ${String(val)}`;
+        }
+      }
+      setError(msg || "Failed to log visit");
     }
     setLoading(false);
   };

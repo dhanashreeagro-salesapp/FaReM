@@ -2,6 +2,9 @@ from rest_framework import serializers
 from .models import FieldVisit, VisitPhoto
 
 class VisitPhotoSerializer(serializers.ModelSerializer):
+    photo_url = serializers.CharField(max_length=2000)
+    thumbnail_url = serializers.CharField(max_length=2000, required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = VisitPhoto
         fields = ['id', 'visit', 'photo_url', 'thumbnail_url', 'created_at']
