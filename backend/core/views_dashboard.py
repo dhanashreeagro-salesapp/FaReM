@@ -88,24 +88,27 @@ class DashboardAPIView(APIView):
         data['top_villages'] = list(village_data)
 
         # Overdue Visits calculation — single query, no Python loop
-        from django.utils import timezone
-        from .models import AppConfiguration
-        from django.db.models import Max, Subquery, OuterRef
-        config = AppConfiguration.get_config()
-        threshold_days = config.visit_frequency_norm_days
-        cutoff_date = today_date - datetime.timedelta(days=threshold_days)
+        try:
+            from django.utils import timezone
+            from .models import AppConfiguration
+            from django.db.models import Max, Subquery, OuterRef
+            config = AppConfiguration.get_config()
+            threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
+            cutoff_date = today_date - datetime.timedelta(days=threshold_days)
 
-        # Get the most recent visit date per farmer
-        last_visit_subq = ActivityLog.objects.filter(
-            farmer=OuterRef('pk'), activity_type='Visit'
-        ).order_by('-date').values('date')[:1]
+            # Get the most recent visit date per farmer
+            last_visit_subq = ActivityLog.objects.filter(
+                farmer=OuterRef('pk'), activity_type='Visit'
+            ).order_by('-date').values('date')[:1]
 
-        # Annotate each farmer with their last visit date, then filter overdue
-        overdue_count = farmers.annotate(
-            last_visit_date=Subquery(last_visit_subq)
-        ).filter(
-            Q(last_visit_date__lt=cutoff_date) | Q(last_visit_date__isnull=True)
-        ).count()
+            # Annotate each farmer with their last visit date, then filter overdue
+            overdue_count = farmers.annotate(
+                last_visit_date=Subquery(last_visit_subq)
+            ).filter(
+                Q(last_visit_date__lt=cutoff_date) | Q(last_visit_date__isnull=True)
+            ).count()
+        except Exception:
+            overdue_count = farmers.count()
 
         data['overdue_visits'] = overdue_count
         
