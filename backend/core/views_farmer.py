@@ -29,17 +29,48 @@ class FarmerViewSet(viewsets.ModelViewSet):
             queryset = Farmer.objects.all()
         else:
             team_users = user.get_team_users()
-            territories = []
-            if user.territory:
-                territories.extend(user.territory.get_all_sub_territories())
-            for managed_territory in user.managed_territories.all():
-                territories.extend(managed_territory.get_all_sub_territories())
-            territories = list(set(territories))
-            
-            if territories:
-                queryset = Farmer.objects.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            team_user_ids = [u.id for u in team_users]
+
+            import time
+            if '_TERRITORY_CACHE' not in globals():
+                globals()['_TERRITORY_CACHE'] = {'ts': 0, 'map': {}}
+            _tc = globals()['_TERRITORY_CACHE']
+            now_ts = time.time()
+            if now_ts - _tc['ts'] > 60 or not _tc['map']:
+                from .models import Territory
+                all_territories = list(Territory.objects.exclude(status__iexact='Inactive'))
+                children_map = {}
+                for t in all_territories:
+                    p_id = t.parent_territory_id
+                    if p_id not in children_map:
+                        children_map[p_id] = []
+                    children_map[p_id].append(t)
+                _tc['ts'] = now_ts
+                _tc['map'] = children_map
             else:
-                queryset = Farmer.objects.filter(assigned_staff__in=team_users)
+                children_map = _tc['map']
+
+            root_t_ids = []
+            if user.territory_id:
+                root_t_ids.append(user.territory_id)
+            root_t_ids.extend(list(user.managed_territories.values_list('id', flat=True)))
+
+            visited_t = set()
+            t_queue = root_t_ids
+            while t_queue:
+                curr_t_id = t_queue.pop(0)
+                if curr_t_id in visited_t:
+                    continue
+                visited_t.add(curr_t_id)
+                children = children_map.get(curr_t_id, [])
+                for c in children:
+                    t_queue.append(c.id)
+
+            q_filter = Q(assigned_staff_id__in=team_user_ids)
+            if visited_t:
+                q_filter |= Q(territory_id__in=visited_t)
+
+            queryset = Farmer.objects.filter(q_filter)
 
         queryset = queryset.select_related('assigned_staff', 'territory')
 

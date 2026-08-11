@@ -46,8 +46,11 @@ class User(AbstractUser):
     def get_all_subordinates(self):
         """Recursively retrieve all subordinates using 60s cached in-memory tree traversal."""
         import time
+        if '_USER_REPORTS_CACHE' not in globals():
+            globals()['_USER_REPORTS_CACHE'] = {'ts': 0, 'map': {}}
+        _urc = globals()['_USER_REPORTS_CACHE']
         now = time.time()
-        if now - _USER_REPORTS_CACHE['ts'] > 60 or not _USER_REPORTS_CACHE['map']:
+        if now - _urc['ts'] > 60 or not _urc['map']:
             all_users = list(User.objects.exclude(status__iexact='Inactive'))
             reports_map = {}
             for u in all_users:
@@ -55,10 +58,10 @@ class User(AbstractUser):
                 if mgr_id not in reports_map:
                     reports_map[mgr_id] = []
                 reports_map[mgr_id].append(u)
-            _USER_REPORTS_CACHE['ts'] = now
-            _USER_REPORTS_CACHE['map'] = reports_map
+            _urc['ts'] = now
+            _urc['map'] = reports_map
         else:
-            reports_map = _USER_REPORTS_CACHE['map']
+            reports_map = _urc['map']
 
         visited = {self.id}
         all_subs = []

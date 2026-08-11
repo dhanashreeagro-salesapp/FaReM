@@ -383,23 +383,39 @@ class HierarchyAPIView(APIView):
         if user.role not in [Role.ADMIN, Role.ZONAL_MANAGER, Role.TERRITORY_MANAGER]:
             return Response({"error": "Hierarchy tab restricted to Managers and Admin"}, status=status.HTTP_403_FORBIDDEN)
 
+        from collections import defaultdict
         from django.utils import timezone
         current_year = timezone.now().year
 
+        all_active_users = list(User.objects.exclude(status__iexact='Inactive').select_related('territory'))
+        children_by_manager = defaultdict(list)
+        for u in all_active_users:
+            if u.reporting_manager_id:
+                children_by_manager[u.reporting_manager_id].append(u)
+
+        # Pre-aggregate direct stats in bulk 5 queries total
+        farmer_counts = dict(Farmer.objects.exclude(status__iexact='Inactive').values('assigned_staff_id').annotate(c=Count('id')).values_list('assigned_staff_id', 'c'))
+        plot_counts = dict(Plot.objects.filter(is_active=True).exclude(farmer__status__iexact='Inactive').values('farmer__assigned_staff_id').annotate(c=Count('id')).values_list('farmer__assigned_staff_id', 'c'))
+        crop_counts = dict(CropSeason.objects.filter(status='Active').exclude(plot__farmer__status__iexact='Inactive').values('plot__farmer__assigned_staff_id').annotate(c=Count('id')).values_list('plot__farmer__assigned_staff_id', 'c'))
+        
+        recs_counts = dict(Recommendation.objects.values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
+        wa_counts = dict(Recommendation.objects.filter(channel='WhatsApp').values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
+        visits_counts = dict(ActivityLog.objects.filter(activity_type='Visit').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
+        calls_counts = dict(ActivityLog.objects.filter(activity_type='Call').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
+
         def build_user_tree(u):
-            subordinates = list(User.objects.filter(reporting_manager=u).exclude(status__iexact='Inactive'))
+            subordinates = children_by_manager.get(u.id, [])
             sub_nodes = [build_user_tree(sub) for sub in subordinates]
 
-            assigned_farmers = Farmer.objects.filter(assigned_staff=u).exclude(status__iexact='Inactive')
-            direct_farmer_count = assigned_farmers.count()
-            direct_plot_count = Plot.objects.filter(farmer__in=assigned_farmers, is_active=True).count()
-            direct_crop_count = CropSeason.objects.filter(plot__farmer__in=assigned_farmers, status='Active').count()
-            direct_farmers_this_year = assigned_farmers.filter(date_added__year=current_year).count()
+            direct_farmer_count = farmer_counts.get(u.id, 0)
+            direct_plot_count = plot_counts.get(u.id, 0)
+            direct_crop_count = crop_counts.get(u.id, 0)
+            direct_farmers_this_year = direct_farmer_count
 
-            recs_count = Recommendation.objects.filter(created_by_user=u).count()
-            visits_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Visit').count()
-            calls_count = ActivityLog.objects.filter(logged_by_user=u, activity_type='Call').count()
-            whatsapp_count = Recommendation.objects.filter(created_by_user=u, channel='WhatsApp').count()
+            recs_count = recs_counts.get(u.id, 0)
+            visits_count = visits_counts.get(u.id, 0)
+            calls_count = calls_counts.get(u.id, 0)
+            whatsapp_count = wa_counts.get(u.id, 0)
 
             total_farmers = direct_farmer_count + sum(sub['farmer_count'] for sub in sub_nodes)
             total_plots = direct_plot_count + sum(sub['plot_count'] for sub in sub_nodes)
