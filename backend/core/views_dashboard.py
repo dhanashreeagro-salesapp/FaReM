@@ -1,4 +1,3 @@
-import pandas as pd
 from django.db.models import Count, Q, Max
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,7 +13,6 @@ class DashboardAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        cache.clear()
         
         # Always calculate real-time aggregate metrics
         data = {}
@@ -23,23 +21,42 @@ class DashboardAPIView(APIView):
         
         if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
             team_users = user.get_team_users()
+            team_user_ids = [u.id for u in team_users]
+
             data['debug_user_email'] = user.email
             data['debug_user_role'] = user.role
             data['debug_user_id'] = str(user.id)
             data['debug_team_emails'] = [u.email for u in team_users]
-            data['debug_subordinates_count'] = user.subordinates.count()
-            data['debug_direct_subs'] = [u.email for u in user.subordinates.all()]
+            data['debug_subordinates_count'] = len(team_users) - 1
 
-            territories = []
-            if user.territory:
-                territories.extend(user.territory.get_all_sub_territories())
-            for managed_territory in user.managed_territories.all():
-                territories.extend(managed_territory.get_all_sub_territories())
-            territories = list(set(territories))
-            
-            q_filter = Q(assigned_staff__in=team_users)
-            if territories:
-                q_filter |= Q(territory__in=territories)
+            from .models import Territory
+            all_territories = list(Territory.objects.filter(status='Active'))
+            children_map = {}
+            for t in all_territories:
+                p_id = t.parent_territory_id
+                if p_id not in children_map:
+                    children_map[p_id] = []
+                children_map[p_id].append(t)
+
+            root_t_ids = []
+            if user.territory_id:
+                root_t_ids.append(user.territory_id)
+            root_t_ids.extend(list(user.managed_territories.values_list('id', flat=True)))
+
+            visited_t = set()
+            t_queue = root_t_ids
+            while t_queue:
+                curr_t_id = t_queue.pop(0)
+                if curr_t_id in visited_t:
+                    continue
+                visited_t.add(curr_t_id)
+                children = children_map.get(curr_t_id, [])
+                for c in children:
+                    t_queue.append(c.id)
+
+            q_filter = Q(assigned_staff_id__in=team_user_ids)
+            if visited_t:
+                q_filter |= Q(territory_id__in=visited_t)
 
             farmers = farmers.filter(q_filter)
         else:
@@ -58,10 +75,6 @@ class DashboardAPIView(APIView):
             'filtered_farmers_count': len(farmer_ids),
         }
 
-        data['total_farmers'] = len(farmer_ids)
-        data['total_visits'] = ActivityLog.objects.filter(farmer_id__in=farmer_ids, activity_type='Visit').count()
-        data['total_calls'] = ActivityLog.objects.filter(farmer_id__in=farmer_ids, activity_type='Call').count()
-        
         import datetime
         from django.utils import timezone
         
@@ -79,10 +92,31 @@ class DashboardAPIView(APIView):
             fy_start = today_date.replace(month=4, day=1)
         else:
             fy_start = today_date.replace(year=today_date.year - 1, month=4, day=1)
-            
-        data['this_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_this_month).count()
-        data['last_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
-        data['ytd_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=fy_start).count()
+
+        data['total_farmers'] = len(farmer_ids)
+
+        # Single aggregate query for visits and calls
+        act_stats = ActivityLog.objects.filter(farmer_id__in=farmer_ids).aggregate(
+            total_visits=Count('id', filter=Q(activity_type='Visit')),
+            total_calls=Count('id', filter=Q(activity_type='Call'))
+        )
+        data['total_visits'] = act_stats['total_visits'] or 0
+        data['total_calls'] = act_stats['total_calls'] or 0
+        
+        # Single aggregate query for monthly / YTD farmer counts using direct datetime comparisons
+        dt_this_month = timezone.make_aware(datetime.datetime.combine(first_day_this_month, datetime.time.min))
+        dt_last_month_start = timezone.make_aware(datetime.datetime.combine(first_day_last_month, datetime.time.min))
+        dt_last_month_end = timezone.make_aware(datetime.datetime.combine(last_day_last_month, datetime.time.max))
+        dt_fy_start = timezone.make_aware(datetime.datetime.combine(fy_start, datetime.time.min))
+
+        farmer_stats = Farmer.objects.filter(id__in=farmer_ids).aggregate(
+            this_month=Count('id', filter=Q(date_added__gte=dt_this_month)),
+            last_month=Count('id', filter=Q(date_added__gte=dt_last_month_start, date_added__lte=dt_last_month_end)),
+            ytd=Count('id', filter=Q(date_added__gte=dt_fy_start))
+        )
+        data['this_month_farmers'] = farmer_stats['this_month'] or 0
+        data['last_month_farmers'] = farmer_stats['last_month'] or 0
+        data['ytd_farmers'] = farmer_stats['ytd'] or 0
         
         # Breakdown by village
         village_data = Farmer.objects.filter(id__in=farmer_ids).exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]

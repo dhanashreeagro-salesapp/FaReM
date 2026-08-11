@@ -44,17 +44,25 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username', 'mobile_number']
 
     def get_all_subordinates(self):
-        """Recursively retrieve all subordinates reporting directly or indirectly to this user."""
-        subs = list(self.subordinates.all())
-        all_subs = []
+        """Recursively retrieve all subordinates using 1 bulk query and in-memory tree traversal."""
+        all_users = list(User.objects.filter(status='Active'))
+        reports_map = {}
+        for u in all_users:
+            mgr_id = u.reporting_manager_id
+            if mgr_id not in reports_map:
+                reports_map[mgr_id] = []
+            reports_map[mgr_id].append(u)
+
         visited = {self.id}
-        while subs:
-            curr = subs.pop(0)
+        all_subs = []
+        queue = list(reports_map.get(self.id, []))
+        while queue:
+            curr = queue.pop(0)
             if curr.id in visited:
                 continue
             visited.add(curr.id)
             all_subs.append(curr)
-            subs.extend(list(curr.subordinates.all()))
+            queue.extend(reports_map.get(curr.id, []))
         return all_subs
 
     def get_team_users(self):
@@ -74,21 +82,26 @@ class Territory(models.Model):
         return self.name
 
     def get_all_sub_territories(self):
-        """Recursively get all sub-territories for this territory safely without infinite cycles."""
+        """Recursively get all sub-territories using 1 bulk query and in-memory tree traversal."""
+        all_territories = list(Territory.objects.filter(status='Active'))
+        children_map = {}
+        for t in all_territories:
+            p_id = t.parent_territory_id
+            if p_id not in children_map:
+                children_map[p_id] = []
+            children_map[p_id].append(t)
+
         visited = set()
-        territories = []
-        curr = [self]
-        while curr:
-            next_curr = []
-            for item in curr:
-                if item.id in visited:
-                    continue
-                visited.add(item.id)
-                territories.append(item)
-                children = list(item.sub_territories.all())
-                next_curr.extend(children)
-            curr = next_curr
-        return territories
+        result = []
+        queue = [self]
+        while queue:
+            curr = queue.pop(0)
+            if curr.id in visited:
+                continue
+            visited.add(curr.id)
+            result.append(curr)
+            queue.extend(children_map.get(curr.id, []))
+        return result
 
 class Farmer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
