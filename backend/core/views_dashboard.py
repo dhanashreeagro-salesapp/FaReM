@@ -42,9 +42,11 @@ class DashboardAPIView(APIView):
                 q_filter |= Q(territory__in=territories)
 
             farmers = farmers.filter(q_filter)
-            activities = activities.filter(farmer__in=farmers)
         else:
             team_users = User.objects.all()
+
+        # Evaluate farmer IDs once into list for fast indexed lookups
+        farmer_ids = list(farmers.values_list('id', flat=True))
 
         data['debug_trace'] = {
             'user_id': str(user.id),
@@ -53,13 +55,12 @@ class DashboardAPIView(APIView):
             'db_total_farmers_all': Farmer.objects.count(),
             'db_active_farmers_all': Farmer.objects.exclude(status__iexact='Inactive').count(),
             'team_users_count': len(team_users) if user.role not in [Role.ADMIN, Role.CONTENT_TEAM] else 'ALL',
-            'filtered_farmers_count': farmers.count(),
+            'filtered_farmers_count': len(farmer_ids),
         }
 
-            
-        data['total_farmers'] = farmers.count()
-        data['total_visits'] = activities.filter(activity_type='Visit').count()
-        data['total_calls'] = activities.filter(activity_type='Call').count()
+        data['total_farmers'] = len(farmer_ids)
+        data['total_visits'] = ActivityLog.objects.filter(farmer_id__in=farmer_ids, activity_type='Visit').count()
+        data['total_calls'] = ActivityLog.objects.filter(farmer_id__in=farmer_ids, activity_type='Call').count()
         
         import datetime
         from django.utils import timezone
@@ -79,46 +80,59 @@ class DashboardAPIView(APIView):
         else:
             fy_start = today_date.replace(year=today_date.year - 1, month=4, day=1)
             
-        data['this_month_farmers'] = farmers.filter(date_added__date__gte=first_day_this_month).count()
-        data['last_month_farmers'] = farmers.filter(date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
-        data['ytd_farmers'] = farmers.filter(date_added__date__gte=fy_start).count()
+        data['this_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_this_month).count()
+        data['last_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
+        data['ytd_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=fy_start).count()
         
         # Breakdown by village
-        village_data = farmers.exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
+        village_data = Farmer.objects.filter(id__in=farmer_ids).exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
         data['top_villages'] = list(village_data)
 
-        # Overdue Visits calculation — fast indexed query (0.04s instead of 15.84s)
+        # Overdue Visits calculation — pure in-memory set difference (0.001s)
         try:
             from .models import AppConfiguration
             config = AppConfiguration.get_config()
             threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
             cutoff_date = today_date - datetime.timedelta(days=threshold_days)
 
-            recent_visited_farmer_ids = ActivityLog.objects.filter(
-                farmer__in=farmers, activity_type='Visit', date__gte=cutoff_date
-            ).values_list('farmer_id', flat=True).distinct()
+            recent_visited_farmer_ids = set(ActivityLog.objects.filter(
+                farmer_id__in=farmer_ids, activity_type='Visit', date__gte=cutoff_date
+            ).values_list('farmer_id', flat=True))
 
-            overdue_count = farmers.exclude(id__in=recent_visited_farmer_ids).count()
+            overdue_count = len(set(farmer_ids) - recent_visited_farmer_ids)
         except Exception:
-            overdue_count = farmers.count()
+            overdue_count = len(farmer_ids)
 
         data['overdue_visits'] = overdue_count
         
-        from .models import Plot, CropSeason
-        data['total_plots'] = Plot.objects.filter(farmer__in=farmers, is_active=True).count()
+        from .models import Plot, CropSeason, CropStage, MarketRate
+        from collections import defaultdict
+
+        data['total_plots'] = Plot.objects.filter(farmer_id__in=farmer_ids, is_active=True).count()
         
-        active_seasons = CropSeason.objects.filter(
-            plot__farmer__in=farmers, plot__is_active=True, status='Active'
-        ).select_related('crop', 'current_stage').prefetch_related('crop__stages')
-        data['active_crop_seasons'] = active_seasons.count()
+        active_seasons = list(
+            CropSeason.objects.filter(plot__farmer_id__in=farmer_ids, plot__is_active=True, status='Active')
+            .select_related('crop', 'current_stage')
+        )
+        data['active_crop_seasons'] = len(active_seasons)
+
+        # Pre-fetch all crop stages in 1 single query to eliminate N+1 loop queries
+        all_crop_stages = CropStage.objects.all().order_by('crop_id', 'sequence_number')
+        crop_stages_map = defaultdict(list)
+        for st in all_crop_stages:
+            crop_stages_map[st.crop_id].append(st)
 
         stage_breakup = {}
+        active_crop_ids = set()
+
         for season in active_seasons:
             try:
-                if not season.crop: continue
+                if not season.crop:
+                    continue
                 crop_name = season.crop.crop_name
+                active_crop_ids.add(season.crop_id)
                 
-                # Use already-assigned current_stage if available, else infer from days
+                # Use already-assigned current_stage if available, else infer from in-memory stages
                 if season.current_stage:
                     stage_name = season.current_stage.stage_name
                 elif season.sowing_date:
@@ -126,7 +140,7 @@ class DashboardAPIView(APIView):
                     stage_name = 'Unknown'
                     if days_since_sowing >= 0:
                         accumulated_days = 0
-                        stages = sorted(season.crop.stages.all(), key=lambda s: s.sequence_number)
+                        stages = crop_stages_map.get(season.crop_id, [])
                         for stage in stages:
                             accumulated_days += stage.days_from_previous_stage
                             if days_since_sowing <= accumulated_days:
@@ -146,39 +160,42 @@ class DashboardAPIView(APIView):
         
         data['crop_stage_breakup'] = stage_breakup
 
-        # Market Trends logic
-        from .models import MarketRate
-        
+        # Market Trends logic - bulk fetch in 1 query
         market_trends = []
-        active_crop_ids = active_seasons.values_list('crop_id', flat=True).distinct()
-        for crop_id in active_crop_ids:
-            rates = list(MarketRate.objects.filter(crop_id=crop_id).order_by('-date')[:3])
-            if rates:
-                latest = rates[0]
-                trend = 'FLAT'
-                percentage_change = 0.0
-                
-                prev = None
-                if len(rates) == 3:
-                    prev = rates[2]
-                elif len(rates) == 2:
-                    prev = rates[1]
-                    
-                if prev and prev.avg_price and latest.avg_price and prev.avg_price > 0:
-                    if latest.avg_price > prev.avg_price:
-                        trend = 'UP'
-                        percentage_change = float(((latest.avg_price - prev.avg_price) / prev.avg_price) * 100)
-                    elif latest.avg_price < prev.avg_price:
-                        trend = 'DOWN'
-                        percentage_change = float(((prev.avg_price - latest.avg_price) / prev.avg_price) * 100)
+        if active_crop_ids:
+            rates_by_crop = defaultdict(list)
+            recent_rates = MarketRate.objects.filter(crop_id__in=active_crop_ids).select_related('crop').order_by('-date')
+            for rate in recent_rates:
+                if len(rates_by_crop[rate.crop_id]) < 3:
+                    rates_by_crop[rate.crop_id].append(rate)
 
-                market_trends.append({
-                    'crop_name': latest.crop.crop_name,
-                    'latest_price': float(latest.avg_price) if latest.avg_price else 0,
-                    'date': latest.date.isoformat(),
-                    'trend': trend,
-                    'percentage_change': round(percentage_change, 2)
-                })
+            for crop_id, rates in rates_by_crop.items():
+                if rates:
+                    latest = rates[0]
+                    trend = 'FLAT'
+                    percentage_change = 0.0
+                    
+                    prev = None
+                    if len(rates) == 3:
+                        prev = rates[2]
+                    elif len(rates) == 2:
+                        prev = rates[1]
+                        
+                    if prev and prev.avg_price and latest.avg_price and prev.avg_price > 0:
+                        if latest.avg_price > prev.avg_price:
+                            trend = 'UP'
+                            percentage_change = float(((latest.avg_price - prev.avg_price) / prev.avg_price) * 100)
+                        elif latest.avg_price < prev.avg_price:
+                            trend = 'DOWN'
+                            percentage_change = float(((prev.avg_price - latest.avg_price) / prev.avg_price) * 100)
+
+                    market_trends.append({
+                        'crop_name': latest.crop.crop_name,
+                        'latest_price': float(latest.avg_price) if latest.avg_price else 0,
+                        'date': latest.date.isoformat(),
+                        'trend': trend,
+                        'percentage_change': round(percentage_change, 2)
+                    })
         data['market_trends'] = market_trends
 
         cache_key = f"dashboard_data_{user.id}"
