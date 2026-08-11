@@ -14,6 +14,7 @@ import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
 import VisitPlanner from './pages/VisitPlanner';
 import RecommendationDashboard from './pages/RecommendationDashboard';
+import DataDebug from './pages/DataDebug';
 
 
 import { MapPin } from 'lucide-react';
@@ -70,6 +71,8 @@ function ProtectedLayout() {
 
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/data-debug" element={<DataDebug />} />
+            <Route path="/frontend-diagnostic" element={<DataDebug />} />
           </Routes>
         </main>
       </div>
