@@ -29,16 +29,28 @@ class ApiClient {
   setTokens(access, refresh) {
     localStorage.setItem('ffma_access_token', access);
     localStorage.setItem('ffma_refresh_token', refresh);
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('ffma_cache_') || k.startsWith('cache_')) {
+        localStorage.removeItem(k);
+      }
+    });
   }
 
   clearTokens() {
     localStorage.removeItem('ffma_access_token');
     localStorage.removeItem('ffma_refresh_token');
     localStorage.removeItem('ffma_role');
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('ffma_cache_') || k.startsWith('cache_')) {
+        localStorage.removeItem(k);
+      }
+    });
   }
 
   async requestWithCache(endpoint, options = {}, cacheKey = null) {
-    const key = cacheKey || `ffma_cache_${endpoint}`;
+    const userEmail = localStorage.getItem('ffma_email') || 'anon';
+    const rawKey = cacheKey || endpoint;
+    const key = `ffma_cache_${userEmail}_${rawKey}`;
     const cachedStr = localStorage.getItem(key);
     
     // Background fresh fetch to update cache silently
@@ -57,7 +69,6 @@ class ApiClient {
     if (cachedStr) {
       try {
         const cachedData = JSON.parse(cachedStr);
-        // Instant response from cache for fast low-network loading!
         return cachedData;
       } catch (e) {
         localStorage.removeItem(key);
