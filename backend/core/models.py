@@ -44,14 +44,21 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username', 'mobile_number']
 
     def get_all_subordinates(self):
-        """Recursively retrieve all subordinates using 1 bulk query and in-memory tree traversal."""
-        all_users = list(User.objects.filter(status='Active'))
-        reports_map = {}
-        for u in all_users:
-            mgr_id = u.reporting_manager_id
-            if mgr_id not in reports_map:
-                reports_map[mgr_id] = []
-            reports_map[mgr_id].append(u)
+        """Recursively retrieve all subordinates using 60s cached in-memory tree traversal."""
+        import time
+        now = time.time()
+        if now - _USER_REPORTS_CACHE['ts'] > 60 or not _USER_REPORTS_CACHE['map']:
+            all_users = list(User.objects.exclude(status__iexact='Inactive'))
+            reports_map = {}
+            for u in all_users:
+                mgr_id = u.reporting_manager_id
+                if mgr_id not in reports_map:
+                    reports_map[mgr_id] = []
+                reports_map[mgr_id].append(u)
+            _USER_REPORTS_CACHE['ts'] = now
+            _USER_REPORTS_CACHE['map'] = reports_map
+        else:
+            reports_map = _USER_REPORTS_CACHE['map']
 
         visited = {self.id}
         all_subs = []

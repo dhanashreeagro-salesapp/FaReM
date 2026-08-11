@@ -29,14 +29,24 @@ class DashboardAPIView(APIView):
             data['debug_team_emails'] = [u.email for u in team_users]
             data['debug_subordinates_count'] = len(team_users) - 1
 
-            from .models import Territory
-            all_territories = list(Territory.objects.filter(status='Active'))
-            children_map = {}
-            for t in all_territories:
-                p_id = t.parent_territory_id
-                if p_id not in children_map:
-                    children_map[p_id] = []
-                children_map[p_id].append(t)
+            import time
+            if '_TERRITORY_CACHE' not in globals():
+                globals()['_TERRITORY_CACHE'] = {'ts': 0, 'map': {}}
+            _tc = globals()['_TERRITORY_CACHE']
+            now_ts = time.time()
+            if now_ts - _tc['ts'] > 60 or not _tc['map']:
+                from .models import Territory
+                all_territories = list(Territory.objects.exclude(status__iexact='Inactive'))
+                children_map = {}
+                for t in all_territories:
+                    p_id = t.parent_territory_id
+                    if p_id not in children_map:
+                        children_map[p_id] = []
+                    children_map[p_id].append(t)
+                _tc['ts'] = now_ts
+                _tc['map'] = children_map
+            else:
+                children_map = _tc['map']
 
             root_t_ids = []
             if user.territory_id:
