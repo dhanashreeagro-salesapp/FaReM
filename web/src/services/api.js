@@ -41,8 +41,10 @@ class ApiClient {
     localStorage.removeItem('ffma_refresh_token');
     localStorage.removeItem('ffma_role');
     Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('ffma_cache_') || k.startsWith('cache_')) {
-        localStorage.removeItem(k);
+      if (k.startsWith('ffma_cache_') || k.startsWith('cache_') || k.startsWith('ffma_')) {
+        if (k !== 'ffma_access_token' && k !== 'ffma_refresh_token') {
+          localStorage.removeItem(k);
+        }
       }
     });
   }
@@ -316,7 +318,7 @@ class ApiClient {
   // Farmers
   getFarmers(params = {}) {
     const qs = new URLSearchParams(params).toString();
-    return this.requestWithCache(`/farmers/${qs ? `?${qs}` : ''}`, {}, `cache_farmers_${qs}`);
+    return this.request(`/farmers/${qs ? `?${qs}` : ''}`);
   }
 
   getVillages() { return this.request('/farmers/villages/'); }
