@@ -9,7 +9,7 @@ import TerritoryManagement from './pages/TerritoryManagement';
 import FarmerManagement from './pages/FarmerManagement';
 import PromotionLibrary from './pages/PromotionLibrary';
 import PromotionsManagement from './pages/PromotionsManagement';
-import Dashboard from './pages/Dashboard';
+import DashboardV2 from './pages/DashboardV2';
 import AuditLogs from './pages/AuditLogs';
 import SettingsPage from './pages/SettingsPage';
 import VisitPlanner from './pages/VisitPlanner';
@@ -67,7 +67,7 @@ function ProtectedLayout() {
             <Route path="/promotions" element={<PromotionLibrary />} />
             <Route path="/promotions-management" element={<PromotionsManagement />} />
             <Route path="/recommendations-dashboard" element={<RecommendationDashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<DashboardV2 />} />
 
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/settings" element={<SettingsPage />} />
