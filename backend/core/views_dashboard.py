@@ -72,8 +72,9 @@ class DashboardAPIView(APIView):
         else:
             team_users = User.objects.all()
 
-        # Evaluate farmer IDs once into list for fast indexed lookups
-        farmer_ids = list(farmers.values_list('id', flat=True))
+        # Use lazy queryset reference instead of evaluating into memory for subqueries
+        farmer_ids_qs = farmers.values('id')
+        total_farmers_count = farmers.count()
 
         data['debug_trace'] = {
             'user_id': str(user.id),
@@ -82,7 +83,7 @@ class DashboardAPIView(APIView):
             'db_total_farmers_all': Farmer.objects.count(),
             'db_active_farmers_all': Farmer.objects.exclude(status__iexact='Inactive').count(),
             'team_users_count': len(team_users) if user.role not in [Role.ADMIN, Role.CONTENT_TEAM] else 'ALL',
-            'filtered_farmers_count': len(farmer_ids),
+            'filtered_farmers_count': total_farmers_count,
         }
 
         import datetime
@@ -103,10 +104,10 @@ class DashboardAPIView(APIView):
         else:
             fy_start = today_date.replace(year=today_date.year - 1, month=4, day=1)
 
-        data['total_farmers'] = len(farmer_ids)
+        data['total_farmers'] = total_farmers_count
 
         # Single aggregate query for visits and calls
-        act_stats = ActivityLog.objects.filter(farmer_id__in=farmer_ids).aggregate(
+        act_stats = ActivityLog.objects.filter(farmer_id__in=farmer_ids_qs).aggregate(
             total_visits=Count('id', filter=Q(activity_type='Visit')),
             total_calls=Count('id', filter=Q(activity_type='Call'))
         )
@@ -120,7 +121,7 @@ class DashboardAPIView(APIView):
             dt_last_month_end = timezone.make_aware(datetime.datetime.combine(last_day_last_month, datetime.time.max))
             dt_fy_start = timezone.make_aware(datetime.datetime.combine(fy_start, datetime.time.min))
 
-            farmer_stats = Farmer.objects.filter(id__in=farmer_ids).aggregate(
+            farmer_stats = farmers.aggregate(
                 this_month=Count('id', filter=Q(date_added__gte=dt_this_month)),
                 last_month=Count('id', filter=Q(date_added__gte=dt_last_month_start, date_added__lte=dt_last_month_end)),
                 ytd=Count('id', filter=Q(date_added__gte=dt_fy_start))
@@ -129,15 +130,15 @@ class DashboardAPIView(APIView):
             data['last_month_farmers'] = farmer_stats['last_month'] or 0
             data['ytd_farmers'] = farmer_stats['ytd'] or 0
         except Exception:
-            data['this_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_this_month).count()
-            data['last_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
-            data['ytd_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=fy_start).count()
+            data['this_month_farmers'] = farmers.filter(date_added__date__gte=first_day_this_month).count()
+            data['last_month_farmers'] = farmers.filter(date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
+            data['ytd_farmers'] = farmers.filter(date_added__date__gte=fy_start).count()
         
         # Breakdown by village
-        village_data = Farmer.objects.filter(id__in=farmer_ids).exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
+        village_data = farmers.exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
         data['top_villages'] = list(village_data)
 
-        # Overdue Visits calculation — pure in-memory set difference (0.001s)
+        # Overdue Visits calculation — robust aggregation
         try:
             from .models import AppConfiguration
             config = AppConfiguration.get_config()
@@ -145,22 +146,23 @@ class DashboardAPIView(APIView):
             cutoff_date = today_date - datetime.timedelta(days=threshold_days)
 
             recent_visited_farmer_ids = set(ActivityLog.objects.filter(
-                farmer_id__in=farmer_ids, activity_type='Visit', date__gte=cutoff_date
+                farmer_id__in=farmer_ids_qs, activity_type='Visit', date__gte=cutoff_date
             ).values_list('farmer_id', flat=True))
 
-            overdue_count = len(set(farmer_ids) - recent_visited_farmer_ids)
+            # Since total_farmers_count is known, simply subtract those visited
+            overdue_count = max(0, total_farmers_count - len(recent_visited_farmer_ids))
         except Exception:
-            overdue_count = len(farmer_ids)
+            overdue_count = total_farmers_count
 
         data['overdue_visits'] = overdue_count
         
         from .models import Plot, CropSeason, CropStage, MarketRate
         from collections import defaultdict
 
-        data['total_plots'] = Plot.objects.filter(farmer_id__in=farmer_ids, is_active=True).count()
+        data['total_plots'] = Plot.objects.filter(farmer_id__in=farmer_ids_qs, is_active=True).count()
         
         active_seasons = list(
-            CropSeason.objects.filter(plot__farmer_id__in=farmer_ids, plot__is_active=True, status='Active')
+            CropSeason.objects.filter(plot__farmer_id__in=farmer_ids_qs, plot__is_active=True, status='Active')
             .select_related('crop', 'current_stage')
         )
         data['active_crop_seasons'] = len(active_seasons)
