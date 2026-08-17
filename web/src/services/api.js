@@ -1,14 +1,20 @@
 let getApiBase = () => {
+  let envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    envUrl = envUrl.trim().replace(/\/+$/, '');
+    if (!envUrl.endsWith('/api')) {
+      envUrl += '/api';
+    }
+    return envUrl;
+  }
+  
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return 'https://farem-web.onrender.com/api';
   }
-  let envUrl = import.meta.env.VITE_API_URL;
-  if (!envUrl) return `http://${window.location.hostname}:8000/api`;
-  envUrl = envUrl.trim().replace(/\/+$/, '');
-  if (!envUrl.endsWith('/api')) {
-    envUrl += '/api';
-  }
-  return envUrl;
+  
+  return typeof window !== 'undefined' 
+    ? `http://${window.location.hostname}:8000/api` 
+    : 'http://localhost:8000/api';
 };
 
 const API_BASE = getApiBase();
