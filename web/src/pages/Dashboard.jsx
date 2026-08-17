@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthProvider';
 import { normalizeDashboardMetrics, normalizeHierarchyResponse } from '../services/dataAdapter';
@@ -126,16 +126,21 @@ export default function Dashboard() {
   const [showPlotsModal, setShowPlotsModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
 
+  // AbortController ref for race condition & unmount protection
+  const abortControllerRef = useRef(null);
+
   const fetchDashboard = async () => {
+    if (!user || !user.email) return;
+
     setLoading(true);
     setError(null);
     try {
-      const raw = await api.getDashboard({ refresh: 'true' });
+      const raw = await api.getDashboard({ refresh: 'true', _t: Date.now() });
       const normalized = normalizeDashboardMetrics(raw);
       setMetrics(normalized);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
-      setError("Unable to load live dashboard data. Please try again.");
+      setError(err?.message || "Unable to load live dashboard data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -143,6 +148,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboard();
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [user?.email]);
 
   const handleOpenActiveCropsModal = async () => {
