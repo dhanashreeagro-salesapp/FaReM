@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../components/AuthProvider';
+import api from '../services/api';
 import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award } from 'lucide-react';
 
 const GIT_SHA = 'bd393dc';
-const API_BASE_URL = 'https://farem-web.onrender.com/api';
 
 export default function DashboardV2() {
   const { user, token } = useAuth();
@@ -26,27 +26,10 @@ export default function DashboardV2() {
   const abortControllerRef = useRef(null);
 
   const fetchDashboard = async () => {
-    // 1. Auth Ready Check
-    if (!user || !user.email) {
-      console.log("[DashboardV2] User auth context not ready. Postponing fetch.");
-      return;
-    }
+    if (!user || !user.email) return;
 
-    const authToken = token || localStorage.getItem('ffma_access_token');
-    if (!authToken) {
-      console.log("[DashboardV2] No auth token available. Displaying Auth Error.");
-      setLoading(false);
-      setError({ message: "Authentication token missing. Please log in again.", status: 401 });
-      return;
-    }
-
-    // 2. Abort previous pending request if any
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-
+    // We no longer abort manually since api.js doesn't easily support signals,
+    // but we can track mount state in the useEffect.
     setLoading(true);
     setError(null);
     const startTime = performance.now();
@@ -54,44 +37,16 @@ export default function DashboardV2() {
     try {
       setRequestCount(prev => prev + 1);
 
-      // Direct HTTP fetch - NO LOCAL STORAGE CACHE, NO SILENT FALLBACKS
-      const response = await fetch(`${API_BASE_URL}/dashboard/?refresh=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        signal
-      });
+      // standard wrapper with explicitly cache-busting url params
+      const json = await api.getDashboard({ refresh: 'true', _t: Date.now() });
 
       const endTime = performance.now();
       setResponseTimeMs(Math.round(endTime - startTime));
-      setHttpStatus(response.status);
-
-      if (!response.ok) {
-        let errBody = '';
-        try { errBody = await response.text(); } catch (e) {}
-        throw {
-          status: response.status,
-          message: `Server returned HTTP ${response.status}: ${response.statusText || 'Error'}`,
-          body: errBody
-        };
-      }
-
-      const json = await response.json();
-
-      // Check if aborted before setting state
-      if (signal.aborted) return;
+      setHttpStatus(200); // api.getDashboard throws on non-200
 
       setData(json);
       setLoading(false);
     } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log("[DashboardV2] Request aborted.");
-        return;
-      }
       console.error("[DashboardV2] Fetch error:", err);
       const endTime = performance.now();
       setResponseTimeMs(Math.round(endTime - startTime));
@@ -105,24 +60,17 @@ export default function DashboardV2() {
   };
 
   const fetchHierarchy = async () => {
-    const authToken = token || localStorage.getItem('ffma_access_token');
-    if (!authToken) return;
+    if (!user || !user.email) return;
 
     setHierarchyLoading(true);
     setHierarchyError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/dashboard/hierarchy/`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Cache-Control': 'no-cache'
-        }
-      });
-      if (res.ok) {
-        const json = await res.json();
+      const json = await api.getHierarchy();
+      if (json) {
         setHierarchyData(json);
       } else {
-        setHierarchyError(`HTTP ${res.status}`);
+        setHierarchyError("Empty response");
       }
     } catch (err) {
       setHierarchyError(err.message || 'Failed to load hierarchy');
@@ -191,25 +139,6 @@ export default function DashboardV2() {
         </div>
       </div>
 
-      {/* Diagnostic Inspector Panel (Dev Diagnostics) */}
-      <div className="p-3 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono border border-slate-800 space-y-1 shadow-inner">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5 font-sans">
-          <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-            <CheckCircle2 size={14} /> Diagnostic Inspector Mode (Deterministic Path)
-          </span>
-          <span className="text-[11px] text-slate-400">Build: {GIT_SHA}</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
-          <div><span className="text-slate-400">User:</span> {user?.email || 'Unauthenticated'}</div>
-          <div><span className="text-slate-400">Role:</span> {user?.role || 'N/A'}</div>
-          <div><span className="text-slate-400">API URL:</span> {API_BASE_URL}</div>
-          <div><span className="text-slate-400">HTTP Status:</span> {httpStatus ? `${httpStatus} OK` : (loading ? 'Fetching...' : 'N/A')}</div>
-          <div><span className="text-slate-400">Req Count:</span> #{requestCount}</div>
-          <div><span className="text-slate-400">Latency:</span> {responseTimeMs ? `${responseTimeMs}ms` : 'N/A'}</div>
-          <div><span className="text-slate-400">Cache Strategy:</span> Direct Network (No Cache)</div>
-          <div><span className="text-slate-400">State:</span> {loading ? 'Loading' : error ? 'Error' : 'Success'}</div>
-        </div>
-      </div>
 
       {/* TAB 1: METRICS OVERVIEW */}
       {activeTab === 'metrics' && (
@@ -377,7 +306,11 @@ export default function DashboardV2() {
 
           {!hierarchyLoading && hierarchyData && (
             <div className="space-y-4">
-              <HierarchyNode node={hierarchyData} isRoot={true} />
+              {Array.isArray(hierarchyData) ? (
+                hierarchyData.map((node, i) => <HierarchyNode key={i} node={node} isRoot={true} />)
+              ) : (
+                <HierarchyNode node={hierarchyData} isRoot={true} />
+              )}
             </div>
           )}
         </div>
@@ -410,7 +343,8 @@ function HierarchyNode({ node, isRoot = false }) {
   const [expanded, setExpanded] = useState(true);
   if (!node) return null;
 
-  const hasChildren = node.children && node.children.length > 0;
+  const childrenNodes = node.children || node.subordinates || [];
+  const hasChildren = childrenNodes.length > 0;
 
   return (
     <div className={`space-y-2 ${!isRoot ? 'ml-6 pl-4 border-l-2 border-border/60' : ''}`}>
@@ -427,7 +361,7 @@ function HierarchyNode({ node, isRoot = false }) {
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-xs text-text truncate">{node.name}</span>
+            <span className="font-bold text-xs text-text truncate">{node.name || node.full_name || 'Unnamed'}</span>
             <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
               {node.role || 'Staff'}
             </span>
@@ -436,14 +370,14 @@ function HierarchyNode({ node, isRoot = false }) {
         </div>
         <div className="text-right">
           <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            {node.farmer_count ?? 0} Farmers
+            {node.farmer_count ?? node.farmers_count ?? 0} Farmers
           </span>
         </div>
       </div>
 
       {expanded && hasChildren && (
         <div className="space-y-2 pt-1">
-          {node.children.map((child, idx) => (
+          {childrenNodes.map((child, idx) => (
             <HierarchyNode key={idx} node={child} />
           ))}
         </div>
