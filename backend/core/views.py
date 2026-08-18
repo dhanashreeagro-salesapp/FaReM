@@ -62,21 +62,22 @@ def login_view(request):
             })
 
         else:
-            user.failed_otp_attempts += 1
-            if user.failed_otp_attempts >= 5:
-                user.locked_until = timezone.now() + timezone.timedelta(minutes=30)
-                from .models import SystemAuditLog
-                SystemAuditLog.objects.create(
-                    entity_type='User',
-                    entity_id=str(user.id),
-                    action_type='Login',
-                    new_value='Account locked due to 5 failed password attempts',
-                    user_id=str(user.id)
-                )
-            user.save()
-            
-            if user.failed_otp_attempts >= 5:
-                return Response({"error": "5 failed attempts. Account locked for 30 minutes."}, status=status.HTTP_403_FORBIDDEN)
+            # Disabled account locking for testing phase
+            # user.failed_otp_attempts += 1
+            # if user.failed_otp_attempts >= 5:
+            #     user.locked_until = timezone.now() + timezone.timedelta(minutes=30)
+            #     from .models import SystemAuditLog
+            #     SystemAuditLog.objects.create(
+            #         entity_type='User',
+            #         entity_id=str(user.id),
+            #         action_type='Login',
+            #         new_value='Account locked due to 5 failed password attempts',
+            #         user_id=str(user.id)
+            #     )
+            # user.save()
+            # 
+            # if user.failed_otp_attempts >= 5:
+            #     return Response({"error": "5 failed attempts. Account locked for 30 minutes."}, status=status.HTTP_403_FORBIDDEN)
                 
             return Response({"error": "Invalid email or password"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
