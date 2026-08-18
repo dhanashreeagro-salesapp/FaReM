@@ -31,8 +31,8 @@ def login_view(request):
         if user.status == 'Inactive':
             return Response({"error": "Account is inactive. Contact Admin."}, status=status.HTTP_403_FORBIDDEN)
             
-        if user.locked_until and user.locked_until > timezone.now():
-            return Response({"error": f"Account is locked until {user.locked_until}. Try again later."}, status=status.HTTP_403_FORBIDDEN)
+        # if user.locked_until and user.locked_until > timezone.now():
+        #     return Response({"error": f"Account is locked until {user.locked_until}. Try again later."}, status=status.HTTP_403_FORBIDDEN)
             
         if user.check_password(password):
             user.failed_otp_attempts = 0
