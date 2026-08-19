@@ -308,7 +308,7 @@ def validate_user_import(import_job_id):
         'admin': 'Admin',
         'content team': 'ContentTeam'
     }
-    roles = [r[0] for r in User.Role.choices]
+    roles = [r[0] for r in User._meta.get_field('role').choices]
 
     existing_mobiles = set(User.objects.values_list('mobile_number', flat=True))
     existing_territories = set(Territory.objects.values_list('name', flat=True))
