@@ -100,7 +100,7 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
                   <p className="font-bold mb-1">Required Columns:</p>
                   <p>Employee ID, Name, Mobile Number, Designation</p>
                   <p className="mt-1 font-bold mb-1">Optional Columns:</p>
-                  <p>Territory</p>
+                  <p>Territory, Email</p>
                 </div>
               )}
 
