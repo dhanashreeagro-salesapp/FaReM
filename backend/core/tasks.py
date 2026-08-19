@@ -337,8 +337,10 @@ def validate_user_import(import_job_id):
             # Check territory if provided
             if 'Territory' in df.columns and not pd.isna(row['Territory']):
                 t_name = str(row['Territory']).strip()
-                if t_name not in existing_territories:
-                    raise ValueError(f"Territory '{t_name}' not found")
+                if t_name and t_name.lower() != 'nan' and t_name not in existing_territories:
+                    existing_territories.add(t_name)
+                    if df.at[index, 'Import Status'] == 'SUCCESS':
+                        df.at[index, 'Import Status'] = f"NEW TERRITORY (Will create '{t_name}')"
 
             valid_rows += 1
         except Exception as e:
@@ -402,6 +404,9 @@ def commit_user_import(import_job_id):
             territory = None
             if territory_name:
                 territory = territories.get(territory_name)
+                if not territory:
+                    territory = Territory.objects.create(name=territory_name, parent_territory=None)
+                    territories[territory_name] = territory
 
             if mobile in existing_users:
                 user = existing_users[mobile]

@@ -206,10 +206,11 @@ export default function TerritoryManagement() {
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1">Parent Territory (Optional)</label>
-              <select value={form.parent_territory} onChange={e => setForm({...form, parent_territory: e.target.value})}
+              <label className="block text-xs font-semibold text-text-muted mb-1">Parent Territory (Required unless Root/Zonal Manager)</label>
+              <select value={form.parent_territory} onChange={e => setForm({...form, parent_territory: e.target.value})} required
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none">
-                <option value="">-- Root (Region) --</option>
+                <option value="">-- Select Parent Territory --</option>
+                <option value="null">-- Root (Zonal Manager) --</option>
                 {[...allTerritories]
                   .filter(t => !editingId || t.id !== editingId)
                   .sort((a, b) => a.name.localeCompare(b.name))

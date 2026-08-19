@@ -73,7 +73,7 @@ class DashboardAPIView(APIView):
             team_users = User.objects.all()
 
         # Evaluate farmer IDs once into list for fast indexed lookups
-        farmer_ids = list(farmers.values_list('id', flat=True))
+        farmer_ids_subquery = farmers.values('id')
 
         data['debug_trace'] = {
             'user_id': str(user.id),

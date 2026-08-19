@@ -1,0 +1,212 @@
+[
+  {
+    "id": "9408aac1-fa23-4500-9570-4d639055ca91",
+    "name": "Sinnar",
+    "parent": "8fba22cd-eafc-434e-80cc-f7dae8fa7a24"
+  },
+  {
+    "id": "8fba22cd-eafc-434e-80cc-f7dae8fa7a24",
+    "name": "Nashik",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "f9f6f6ac-9cf1-41fd-8845-5b8ac016d162",
+    "name": "Niphad",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "04477d0e-581d-4b90-a9ae-9eae08ec6e93",
+    "name": "Jalgaon",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "506b02f9-c937-4d04-91a9-fb0c532277e9",
+    "name": "Ch.Sambhajinagar",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "bfa29706-affb-4ded-995f-67cc1ffd8c4b",
+    "name": "Maharashtra",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "cbab16fe-e075-4a60-820d-0dd251a50c8f",
+    "name": "Nitin A Rajput",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "1acd3e48-d87f-4635-9855-2d6747353438",
+    "name": "Omkar Gaikar",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "7bc57220-cfae-45f8-8f34-504c12b9bd30",
+    "name": "Gajanan Tale",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "dfb3e42e-cf9f-4c5a-9d76-5313e2375d7a",
+    "name": "Rahul Borse",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "f60c806c-41d9-48e2-94b1-67d16f2b3728",
+    "name": "AURANGABAD",
+    "parent": null
+  },
+  {
+    "id": "8dbddcb4-ee03-49e8-8ad8-bd8330ccb111",
+    "name": "Avinash Patil",
+    "parent": null
+  },
+  {
+    "id": "63ab0960-a50b-47b7-b607-0dd497373863",
+    "name": "Digvijay Pawar",
+    "parent": null
+  },
+  {
+    "id": "b2f70b19-ad83-4b3f-b4f2-3062d3782443",
+    "name": "Dr. Anil Gavande",
+    "parent": null
+  },
+  {
+    "id": "7136b701-5122-4a89-a6d4-1b17030af458",
+    "name": "Gajanan Sakhare",
+    "parent": null
+  },
+  {
+    "id": "aad6b8a2-8c97-4ba3-9bd3-30ce2c3e1842",
+    "name": "Jeevan Deshmukh",
+    "parent": null
+  },
+  {
+    "id": "1e0d60df-6614-4a33-ba9c-27beed0db386",
+    "name": "Jeevan Wadkar",
+    "parent": null
+  },
+  {
+    "id": "8b353973-c02a-498a-b7c3-3d67afc9b09b",
+    "name": "Kiran Nikam",
+    "parent": null
+  },
+  {
+    "id": "7b5c89a9-66d1-493f-a117-88f504087f5f",
+    "name": "Kiran Satpute",
+    "parent": null
+  },
+  {
+    "id": "a1e8b4f3-7ae8-4c43-af1c-0d1ce686bfea",
+    "name": "Krushna Patil",
+    "parent": null
+  },
+  {
+    "id": "f0070881-6aef-4b27-9aca-394bfb7614e1",
+    "name": "Mangesh Gund",
+    "parent": null
+  },
+  {
+    "id": "250c1165-f5e5-4571-a07e-b99584f174ca",
+    "name": "Manoj Patil",
+    "parent": null
+  },
+  {
+    "id": "d7080b5c-6ca5-4f08-9e55-5136e9477f9d",
+    "name": "Solapur Pravin Patil",
+    "parent": null
+  },
+  {
+    "id": "c3cd7afe-9e98-4c40-b1ed-4d58b5457501",
+    "name": "West-1",
+    "parent": null
+  },
+  {
+    "id": "02941940-aa81-4dfe-bb4c-f3961ca54f0a",
+    "name": "Sahadev Bade",
+    "parent": null
+  },
+  {
+    "id": "50696455-27d3-496a-a1ec-d1ca011ee9d9",
+    "name": "Shashank",
+    "parent": null
+  },
+  {
+    "id": "9bfdd0d7-b7c1-4b8a-b5b5-5d7f639a1355",
+    "name": "Shubham Ingale",
+    "parent": null
+  },
+  {
+    "id": "117b4fa6-5ea0-4cb8-8bf5-d8443a8daca4",
+    "name": "Sunil Rupnar",
+    "parent": null
+  },
+  {
+    "id": "097a462b-2cee-4739-9f68-fa00280640eb",
+    "name": "Suraj Patil",
+    "parent": null
+  },
+  {
+    "id": "4cbc198d-fc36-4caa-ac75-794f44a30643",
+    "name": "Tembhurni (Shridhar Patil)",
+    "parent": null
+  },
+  {
+    "id": "19cb5ea4-7269-4d3b-bba6-4f399514058f",
+    "name": "Bhagwat",
+    "parent": null
+  },
+  {
+    "id": "a951f39d-e91c-4d28-bb29-55e4d6fec190",
+    "name": "Vishal More",
+    "parent": null
+  },
+  {
+    "id": "e03c4991-1eb2-49c0-b5e9-226dca496570",
+    "name": "Ambadas",
+    "parent": null
+  },
+  {
+    "id": "4d14f322-7c10-4027-8b6e-9fa4926b3151",
+    "name": "Yaval ( Jeevan Bhangale)",
+    "parent": null
+  },
+  {
+    "id": "0a61743d-c3b1-4d48-9feb-f0e2a1a7498c",
+    "name": "Vishnu Bhagare",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "5cfd12fb-8257-458c-b5f7-f933b8575f23",
+    "name": "Sandip Dherange",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "0f2decf2-1571-48be-bbc8-10913746516e",
+    "name": "Talndulwadi (Pankaj Wagh)",
+    "parent": null
+  },
+  {
+    "id": "9cc5ba74-f3d9-419a-91fb-200c7e820f8a",
+    "name": "Vikas More",
+    "parent": null
+  },
+  {
+    "id": "99c6bcf0-c4f5-46d6-ae24-bb488df5d771",
+    "name": "Vithal Dahiphale (G)",
+    "parent": null
+  },
+  {
+    "id": "187cd358-5149-4349-ad82-189ee67f0843",
+    "name": "Sushil Giri",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "92a9dc6c-c7a2-4420-a4ef-3dc66a0abac4",
+    "name": "Vishal Nikumbe",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  },
+  {
+    "id": "3d30a64d-efc4-44dc-b95a-5cf18846d532",
+    "name": "Bhagwat Waghchaure",
+    "parent": "187cd358-5149-4349-ad82-189ee67f0843"
+  }
+]

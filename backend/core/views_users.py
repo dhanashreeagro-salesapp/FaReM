@@ -28,8 +28,8 @@ class UserViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # Users aren't created by themselves, admin assigns role at creation
-        user = serializer.save()
+        self.perform_create(serializer)
+        user = serializer.instance
         
         SystemAuditLog.objects.create(
             entity_type='User',
@@ -39,6 +39,19 @@ class UserViewSet(viewsets.ModelViewSet):
             user_id=str(request.user.id)
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        self._assign_manager_from_territory(user)
+
+    def perform_update(self, serializer):
+        user = serializer.save()
+        self._assign_manager_from_territory(user)
+
+    def _assign_manager_from_territory(self, user):
+        if user.territory and user.territory.parent_territory and user.territory.parent_territory.manager:
+            user.reporting_manager = user.territory.parent_territory.manager
+            user.save(update_fields=['reporting_manager'])
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsAdminUser])
     def download_template(self, request):
