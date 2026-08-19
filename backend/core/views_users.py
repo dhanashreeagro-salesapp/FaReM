@@ -59,7 +59,7 @@ class UserViewSet(viewsets.ModelViewSet):
         from django.http import HttpResponse
         from io import BytesIO
 
-        df = pd.DataFrame(columns=['Employee ID', 'Name', 'Mobile Number', 'Designation', 'Territory', 'Email'])
+        df = pd.DataFrame(columns=['Employee ID', 'Name', 'Mobile Number', 'Designation', 'Territory', 'Email', 'Password'])
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)

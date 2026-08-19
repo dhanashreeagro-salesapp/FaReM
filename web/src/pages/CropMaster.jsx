@@ -7,6 +7,14 @@ import { useAuth } from '../components/AuthProvider';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const HOST_BASE = API_BASE.replace('/api', '');
 
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const baseUrl = HOST_BASE.replace(/\/$/, "");
+  const imagePath = path.startsWith('/') ? path : `/${path}`;
+  return `${baseUrl}${imagePath}`;
+};
+
 export default function CropMaster() {
   const { isAdmin } = useAuth();
   const [crops, setCrops] = useState([]);
@@ -248,7 +256,7 @@ export default function CropMaster() {
               {editingCrop && editingCrop.reference_image && (
                 <div className="mr-auto flex items-center gap-2">
                   <span className="text-xs text-text-muted">Current photo:</span>
-                  <img src={editingCrop.reference_image.startsWith('http') ? editingCrop.reference_image : `${HOST_BASE}${editingCrop.reference_image}`} alt="Preview" className="h-8 w-8 object-cover rounded" />
+                  <img src={getImageUrl(editingCrop.reference_image)} alt="Preview" className="h-8 w-8 object-cover rounded" />
                 </div>
               )}
               <button type="submit" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-medium text-sm btn-press">
@@ -275,7 +283,7 @@ export default function CropMaster() {
             <div className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => setExpandedCrop(expandedCrop === crop.id ? null : crop.id)}>
                 {crop.reference_image ? (
-                  <img src={crop.reference_image.startsWith('http') ? crop.reference_image : `${HOST_BASE}${crop.reference_image}`} alt={crop.crop_name} className="w-12 h-12 rounded-lg object-cover border border-border" />
+                  <img src={getImageUrl(crop.reference_image)} alt={crop.crop_name} className="w-12 h-12 rounded-lg object-cover border border-border bg-white" />
                 ) : (
                   <div className="w-12 h-12 rounded-lg bg-green-50 flex items-center justify-center border border-green-100">
                     <span className="text-primary text-xl">🌾</span>

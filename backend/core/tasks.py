@@ -13,7 +13,8 @@ HEADER_ALIASES = {
     'PinCode': ['pincode', 'pin code', 'zipcode', 'zip code', 'pin', 'pin_code'],
     'StaffMobile': ['staffmobile', 'staff mobile', 'assigned staff id', 'assigned staff', 'responsible person', 'staff id', 'staff email', 'staff_mobile', 'staff', 'assigned_staff', 'staff_name', 'officer', 'staff_phone'],
     'AcquisitionDate': ['acquisitiondate', 'acquisition date', 'date of acquisition', 'date', 'acquisition_date'],
-    'Source': ['source']
+    'Source': ['source'],
+    'Password': ['password', 'pwd', 'pass']
 }
 
 
@@ -287,7 +288,7 @@ def validate_user_import(import_job_id):
     error_report = []
 
     required_columns = ['Employee ID', 'FullName', 'PrimaryMobile', 'Designation']
-    expected_columns = required_columns + ['Territory', 'Email']
+    expected_columns = required_columns + ['Territory', 'Email', 'Password']
     
     df = normalize_dataframe_headers(df, expected_columns)
     
@@ -424,6 +425,10 @@ def commit_user_import(import_job_id):
             if email == 'nan' or pd.isna(row.get('Email')):
                 email = ''
 
+            password = str(row.get('Password', '')).strip()
+            if password == 'nan' or pd.isna(row.get('Password')) or not password:
+                password = 'Welcome@123'
+
             if mobile in existing_users:
                 user = existing_users[mobile]
                 user.first_name = first_name
@@ -433,6 +438,8 @@ def commit_user_import(import_job_id):
                 user.territory = territory
                 if email:
                     user.email = email
+                if password and password != 'Welcome@123':
+                    user.set_password(password)
                 user.status = 'Active'
                 
                 if territory and territory.parent_territory and territory.parent_territory.manager:
@@ -452,6 +459,7 @@ def commit_user_import(import_job_id):
                     email=email,
                     status='Active'
                 )
+                user.set_password(password)
                 if territory and territory.parent_territory and territory.parent_territory.manager:
                     user.reporting_manager = territory.parent_territory.manager
                 

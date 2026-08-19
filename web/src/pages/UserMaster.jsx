@@ -15,7 +15,7 @@ export default function UserMaster() {
   const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [territories, setTerritories] = useState([]);
-  const [form, setForm] = useState({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
+  const [form, setForm] = useState({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '', password: '' });
   const [error, setError] = useState('');
 
 
@@ -64,7 +64,7 @@ export default function UserMaster() {
       
       setShowForm(false);
       setEditingUser(null);
-      setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
+      setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '', password: '' });
       await fetchUsers(true);
     } catch (err) {
       setError(err.error || err.mobile_number?.[0] || err.detail || 'Failed to save user');
@@ -81,7 +81,8 @@ export default function UserMaster() {
       employee_id: user.employee_id || '',
       role: user.role,
       territory: user.territory || '',
-      reporting_manager: user.reporting_manager || ''
+      reporting_manager: user.reporting_manager || '',
+      password: ''
     });
     setShowForm(true);
     setError('');
@@ -154,7 +155,7 @@ export default function UserMaster() {
               </button>
               <button id="add-user-btn" onClick={() => {
                 setEditingUser(null);
-                setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '' });
+                setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '', password: '' });
                 setShowForm(!showForm);
                 setError('');
               }}
@@ -203,6 +204,11 @@ export default function UserMaster() {
               <label className="block text-xs font-semibold text-text-muted mb-1">Email Address</label>
               <input type="email" placeholder="email@example.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})}
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Password {editingUser ? '(leave blank to keep current)' : '*'}</label>
+              <input type="text" placeholder={editingUser ? "Unchanged" : "Secure Password"} value={form.password} onChange={e => setForm({...form, password: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" required={!editingUser} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-text-muted mb-1">Employee ID</label>
