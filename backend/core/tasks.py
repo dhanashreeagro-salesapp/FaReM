@@ -286,8 +286,8 @@ def validate_user_import(import_job_id):
     duplicate_count = 0
     error_report = []
 
-    required_columns = ['Employee ID', 'Name', 'Mobile Number', 'Designation']
-    expected_columns = required_columns + ['Territory']
+    required_columns = ['Employee ID', 'FullName', 'PrimaryMobile', 'Designation']
+    expected_columns = required_columns + ['Territory', 'Email']
     
     df = normalize_dataframe_headers(df, expected_columns)
     
@@ -313,11 +313,11 @@ def validate_user_import(import_job_id):
     existing_mobiles = set(User.objects.values_list('mobile_number', flat=True))
     existing_territories = set(Territory.objects.values_list('name', flat=True))
 
-    df['Import Status'] = 'SUCCESS'
+    df['Import Status'] = 'SUCCESS (Will be CREATED)'
 
     for index, row in df.iterrows():
         try:
-            mobile = str(row['Mobile Number']).split('.')[0].strip()
+            mobile = str(row['PrimaryMobile']).split('.')[0].strip()
             
             # Map human-readable designation to system role if necessary
             designation = str(row['Designation']).strip().lower()
@@ -331,21 +331,28 @@ def validate_user_import(import_job_id):
 
             if mobile in existing_mobiles:
                 duplicate_count += 1
-                if df.at[index, 'Import Status'] == 'SUCCESS':
-                    df.at[index, 'Import Status'] = 'DUPLICATE (Will be updated)'
+                if 'SUCCESS' in str(df.at[index, 'Import Status']):
+                    df.at[index, 'Import Status'] = 'DUPLICATE (Will be UPDATED)'
             
             # Check territory if provided
             if 'Territory' in df.columns and not pd.isna(row['Territory']):
                 t_name = str(row['Territory']).strip()
                 if t_name and t_name.lower() != 'nan' and t_name not in existing_territories:
                     existing_territories.add(t_name)
-                    if df.at[index, 'Import Status'] == 'SUCCESS':
-                        df.at[index, 'Import Status'] = f"NEW TERRITORY (Will create '{t_name}')"
+                    if 'SUCCESS' in str(df.at[index, 'Import Status']) or 'UPDATED' in str(df.at[index, 'Import Status']):
+                        df.at[index, 'Import Status'] += f" | NEW TERRITORY (Will create '{t_name}')"
 
             valid_rows += 1
         except Exception as e:
             error_count += 1
             error_report.append({"row": index + 2, "error": str(e)})
+            df.at[index, 'Import Status'] = f"ERROR: {str(e)} (Will NOT be uploaded)"
+
+    try:
+        with pd.ExcelWriter(job.filename, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+    except Exception as e:
+        pass
 
     job.total_rows = total_rows
     job.valid_rows = valid_rows
@@ -366,6 +373,11 @@ def commit_user_import(import_job_id):
         return {"status": "failed", "error": "Job not found"}
 
     df = pd.read_excel(job.filename)
+    
+    # Re-normalize just to be safe
+    expected_columns = ['Employee ID', 'FullName', 'PrimaryMobile', 'Designation', 'Territory', 'Email']
+    df = normalize_dataframe_headers(df, expected_columns)
+    
     created_count = 0
     updated_count = 0
 
@@ -385,11 +397,11 @@ def commit_user_import(import_job_id):
 
     for index, row in df.iterrows():
         try:
-            name_parts = str(row['Name']).strip().split(' ', 1)
+            name_parts = str(row['FullName']).strip().split(' ', 1)
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ''
             
-            mobile = str(row['Mobile Number']).split('.')[0].strip()
+            mobile = str(row['PrimaryMobile']).split('.')[0].strip()
             employee_id = str(row.get('Employee ID', '')).strip()
             if employee_id == 'nan' or pd.isna(row.get('Employee ID')):
                 employee_id = ''
@@ -408,6 +420,10 @@ def commit_user_import(import_job_id):
                     territory = Territory.objects.create(name=territory_name, parent_territory=None)
                     territories[territory_name] = territory
 
+            email = str(row.get('Email', '')).strip()
+            if email == 'nan' or pd.isna(row.get('Email')):
+                email = ''
+
             if mobile in existing_users:
                 user = existing_users[mobile]
                 user.first_name = first_name
@@ -415,7 +431,13 @@ def commit_user_import(import_job_id):
                 user.employee_id = employee_id
                 user.role = role
                 user.territory = territory
+                if email:
+                    user.email = email
                 user.status = 'Active'
+                
+                if territory and territory.parent_territory and territory.parent_territory.manager:
+                    user.reporting_manager = territory.parent_territory.manager
+                
                 users_to_update.append(user)
                 updated_count += 1
             else:
@@ -427,8 +449,12 @@ def commit_user_import(import_job_id):
                     employee_id=employee_id,
                     role=role,
                     territory=territory,
+                    email=email,
                     status='Active'
                 )
+                if territory and territory.parent_territory and territory.parent_territory.manager:
+                    user.reporting_manager = territory.parent_territory.manager
+                
                 users_to_create.append(user)
                 created_count += 1
         except:
@@ -437,7 +463,7 @@ def commit_user_import(import_job_id):
     if users_to_create:
         User.objects.bulk_create(users_to_create, batch_size=500)
     if users_to_update:
-        User.objects.bulk_update(users_to_update, ['first_name', 'last_name', 'employee_id', 'role', 'territory', 'status'], batch_size=500)
+        User.objects.bulk_update(users_to_update, ['first_name', 'last_name', 'employee_id', 'role', 'territory', 'email', 'status', 'reporting_manager'], batch_size=500)
 
     job.status = 'Completed'
     job.save()
