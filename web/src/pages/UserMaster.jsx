@@ -30,7 +30,9 @@ export default function UserMaster() {
   const fetchTerritories = async () => {
     try {
       const data = await api.getTerritories();
-      setTerritories(Array.isArray(data) ? data : data.results || []);
+      const territoryList = Array.isArray(data) ? data : data.results || [];
+      territoryList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setTerritories(territoryList);
     } catch { setTerritories([]); }
   };
 
