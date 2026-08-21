@@ -106,18 +106,63 @@ export default function SettingsPage() {
           <h3 className="font-heading font-semibold text-text mb-4">Gateway Credentials</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-muted mb-1">MSG91 Auth Key</label>
-              <input type="password" value={config.msg91_auth_key || ''} placeholder="Enter MSG91 auth key"
-                onChange={e => setConfig({...config, msg91_auth_key: e.target.value})}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-mono focus:ring-2 focus:ring-primary focus:outline-none" />
+              <label className="block text-sm font-medium text-text-muted mb-1">Active SMS Provider</label>
+              <select
+                value={config.active_sms_provider || 'STPL'}
+                onChange={e => setConfig({...config, active_sms_provider: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-semibold focus:ring-2 focus:ring-primary focus:outline-none"
+              >
+                <option value="STPL">STPL (Recommended)</option>
+                <option value="MSG91">MSG91</option>
+              </select>
             </div>
-            <div>
+            {config.active_sms_provider === 'STPL' ? (
+              <div className="space-y-4 p-4 border border-border rounded-lg bg-bg/50">
+                <h4 className="font-semibold text-sm">STPL Configuration</h4>
+                <div>
+                  <label className="block text-sm font-medium text-text-muted mb-1">STPL API URL</label>
+                  <input type="text" value={config.stpl_api_url || ''} placeholder="https://www.smsgatewayhub.com/api/mt/SendSMS"
+                    onChange={e => setConfig({...config, stpl_api_url: e.target.value})}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-muted mb-1">STPL API Key</label>
+                  <input type="password" value={config.stpl_api_key || ''} placeholder="Enter STPL API key"
+                    onChange={e => setConfig({...config, stpl_api_key: e.target.value})}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-mono focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-muted mb-1">Sender ID (DLT Approved)</label>
+                  <input type="text" value={config.stpl_sender_id || ''} placeholder="e.g. FRMNUI" maxLength="6"
+                    onChange={e => setConfig({...config, stpl_sender_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none uppercase" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 p-4 border border-border rounded-lg bg-bg/50">
+                <h4 className="font-semibold text-sm">MSG91 Configuration</h4>
+                <div>
+                  <label className="block text-sm font-medium text-text-muted mb-1">MSG91 Auth Key</label>
+                  <input type="password" value={config.msg91_auth_key || ''} placeholder="Enter MSG91 auth key"
+                    onChange={e => setConfig({...config, msg91_auth_key: e.target.value})}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-mono focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+              </div>
+            )}
+            <div className="pt-2 border-t border-border">
               <label className="block text-sm font-medium text-text-muted mb-1">Interakt API Key (WhatsApp)</label>
               <input type="password" value={config.interakt_api_key || ''} placeholder="Enter Interakt API key"
                 onChange={e => setConfig({...config, interakt_api_key: e.target.value})}
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface font-mono focus:ring-2 focus:ring-primary focus:outline-none" />
             </div>
             <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">Interakt Generic Template Name</label>
+              <input type="text" value={config.interakt_template_name || ''} placeholder="farmer_alert_01"
+                onChange={e => setConfig({...config, interakt_template_name: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+              <p className="text-xs text-text-muted mt-1">Default Template Name approved on DLT/Interakt for broadcast messages.</p>
+            </div>
+            <div className="pt-2 border-t border-border">
               <label className="block text-sm font-medium text-text-muted mb-1">Cloudinary URL</label>
               <input type="text" value={config.cloudinary_url || ''} placeholder="cloudinary://API_KEY:API_SECRET@CLOUD_NAME"
                 onChange={e => setConfig({...config, cloudinary_url: e.target.value})}

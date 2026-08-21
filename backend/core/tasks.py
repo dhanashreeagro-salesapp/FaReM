@@ -1,5 +1,6 @@
 from celery import shared_task
 import pandas as pd
+import requests
 from .models import Farmer, User, SystemAuditLog
 import io
 
@@ -495,22 +496,74 @@ def create_audit_log_async(entity_type, entity_id, field_changed, old_value, new
         action_type=action_type
     )
 
+def __send_notification__(channel, mobile_number, text_content, custom_template=None):
+    from .models import AppConfiguration
+    config = AppConfiguration.get_config()
+    success = False
+    
+    if not str(mobile_number).startswith('+'):
+        mobile_number = f"+91{mobile_number}" if len(str(mobile_number)) == 10 else str(mobile_number)
+
+    try:
+        mobile_clean = str(mobile_number).replace('+91', '').replace('+', '')
+        if channel == 'WhatsApp' and config.interakt_api_key:
+            headers = {
+                'Authorization': f'Basic {config.interakt_api_key}',
+                'Content-Type': 'application/json'
+            }
+            template_name = custom_template or config.interakt_template_name or 'farmer_alert_01'
+            payload = {
+                "countryCode": "+91",
+                "phoneNumber": mobile_clean,
+                "type": "Template",
+                "template": {
+                    "name": template_name,
+                    "languageCode": "en",
+                    "bodyValues": [text_content[:1024]]
+                }
+            }
+            resp = requests.post("https://api.interakt.ai/v1/public/message/", json=payload, headers=headers, timeout=10)
+            success = resp.status_code in [200, 201, 202]
+
+        elif channel == 'SMS':
+            if getattr(config, 'active_sms_provider', 'STPL') == 'STPL' and config.stpl_api_key:
+                url = config.stpl_api_url or "https://www.smsgatewayhub.com/api/mt/SendSMS"
+                params = {
+                    "APIKey": config.stpl_api_key,
+                    "senderid": config.stpl_sender_id or "FRMNUI",
+                    "channel": "2",
+                    "DCS": "0",
+                    "flashsms": "0",
+                    "number": mobile_clean,
+                    "text": text_content,
+                    "route": "1"
+                }
+                resp = requests.get(url, params=params, timeout=10)
+                success = resp.status_code == 200
+            elif config.msg91_auth_key:
+                headers = {'authkey': config.msg91_auth_key, 'content-type': 'application/json'}
+                payload = {
+                    "sender": "FRMNUI",
+                    "route": "4",
+                    "country": "91",
+                    "sms": [{"message": text_content, "to": [mobile_clean]}]
+                }
+                resp = requests.post("https://api.msg91.com/api/v2/sendsms", json=payload, headers=headers, timeout=10)
+                success = resp.status_code == 200
+    except Exception as e:
+        print("Notification Error:", e)
+        success = False
+
+    return success
+
 @shared_task
 def dispatch_recommendation_msg(recommendation_id):
     from .models import Recommendation
     try:
         rec = Recommendation.objects.get(id=recommendation_id)
         
-        # Determine the channel and dispatch to respective API
-        # Mocking the external API calls
-        success = True
-        
-        if rec.channel == 'WhatsApp':
-            # Call Interakt API
-            pass
-        elif rec.channel == 'SMS':
-            # Call MSG91 API
-            pass
+        text = f"Recommendation: {rec.product_name} at {rec.dose} {rec.dose_unit} for {rec.crop.name if rec.crop else 'crop'}."
+        success = __send_notification__(rec.channel, rec.farmer.primary_mobile, text)
             
         rec.send_status = 'Delivered' if success else 'Failed'
         rec.save(update_fields=['send_status'])
@@ -639,10 +692,28 @@ def execute_bulk_send_batch(batch_id):
         
         sent = 0
         failed = 0
+        
+        # Gather text content or template
+        template_name = None
+        if batch.channel == 'WhatsApp':
+            template_name = batch.content.whatsapp_template
+        elif batch.channel == 'SMS':
+            template_name = batch.content.sms_template
+            
+        text_content = getattr(batch.content, 'title', 'New Promotion from Dhanashree Crop Solutions')
+        
+        from .models import Farmer
         # Iterate over farmer_ids
         for farmer_id in batch.farmer_ids:
-            # Mock success for now
-            sent += 1
+            try:
+                farmer = Farmer.objects.get(id=farmer_id)
+                succ = __send_notification__(batch.channel, farmer.primary_mobile, text_content, custom_template=template_name)
+                if succ:
+                    sent += 1
+                else:
+                    failed += 1
+            except Farmer.DoesNotExist:
+                failed += 1
             
         batch.sent_count += sent
         batch.failed_count += failed

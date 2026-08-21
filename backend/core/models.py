@@ -486,8 +486,13 @@ class AppConfiguration(models.Model):
     planner_refresh_hour = models.IntegerField(default=6, help_text='Hour (0-23) when daily smart planner refreshes')
     visit_radius_meters = models.IntegerField(default=150, help_text='Maximum distance in meters for verified visit')
     gps_validation_mode = models.CharField(max_length=20, choices=[('Strict', 'Strict'), ('Warning', 'Warning')], default='Warning', help_text='Strict blocks save outside radius; Warning flags visit and permits save')
+    active_sms_provider = models.CharField(max_length=20, choices=[('MSG91', 'MSG91'), ('STPL', 'STPL')], default='STPL')
     msg91_auth_key = models.CharField(max_length=255, blank=True, null=True)
+    stpl_api_url = models.CharField(max_length=500, blank=True, null=True, default='https://www.smsgatewayhub.com/api/mt/SendSMS')
+    stpl_api_key = models.CharField(max_length=255, blank=True, null=True)
+    stpl_sender_id = models.CharField(max_length=20, blank=True, null=True)
     interakt_api_key = models.CharField(max_length=255, blank=True, null=True)
+    interakt_template_name = models.CharField(max_length=255, blank=True, null=True, default='farmer_alert_01', help_text='Default generic template name for WhatsApp broadcasts')
     cloudinary_url = models.CharField(max_length=500, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 

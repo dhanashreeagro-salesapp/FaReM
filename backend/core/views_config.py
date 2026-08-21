@@ -10,7 +10,8 @@ class AppConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppConfiguration
         fields = ['visit_frequency_norm_days', 'planner_refresh_hour', 'visit_radius_meters', 'gps_validation_mode',
-                  'msg91_auth_key', 'interakt_api_key', 'cloudinary_url', 'updated_at']
+                  'active_sms_provider', 'msg91_auth_key', 'stpl_api_url', 'stpl_api_key', 'stpl_sender_id', 
+                  'interakt_api_key', 'interakt_template_name', 'cloudinary_url', 'updated_at']
         read_only_fields = ['updated_at']
 
 
