@@ -12,6 +12,7 @@ class VisitPhotoSerializer(serializers.ModelSerializer):
 
 class FieldVisitSerializer(serializers.ModelSerializer):
     photos = VisitPhotoSerializer(many=True, read_only=True)
+    notes = serializers.CharField(max_length=3000, required=False, allow_blank=True, allow_null=True)
     farmer_name = serializers.CharField(source='farmer.full_name', read_only=True)
     farmer_mobile = serializers.CharField(source='farmer.primary_mobile', read_only=True)
     farmer_village = serializers.CharField(source='farmer.village', read_only=True)

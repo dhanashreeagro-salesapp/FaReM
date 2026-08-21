@@ -392,13 +392,14 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-xs font-semibold text-text">Visit Notes & Observations</label>
-            <span className={`text-[11px] ${notes.length < 10 ? 'text-amber-600' : 'text-emerald-600'}`}>
+            <span className={`text-[11px] ${notes.length < 10 || notes.length > 3000 ? 'text-danger' : 'text-emerald-600'}`}>
               {notes.length} / 3000 chars (Min 10)
             </span>
           </div>
           <textarea
             rows={3}
             value={notes}
+            maxLength={3000}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Record observations, crop growth status, pest issues, or recommendations discussed..."
             className="w-full p-3 bg-bg border border-border rounded-xl text-sm text-text focus:ring-2 focus:ring-primary/20 outline-none resize-none"
@@ -444,7 +445,7 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
           </button>
           <button
             type="button"
-            disabled={loading || notes.length < 10}
+            disabled={loading || notes.length < 10 || notes.length > 3000}
             onClick={handleSaveVisit}
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all cursor-pointer"
           >

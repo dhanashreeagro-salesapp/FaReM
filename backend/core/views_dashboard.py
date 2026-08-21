@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.core.cache import cache
-from .models import Farmer, User, ActivityLog, Role, Plot, CropSeason, Recommendation
+from .models import Farmer, User, ActivityLog, FieldVisit, CallLog, Role, Plot, CropSeason, Recommendation
 
 from django.http import HttpResponse
 
@@ -105,13 +105,8 @@ class DashboardAPIView(APIView):
 
         data['total_farmers'] = len(farmer_ids)
 
-        # Single aggregate query for visits and calls
-        act_stats = ActivityLog.objects.filter(farmer_id__in=farmer_ids).aggregate(
-            total_visits=Count('id', filter=Q(activity_type='Visit')),
-            total_calls=Count('id', filter=Q(activity_type='Call'))
-        )
-        data['total_visits'] = act_stats['total_visits'] or 0
-        data['total_calls'] = act_stats['total_calls'] or 0
+        data['total_visits'] = FieldVisit.objects.filter(farmer_id__in=farmer_ids).count()
+        data['total_calls'] = CallLog.objects.filter(farmer_id__in=farmer_ids).count()
         
         # Monthly / YTD farmer counts with robust fallback
         try:
@@ -144,8 +139,8 @@ class DashboardAPIView(APIView):
             threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
             cutoff_date = today_date - datetime.timedelta(days=threshold_days)
 
-            recent_visited_farmer_ids = set(ActivityLog.objects.filter(
-                farmer_id__in=farmer_ids, activity_type='Visit', date__gte=cutoff_date
+            recent_visited_farmer_ids = set(FieldVisit.objects.filter(
+                farmer_id__in=farmer_ids, created_at__gte=cutoff_date
             ).values_list('farmer_id', flat=True))
 
             overdue_count = len(set(farmer_ids) - recent_visited_farmer_ids)
@@ -247,8 +242,6 @@ class DashboardAPIView(APIView):
                     })
         data['market_trends'] = market_trends
 
-        cache_key = f"dashboard_data_{user.id}"
-        cache.set(cache_key, data, 60)
         return Response(data)
 
 
