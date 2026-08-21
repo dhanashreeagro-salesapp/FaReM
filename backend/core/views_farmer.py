@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from .models import Farmer, Role
+from .models import Farmer, Role, User
 from .serializers_farmer import FarmerSerializer
 from .permissions import IsAdminUser
 from django.db.models import Q
@@ -153,9 +153,15 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 pass
 
         primary_mobile = str(request.data.get('primary_mobile', '')).strip()
+        full_name = str(request.data.get('full_name', '')).strip()
         
-        # If farmer with this mobile number already exists, update details and assign to current user
-        existing_farmer = Farmer.objects.filter(primary_mobile=primary_mobile).first() if primary_mobile else None
+        # If farmer with this mobile number OR exact same name already exists, update details and assign
+        existing_farmer = None
+        if primary_mobile:
+            existing_farmer = Farmer.objects.filter(primary_mobile=primary_mobile).first()
+        if not existing_farmer and full_name:
+            existing_farmer = Farmer.objects.filter(full_name__iexact=full_name).first()
+            
         if existing_farmer:
             serializer = self.get_serializer(existing_farmer, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)

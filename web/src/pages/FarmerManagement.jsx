@@ -40,7 +40,7 @@ export default function FarmerManagement() {
   // Search & Filter State
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [filterPinCode, setFilterPinCode] = useState('');
-  const [filterVillage, setFilterVillage] = useState('');
+  const [filterVillage, setFilterVillage] = useState(searchParams.get('village') || '');
   const [filterTaluka, setFilterTaluka] = useState('');
   const [filterDistrict, setFilterDistrict] = useState('');
   const [filterTerritory, setFilterTerritory] = useState('');
@@ -725,9 +725,9 @@ export default function FarmerManagement() {
                                                 </span>
                                               </div>
                                               <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
-                                                <a href={`tel:${f.primary_mobile}`} className="p-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1">
+                                                <button onClick={() => setSelectedFarmerForCall(f)} className="p-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center gap-1">
                                                   <PhoneCall size={13} /> Call
-                                                </a>
+                                                </button>
                                                 <button onClick={() => setSelectedFarmerForVisit(f)} className="p-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 flex items-center gap-1">
                                                   <MapPin size={13} /> Visit
                                                 </button>
@@ -790,9 +790,9 @@ export default function FarmerManagement() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                  <a href={`tel:${f.primary_mobile}`} className="flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100">
+                  <button onClick={() => setSelectedFarmerForCall(f)} className="flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100">
                     <PhoneCall size={14} /> Call
-                  </a>
+                  </button>
                   <button onClick={() => setSelectedFarmerForVisit(f)} className="flex items-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-semibold hover:bg-purple-100">
                     <MapPin size={14} /> Visit
                   </button>
@@ -810,7 +810,7 @@ export default function FarmerManagement() {
       {viewMode === 'flat' && (
         <div className="card overflow-hidden">
           {/* Desktop Data Table */}
-          <div className="hidden md:block">
+          <div className="hidden md:block w-full overflow-x-auto border border-border rounded-xl">
             <table className="data-table">
               <thead>
                 <tr>
@@ -958,9 +958,9 @@ export default function FarmerManagement() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                  <a href={`tel:${farmer.primary_mobile}`} className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <button onClick={() => setSelectedFarmerForCall(farmer)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold min-h-[44px]">
                     <PhoneCall size={14} /> Call
-                  </a>
+                  </button>
                   <a href={`https://wa.me/91${farmer.primary_mobile}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold min-h-[44px]">
                     <MessageSquare size={14} /> WhatsApp
                   </a>

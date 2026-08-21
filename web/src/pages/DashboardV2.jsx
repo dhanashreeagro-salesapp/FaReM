@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import api from '../services/api';
 import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const GIT_SHA = 'bd393dc';
 
 export default function DashboardV2() {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
 
   // Single State Container
   const [loading, setLoading] = useState(true);
@@ -244,7 +246,11 @@ export default function DashboardV2() {
                   {data.top_villages && data.top_villages.length > 0 ? (
                     <div className="space-y-2.5">
                       {data.top_villages.map((v, i) => (
-                        <div key={i} className="flex justify-between items-center p-2.5 bg-bg/60 rounded-xl text-xs">
+                        <div 
+                          key={i} 
+                          onClick={() => navigate(`/farmers?village=${encodeURIComponent(v.village)}`)}
+                          className="flex justify-between items-center p-2.5 bg-bg/60 rounded-xl text-xs hover:bg-bg cursor-pointer transition-colors"
+                        >
                           <span className="font-semibold text-text">{v.village}</span>
                           <span className="px-2.5 py-1 bg-primary/10 text-primary font-bold rounded-lg">
                             {v.count} Farmers
@@ -287,7 +293,7 @@ export default function DashboardV2() {
 
       {/* TAB 2: ORG HIERARCHY TREE */}
       {activeTab === 'hierarchy' && (
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-5">
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-5 overflow-x-auto w-full">
           <h3 className="text-base font-heading font-bold text-text flex items-center gap-2">
             <Layers size={18} className="text-primary" /> Organization Hierarchy Tree
           </h3>
