@@ -14,6 +14,7 @@ class Role(models.TextChoices):
     ZONAL_MANAGER = 'ZonalManager', 'Zonal Manager'
     ADMIN = 'Admin', 'Admin'
     CONTENT_TEAM = 'ContentTeam', 'Content Team'
+    CONTENT_ADMIN = 'ContentAdmin', 'Content Admin'
 
 class Status(models.TextChoices):
     ACTIVE = 'Active', 'Active'
@@ -508,4 +509,67 @@ class AppConfiguration(models.Model):
     class Meta:
         verbose_name = 'App Configuration'
         verbose_name_plural = 'App Configuration'
+
+
+# --- Addendum 1 & 2 Models ---
+
+class RouteCorridor(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    staff = models.ForeignKey(User, on_delete=models.CASCADE, related_name='route_corridors')
+    name = models.CharField(max_length=255)
+    start_location = gis_models.PointField(null=True, blank=True)
+    end_location = gis_models.PointField(null=True, blank=True)
+    route_polyline = gis_models.LineStringField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class ContentTeamSend(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='content_sends')
+    content = models.ForeignKey(PromotionLibrary, on_delete=models.CASCADE)
+    sent_by_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    channel = models.CharField(max_length=20, default='Internal')
+
+class WeatherRiskRule(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    crop = models.ForeignKey(CropMaster, on_delete=models.CASCADE)
+    stage = models.ForeignKey(CropStage, on_delete=models.CASCADE, null=True, blank=True)
+    condition_type = models.CharField(max_length=100) # e.g. "Rainfall", "Temperature"
+    threshold_value = models.DecimalField(max_digits=10, decimal_places=2)
+    operator = models.CharField(max_length=10) # e.g. ">", "<", "=="
+    advisory_message = models.TextField()
+
+class WeatherSnapshot(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    plot = models.ForeignKey(Plot, on_delete=models.CASCADE, related_name='weather_snapshots')
+    captured_at = models.DateTimeField(auto_now_add=True)
+    temperature = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    rainfall_mm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    forecast_summary = models.TextField(blank=True, null=True)
+    provider = models.CharField(max_length=100, default='IMD')
+
+class MarketPriceImportBatch(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    imported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+    filename = models.CharField(max_length=255)
+    records_processed = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, choices=[('Success', 'Success'), ('Failed', 'Failed')], default='Success')
+
+class MarketPriceRecord(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    import_batch = models.ForeignKey(MarketPriceImportBatch, on_delete=models.CASCADE, related_name='records')
+    date = models.DateField()
+    market_name = models.CharField(max_length=255)
+    commodity_name = models.CharField(max_length=255) # Maps to CropMaster if available
+    crop = models.ForeignKey(CropMaster, on_delete=models.SET_NULL, null=True, blank=True)
+    modal_price = models.DecimalField(max_digits=10, decimal_places=2)
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('date', 'market_name', 'commodity_name')
+        indexes = [
+            models.Index(fields=['commodity_name', 'date']),
+        ]
 

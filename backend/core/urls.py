@@ -20,8 +20,11 @@ from . import views_visit
 from . import views_call
 from . import views_timeline
 from . import views_sync
+from . import views_market
+from . import views_route
 
 router = DefaultRouter()
+router.register(r'route-corridors', views_route.RouteCorridorViewSet, basename='route-corridors')
 router.register(r'users', views_users.UserViewSet, basename='users')
 router.register(r'territories', views_territory.TerritoryViewSet, basename='territories')
 router.register(r'crops', views_crop.CropMasterViewSet, basename='crops')
@@ -68,6 +71,9 @@ urlpatterns = [
     path('field-visits', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('field_visits/', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('field_visits', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
+    path('market/import/', views_market.MarketDataImportView.as_view(), name='market_import'),
+    path('market/snapshot/', views_market.MarketSnapshotView.as_view(), name='market_snapshot'),
+    path('route/big-farmers/', views_route.BigFarmerDirectoryView.as_view(), name='big_farmers'),
     path('', include(router.urls)),
 ]
 

@@ -286,6 +286,42 @@ export default function DashboardV2() {
 
               </div>
 
+              {/* Market Intelligence Snapshot Widget */}
+              <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4 col-span-1 md:col-span-2">
+                  <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-heading font-bold text-text flex items-center gap-2">
+                        <Award size={16} className="text-primary" /> Market Intelligence Snapshot
+                      </h3>
+                      <button 
+                          onClick={() => navigate('/market-intelligence')}
+                          className="text-xs text-primary font-bold hover:underline flex items-center"
+                      >
+                          View Full Dashboard <ChevronRight size={14} />
+                      </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* For MVP Dashboard view, using static data. In full version, fetch from /market/snapshot/ */}
+                      <div className="p-3 bg-bg/60 rounded-xl">
+                        <p className="text-xs text-text-muted font-semibold">Grapes</p>
+                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
+                            ₹120 <span className="text-success text-[10px] bg-success/10 px-2 py-0.5 rounded-full">5.2% ↑</span>
+                        </p>
+                      </div>
+                      <div className="p-3 bg-bg/60 rounded-xl">
+                        <p className="text-xs text-text-muted font-semibold">Pomegranate</p>
+                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
+                            ₹150 <span className="text-danger text-[10px] bg-danger/10 px-2 py-0.5 rounded-full">-2.1% ↓</span>
+                        </p>
+                      </div>
+                      <div className="p-3 bg-bg/60 rounded-xl">
+                        <p className="text-xs text-text-muted font-semibold">Tomato</p>
+                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
+                            ₹40 <span className="text-success text-[10px] bg-success/10 px-2 py-0.5 rounded-full">15.0% ↑</span>
+                        </p>
+                      </div>
+                  </div>
+              </div>
+
             </div>
           )}
         </>

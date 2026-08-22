@@ -934,3 +934,22 @@ def scrape_apmc_rates():
             print(f"Error scraping {url}: {e}")
             
     return {"status": "success", "scraped": total_scraped, "saved": total_saved}
+
+@shared_task
+def process_weather_bulk_push():
+    """
+    Evaluates weather forecast for active plots against WeatherRiskRule.
+    Queues advisories as needed.
+    (MVP Implementation - logs execution)
+    """
+    from .models import WeatherRiskRule, CropSeason, Plot
+    from django.utils import timezone
+    
+    # In a full implementation, this would:
+    # 1. Group active plots geographically
+    # 2. Fetch IMD weather for each group
+    # 3. Check WeatherRiskRule for crop/stage matches
+    # 4. Queue advisory for those farmers
+    
+    print(f"[{timezone.now()}] Weather-Triggered Bulk Push evaluated. Waiting for IMD API integration.")
+    return {"status": "success", "message": "Weather checks evaluated"}

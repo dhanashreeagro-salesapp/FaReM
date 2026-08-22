@@ -13,6 +13,7 @@ const navItems = [
   { path: '/recommendations-dashboard', label: 'Recommendation Engine', icon: Award, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam'] },
   { path: '/promotions-management', label: 'Promotions Management', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
+  { path: '/market-intelligence', label: 'Market Intelligence', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Admin'] },
   { path: '/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];

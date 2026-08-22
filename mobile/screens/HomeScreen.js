@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import api from '../services/api';
 import { theme } from '../theme';
 import { syncOfflineData } from '../services/sync';
+import * as Location from 'expo-location';
 
 export default function HomeScreen({ navigation }) {
   const [data, setData] = useState(null);
@@ -24,6 +25,28 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     fetchData();
+    
+    // MVP Geo-Fencing & Proximity Logic (Foreground)
+    let locationSubscription;
+    (async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+            locationSubscription = await Location.watchPositionAsync(
+                { accuracy: Location.Accuracy.Balanced, timeInterval: 30000, distanceInterval: 100 },
+                (loc) => {
+                    // Logic to check proximity to planned visits and trigger pop-up
+                    // Example: if distance < 500m, show advisory/promotion popup
+                    console.log("Foreground location update:", loc.coords);
+                }
+            );
+        }
+    })();
+    
+    return () => {
+        if (locationSubscription) {
+            locationSubscription.remove();
+        }
+    };
   }, []);
 
   const onRefresh = () => {
@@ -58,6 +81,15 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.statNumber}>{data?.summary?.pending_visits || 0}</Text>
           <Text style={styles.statLabel}>Pending</Text>
         </View>
+      </View>
+      
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('RoutePlanner')}>
+          <Text style={styles.actionBtnText}>📍 Route Planner</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('BigFarmerDirectory', { village: 'Sinnar' })}>
+          <Text style={styles.actionBtnText}>🏆 Village Insights</Text>
+        </TouchableOpacity>
       </View>
       
       <Text style={styles.sectionTitle}>Today's Smart Plan</Text>
@@ -110,5 +142,8 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 10, fontFamily: theme.fonts.heading, fontWeight: 'bold' },
   farmerDetail: { fontSize: 14, fontFamily: theme.fonts.body, color: theme.colors.textMuted, marginBottom: 4 },
   emptyContainer: { padding: 40, alignItems: 'center' },
-  emptyText: { fontFamily: theme.fonts.body, color: theme.colors.textMuted }
+  emptyText: { fontFamily: theme.fonts.body, color: theme.colors.textMuted },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 20 },
+  actionBtn: { flex: 1, backgroundColor: theme.colors.surface, padding: 12, borderRadius: 8, marginHorizontal: 4, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3 },
+  actionBtnText: { fontFamily: theme.fonts.heading, fontSize: 13, color: theme.colors.primary, fontWeight: 'bold' }
 });

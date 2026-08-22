@@ -11,6 +11,8 @@ import HomeScreen from './screens/HomeScreen';
 import FarmerProfile from './screens/FarmerProfile';
 import LoginScreen from './screens/LoginScreen';
 import LogVisitScreen from './screens/LogVisitScreen';
+import RoutePlannerScreen from './screens/RoutePlannerScreen';
+import BigFarmerDirectoryScreen from './screens/BigFarmerDirectoryScreen';
 import { initDatabase } from './services/database';
 import { theme } from './theme';
 
@@ -63,6 +65,8 @@ export default function App() {
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'FFMA Dashboard' }} />
             <Stack.Screen name="FarmerProfile" component={FarmerProfile} options={{ title: 'Farmer Profile' }} />
             <Stack.Screen name="LogVisit" component={LogVisitScreen} options={{ title: 'Log Visit' }} />
+            <Stack.Screen name="RoutePlanner" component={RoutePlannerScreen} options={{ title: 'Route Planner' }} />
+            <Stack.Screen name="BigFarmerDirectory" component={BigFarmerDirectoryScreen} options={{ title: 'Village Insights' }} />
           </>
         )}
       </Stack.Navigator>
