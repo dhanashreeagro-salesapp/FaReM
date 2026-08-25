@@ -130,6 +130,7 @@ export default function UserMaster() {
     ZonalManager: 'bg-indigo-100 text-indigo-800',
     Admin: 'bg-green-100 text-green-800',
     ContentTeam: 'bg-orange-100 text-orange-800',
+    ContentAdmin: 'bg-red-100 text-red-800',
   };
 
   return (
@@ -226,6 +227,7 @@ export default function UserMaster() {
                 <option value="ZonalManager">Zonal Manager</option>
                 <option value="Admin">Admin</option>
                 <option value="ContentTeam">Content Team</option>
+                <option value="ContentAdmin">Content Admin</option>
               </select>
             </div>
             <div>

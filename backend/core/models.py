@@ -495,6 +495,7 @@ class AppConfiguration(models.Model):
     interakt_api_key = models.CharField(max_length=255, blank=True, null=True)
     interakt_template_name = models.CharField(max_length=255, blank=True, null=True, default='farmer_alert_01', help_text='Default generic template name for WhatsApp broadcasts')
     cloudinary_url = models.CharField(max_length=500, blank=True, null=True)
+    content_admin_weekly_promotion_limit = models.IntegerField(default=2, help_text='Maximum promotions a farmer can receive per week from the Content Team')
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):

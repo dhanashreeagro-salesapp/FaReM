@@ -1,0 +1,30 @@
+﻿b6aab8f | 2026-08-22 | Fix UI card component build error
+7e68603 | 2026-08-22 | feat: Addendum 1 and 2 implementation (Route Planner, Market Intelligence, Geo-Fencing, etc.)
+15e446c | 2026-08-21 | feat(ui): optimize iphone usability, dashboard drilldown, call-log sync
+a263a9d | 2026-08-21 | fix(dashboard): resolve QA defects for visits, calls, and overdue calculations
+7a6b956 | 2026-08-21 | feat: integrate STPL and Interakt APIs for notifications
+3ab391c | 2026-08-20 | feat: Sort territories alphabetically in user creation form
+b301fa4 | 2026-08-19 | feat: Add password management and fix crop thumbnail routing
+3b1ab1f | 2026-08-19 | Fix syntax for User Role choices in bulk import
+e02e95e | 2026-08-19 | Add Email to user import template download
+97356aa | 2026-08-19 | Fix user import missing columns and add Email support
+a72092c | 2026-08-19 | Fix Admin Territory Management and Bulk Import bugs
+8c45f74 | 2026-08-18 | feat(web): add show password toggle to login screen
+6269885 | 2026-08-18 | fix(backend): comment out locked_until check to fully disable lockouts
+c4a607c | 2026-08-18 | fix(backend): disable incorrect password locking feature for testing phase
+e37407b | 2026-08-17 | fix(web): properly respect VITE_API_URL instead of hardcoding render backend
+187861b | 2026-08-17 | Fix memory overflow and 502 Bad Gateway during dashboard load by avoiding massive id__in queries
+790a056 | 2026-08-17 | Map dashboard route back to Dashboard.jsx
+6d557a6 | 2026-08-17 | Update dashboard data loading fixes
+e818139 | 2026-08-17 | fix(dashboard): remove debug info, fix CORS headers, fix hierarchy array mapping
+5c39d27 | 2026-08-11 | Fix CORS preflight headers and update getFarmers to direct network fetch
+767318d | 2026-08-11 | Optimize FarmerViewSet and HierarchyAPIView to eliminate N+1 queries and subquery timeouts
+92e7f98 | 2026-08-11 | Add 60s in-memory process caching for user and territory trees
+857bd45 | 2026-08-11 | Add exception safety fallback to date aggregations in views_dashboard.py
+181f995 | 2026-08-11 | Optimize DashboardAPIView and tree traversal to minimize DB roundtrips
+cf0ed62 | 2026-08-11 | Optimize DashboardAPIView query performance to 0.038s eliminating N+1 and subqueries
+4de70b2 | 2026-08-11 | Deploy DashboardV2 deterministic component architecture
+bd393dc | 2026-08-11 | Add explicit field-visits URL patterns to backend/core/urls.py
+fa7aa5f | 2026-08-11 | Remove shadowing path definitions for field-visits endpoint in core/urls.py
+97eefb7 | 2026-08-11 | Fix NameError: import Q in views_visit.py for field visits endpoint
+8068176 | 2026-08-11 | Optimize overdue_visits calculation query to eliminate dashboard API load timeout

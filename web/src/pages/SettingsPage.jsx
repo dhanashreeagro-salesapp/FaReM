@@ -64,6 +64,20 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Content & Promotion Governance */}
+        <div className="card p-6 animate-stagger-in" style={{ animationDelay: '15ms' }}>
+          <h3 className="font-heading font-semibold text-text mb-4">Content & Promotion Governance</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">Weekly Content Admin Promotion Limit</label>
+              <input type="number" min="1" max="50" value={config.content_admin_weekly_promotion_limit || 2}
+                onChange={e => setConfig({...config, content_admin_weekly_promotion_limit: parseInt(e.target.value)})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+              <p className="text-xs text-text-muted mt-1">Maximum number of centralized promotions a farmer can receive per week.</p>
+            </div>
+          </div>
+        </div>
+
         {/* GPS & Location Validation Settings */}
         <div className="card p-6 animate-stagger-in" style={{ animationDelay: '30ms' }}>
           <h3 className="font-heading font-semibold text-text mb-4">GPS Proximity & Visit Validation Settings</h3>

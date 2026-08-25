@@ -48,6 +48,23 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
                 
             farmer_ids = list(farmers.values_list('id', flat=True))
             
+        if user.role in [Role.CONTENT_ADMIN, Role.CONTENT_TEAM]:
+            from django.utils import timezone
+            import datetime
+            from django.db.models import Count
+            from .models import ContentTeamSend, AppConfiguration
+            
+            limit = AppConfiguration.get_config().content_admin_weekly_promotion_limit
+            cutoff = timezone.now() - datetime.timedelta(days=7)
+            
+            over_limit_farmers = ContentTeamSend.objects.filter(
+                sent_at__gte=cutoff
+            ).values('farmer_id').annotate(
+                count=Count('id')
+            ).filter(count__gte=limit).values_list('farmer_id', flat=True)
+            
+            farmer_ids = [fid for fid in farmer_ids if fid not in over_limit_farmers]
+            
         batch = serializer.save(
             created_by_user=user,
             farmer_ids=farmer_ids,

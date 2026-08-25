@@ -702,7 +702,9 @@ def execute_bulk_send_batch(batch_id):
             
         text_content = getattr(batch.content, 'title', 'New Promotion from Dhanashree Crop Solutions')
         
-        from .models import Farmer
+        from .models import Farmer, Role, ContentTeamSend
+        is_content_admin = batch.created_by_user.role in [Role.CONTENT_ADMIN, Role.CONTENT_TEAM]
+        
         # Iterate over farmer_ids
         for farmer_id in batch.farmer_ids:
             try:
@@ -710,6 +712,13 @@ def execute_bulk_send_batch(batch_id):
                 succ = __send_notification__(batch.channel, farmer.primary_mobile, text_content, custom_template=template_name)
                 if succ:
                     sent += 1
+                    if is_content_admin:
+                        ContentTeamSend.objects.create(
+                            farmer=farmer,
+                            content=batch.content,
+                            sent_by_user=batch.created_by_user,
+                            channel=batch.channel
+                        )
                 else:
                     failed += 1
             except Farmer.DoesNotExist:

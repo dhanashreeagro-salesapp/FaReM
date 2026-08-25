@@ -1,0 +1,87 @@
+📋 ADDENDUM — Combined Feature Enhancements (Addendum 1 + Addendum 2)
+Dhanashree Crop Solutions — Field Force Mobile Application
+Extends: DhanashreeMasterPlans.docx (Module 1 – Crop Master, Module 2 – Farmer Master, Module 3 – Sales Person, Module 4 – Regional Manager & Back-end)   |   Reference: Product Recommendation & Feature Specification
+This file combines all feature enhancements requested after the original Product Recommendation Document, in two batches: Addendum 1 (Sections 10.1–10.5) and Addendum 2 (Sections 10.6–10.8). Numbering continues the master document's structure so this can be included directly in the schema reference alongside the four master plans (Crop Master, Farmer Master, Sales Person Master, Regional Manager & Back-end Plan).
+Addendum 1 — Route Planning, Big Farmer Directory, Auto Pop-Up & Content Admin
+The following four enhancements were requested after the initial recommendation and are appended as new sub-modules 10.1–10.5. They extend Module 2 (Farmer Master), Module 3 (Sales Person), and Module 4 (Regional Manager & Back-end Team), and introduce a new content-governance role.
+10.1 Farmer-wise Route Plan (Location-to-Location Journey Planning)
+Purpose: When a field staff member travels from one location to another (e.g. Nashik to Sinnar), the app should plan the route and surface every farmer, plot, crop, and growth stage that falls along or near that route — turning a routine commute into a productive visit itinerary.
+10.1.1 Route Planning Fields
+Recommendation: Build this as a map-first screen — draw the route line from start to end, overlay farmer-plot pins colour-coded by overdue days, and list plots in a scrollable panel below the map showing crop, stage, and acreage. Let staff filter the corridor by crop and crop stage before planning stops, and let the corridor radius be configurable per territory since road density varies. Offline note: route calculation requires connectivity, but once a route plan is generated it should cache the farmer list, plot locations, and crop/stage data locally so staff can view and log visits offline while travelling.
+10.2 “Top / Big Farmer” Identification in a Village (Acreage-Ranked Directory)
+Purpose: When a field staff member is visiting or planning to visit a village, they should be able to instantly see which farmers in that village hold the largest cultivated acreage — the highest-value relationships to prioritise — with filters to narrow the list.
+10.2.1 Big Farmer Directory Fields
+Recommendation: Surface this as a “Village Insights” tab: staff selects (or is auto-located into) a village, and the app shows a ranked, filterable list — biggest farmer first. Combine all four filters (crop, acreage, stage, location) so staff can, for example, find “grape farmers in Sinnar village, above 3 acres, currently in flowering stage” in a few taps. This directly supports prioritising high-acreage farmers for visits, recommendations, and promotional pushes.
+10.3 Location-Aware Automatic Promotion Pop-Up
+Purpose: Extend the existing Digital Promotion Library and content-suggestion engine (see 2.3 and 2.11) so that relevant content surfaces automatically and proactively the moment a field staff member is physically at or opens a matching farmer/plot — not just when they manually search the library.
+10.3.1 Auto-Pop-Up Behaviour
+Recommendation: This is a proactive layer on top of the existing suggestion engine (2.3/2.11) — the current design shows suggestions when staff opens a farmer; this addendum makes it also trigger on geo-arrival at the plot, so staff are prompted even before they manually open the record, useful when walking a village and moving farmer to farmer.
+10.4 Content Admin Role & Governed Promotion Push
+Purpose: Introduce a dedicated Content Admin role that centrally controls what promotional content reaches the sales team and, in turn, what the sales team can forward to farmers — with full traceability and a built-in frequency cap to avoid over-messaging farmers.
+10.4.1 Content Admin — Role & Permissions
+10.4.2 Per-Farmer Messaging Frequency Cap
+Recommendation: Keep the cap independent of field-staff-initiated sends (2.11) — the 2-per-week limit applies specifically to the centrally-pushed Content Team channel, so a farmer can still receive individual recommendations from their assigned field staff without those counting against the Content Team's cap. RBAC Update: Update the Role-Based Access Control table (4.2) to add Content Admin — access to the full Promotion Library, audience targeting tools (crop/stage/region/weather), and push analytics; no access to farmer visit/call logs beyond what is needed to confirm delivery.
+10.5 Summary of Addendum 1 Additions
+These additions should be reflected in the database schema (new tables/fields for route corridors, acreage aggregation views, geo-trigger rules, and a content_team_sends table with a rolling-week counter) and included in the Phase 2 and Phase 3 roadmap items (Section 7), since route planning and the big-farmer directory depend on Farmer/Plot data already scoped for Phase 1, while the Content Admin role and governed push logic extend the Phase 2 promotions work.
+Addendum 2 — Weather Advisory & Market Price Intelligence Enhancements
+Two further enhancements were requested after Addendum 1 and are appended here as new sub-modules 10.6 and 10.7. Numbering continues the master document's structure for direct inclusion in the schema reference.
+10.6 Location-Aware Weather Advisory Pop-Up (Current Visit Weather & Forecast)
+Purpose: While a field staff member is at or near a farmer's geotagged plot, the app should automatically pull the current weather and short-range forecast for that exact location, match it against crop + growth-stage risk rules, and surface a ready-to-send advisory in the same pop-up mechanism already defined for crop-stage promotions (see 10.3). This turns the field visit into a real-time, location-specific advisory moment rather than a generic broadcast.
+10.6.1 Weather Data Capture at Visit
+10.6.2 How This Extends the Existing Promotion Pop-Up (10.3)
+The weather advisory pop-up is not a separate feature from the auto-pop-up already specified in 10.3 — it is a second trigger source feeding the same pop-up card component:
+Trigger A (existing, 10.3): Farmer-profile open, or geo check-in at a matching crop + stage plot → surfaces Digital Promotion Library content.
+Trigger B (new, 10.6): Geo check-in + live weather/forecast at that plot matches a crop + stage risk rule → surfaces a weather advisory instead of, or alongside, the promotion content.
+Both triggers can fire together — e.g. a grape/flowering-stage plot may show the scheduled promotional video and a rain-risk advisory in the same session, stacked as two cards.
+10.6.3 Weather-Triggered Bulk Push (Territory-Wide)
+Recommendation: Build this as a background service — a scheduled job checks each active plot's forecast against its crop+stage risk rules every few hours, and queues advisory pop-ups so they are ready the moment a staff member opens that farmer or arrives at the plot. Individual, at-the-plot advisories (10.6.1) are staff-triggered and personal; territory-wide advisories (10.6.3) are Content-Admin-triggered and broadcast — both share the same underlying weather feed and risk-rule engine.
+10.6.4 Weather Data Source
+Note: This upgrades the Phase 2 "Weather Trigger Rules" item already listed under Crop Master (2.4) and the Phase-2 roadmap item "Weather-trigger bulk push rules" (Section 7) from a territory-level future feature to a per-visit, location-specific live feature — the underlying weather feed and risk-rule engine are the same; 10.6 adds the real-time, GPS-tied pop-up layer on top.
+10.7 Commodity Market Intelligence Dashboard (Admin-Driven, Acreage-Ranked)
+Purpose: Add a Commodity Market Intelligence system, built on top of the existing app's dashboard, that converts admin-uploaded market-price data into simple, visual, and actionable intelligence for Regional Managers and Field Staff. Every user should see market movement only for the commodities that matter to the farmers they actually manage, expressed through historical, statistics-based indicators — never AI-generated or predictive. Core dashboard question: “What is happening to the market price of the crops that matter most to my farmers?”
+10.7.1 Admin Market Data Import (Excel-Based)
+An Admin-only “Import Market Data” feature lets the Back-end Admin upload the company's existing Excel market-price file. The uploaded data becomes the primary — and only — source of commodity and price information in the app.
+Dynamic Commodity Handling
+The number of commodities in the Excel file will change between uploads as market conditions change (e.g. Upload 1: Tomato, Onion, Grapes, Potato → Upload 2 adds Pomegranate, Rose → Upload 3 drops Onion, Potato). The system must handle this automatically:
+New commodities appearing in an upload automatically become available in the app — no manual setup required.
+Historical records are preserved even if a commodity is absent from a later upload.
+Existing commodity data is updated for that specific date and market (not duplicated) when new records for that commodity/date/market are uploaded.
+The application must not break if commodities are added or removed between uploads.
+The import process detects duplicate, missing, or invalid records and shows an import status with the number of records successfully imported.
+There is no user-facing “Add Commodity/Crop” feature — users cannot manually add commodities. The uploaded Excel is the sole source of truth for available market commodities.
+10.7.2 User-Specific Commodity Relevance (Acreage-Ranked)
+A new “🌾 Commodity Market Snapshot” section is added to the existing Dashboard & Reports page. It shows only the commodities most relevant to the individual logged-in user, determined from the farmers and crops that user actually manages — never a random or generic commodity list.
+Example: a user managing 100 farmers growing Grapes (100 acres), Tomato (80 acres), Pomegranate (50 acres), Potato (30 acres), and Onion (15 acres) would see Grapes ranked #1, Tomato #2, Pomegranate #3, and Potato #4 on their snapshot.
+10.7.3 Commodity Market Snapshot — Dashboard Card
+Header: “🌾 Commodity Market Snapshot”, subtitle “Market prices for the crops most relevant to your farmer portfolio,” with a “View All Market Intelligence →” link to the full dashboard (10.7.9).
+10.7.4 7-Day Price Change & Visual Price Bands
+Because a single day's price can fluctuate sharply, the primary indicator is a 7-day price change, not a day-over-day change.
+Formula: Price Change % = ((Current Modal Price − Previous Modal Price) / Previous Modal Price) × 100, comparing the latest available Modal Price against the nearest available Modal Price from approximately 7 days earlier. Example: Current ₹3,200, 7-day-earlier ₹2,950 → +8.47%.
+Important: these colours indicate price movement only. They must never be shown or implied as “good crop,” “bad crop,” “sell now,” “buy now,” or a guarantee of future price.
+10.7.5 21-Day Trend Indicator
+A secondary indicator adds context so the dashboard does not overreact to one price movement: the latest 7-day average Modal Price is compared with the prior 7-day average within the same approximate 21-day window, and displayed as ↑ Increasing, → Stable, or ↓ Decreasing (e.g. “7-Day Change: +8.2% | 21-Day Trend: ↑ Strong Increasing”).
+10.7.6 Latest Market Price & Historical Comparison
+10.7.7 Same-Calendar-Month Historical Analysis
+A “📅 Historical Month Context” section compares the current commodity price with the same calendar month in previous years — e.g. August 2024, August 2025, and the current August — averaging each year where sufficient data exists, then stating the comparison in plain language: “Average August price over the last 2 years was ₹20/kg. The current August price is 25% higher.” If there isn't enough historical data, the app shows “Not enough historical data for this comparison” rather than guessing.
+10.7.8 Festival Price Context
+A “🎉 Festival Price Context” section identifies relevant approaching Indian festivals (Ganesh Chaturthi, Diwali, Dussehra, Holi, Gudi Padwa, Eid, Christmas, and other regionally relevant festivals) and, for commodities with sufficient history, compares average price Before → During → After the same festival period in prior years — e.g. “Historically, prices increased by approximately 12% during the Ganesh festival period.”
+This must always be labelled as historical behaviour, never a prediction. Use “Prices increased by 12% historically” — never “Prices will increase by 12%.”
+10.7.9 Full Commodity Market Intelligence Dashboard
+A separate “Commodity Market Intelligence” page opens from the snapshot card, with filters for Commodity, State, District, Market, and Date Range (7 Days / 30 Days / 3 Months / 6 Months / 1 Year / Custom Range).
+Example market comparison:
+10.7.10 Key Market Patterns & Sales/Market Opportunity
+A concise “Key Market Patterns” section surfaces only the important findings — strong price increase/decrease, high volatility, highest/lowest-price market, a strong seasonal pattern, a historical festival movement, a harvest-period movement, and current price vs historical/same-month average — rather than raw data. A separate “Sales & Market Opportunity” section gives Regional Managers and Field Staff data-based pointers: commodities with strong recent price movement, commodities with high acreage under the user's management, markets showing higher prices, commodities approaching harvest, seasonal opportunities, and festival-related historical patterns. This section is generated entirely from uploaded data and predefined rules — it does not generate AI recommendations.
+10.7.11 Data Accuracy Rules & Guardrails
+Admin-uploaded Excel data is the sole source of truth for market prices — the system never invents prices, dates, market information, or historical records.
+Every price shown is date-stamped and market-identified, and latest data is always visually distinguished from historical data.
+Historical observations (7-day, 21-day, same-month, festival, seasonal, harvest) are shown strictly as historical context, never as a forecast or a guarantee of future price movement.
+No seasonal or festival pattern is shown unless it is actually supported by the uploaded historical data; otherwise the app shows “Insufficient data available for reliable analysis.”
+No AI Assistant, AI chatbot, AI-generated recommendation, AI prediction, AI forecasting, or AI-generated explanation is included anywhere in this module. All analysis is produced from uploaded market data + farmer portfolio data + statistical calculations + predefined business rules only.
+10.7.12 Design & Data Relationship
+Visual design follows the existing app's theme — green agricultural palette, clean white background, rounded cards, clear KPI cards, minimal text, simple icons, and a responsive, professional layout — so the Commodity Market Snapshot feels like a native part of the existing Dashboard & Reports page rather than a bolted-on module.
+Data relationship: User → Farmers Managed → Farmer Crops + Acreage → Total Acreage by Commodity → Top Relevant Commodities → Admin Market Database → Latest Market Price + Historical Analysis → Commodity Market Snapshot. This chain ensures every user sees market information relevant only to the crops they actually manage.
+10.7.13 Access & RBAC
+This extends the Role-Based Access Control table (4.2). Field Staff and Regional Managers still push commodity/market-rate advisories to farmers using the existing one-tap WhatsApp/SMS pattern (2.11) and the Content Team frequency cap (10.4.2) where sent centrally; those send/log mechanics are unchanged from the earlier recommendation, only the underlying price intelligence they draw on is now admin-Excel-driven and acreage-ranked as specified above.
+10.8 Summary of Addendum 2 Additions
+These additions should be reflected in the database schema (new tables for weather_snapshots, weather_risk_rules, market_price_import_batches, market_price_records keyed by date + market + commodity, and aggregation views for acreage-by-commodity and trend calculations) and included in the roadmap: 10.6 (individual advisory pop-up) fits naturally into Phase 2 alongside the existing promotion pop-up work, since it reuses the same trigger/pop-up mechanism; 10.6's territory-wide bulk push and the full 10.7 Commodity Market Intelligence dashboard depend on the Content Admin role and reporting layer plus the admin Excel-import pipeline, so they are best scheduled alongside or after Phase 3.
+Document prepared for: Dhanashree Crop Solutions   |   Reference: DhanashreeMasterPlans.docx (Addendum 1 + Addendum 2, Combined)   |   Website: www.dhanashreecropsolutions.com

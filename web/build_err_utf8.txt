@@ -1,0 +1,11 @@
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 1490 modules transformed.
+[31mx[39m Build failed in 3.08s
+[31merror during build:
+[31mCould not resolve "../components/ui/card" from "src/pages/MarketIntelligence.jsx"[31m
+file: [36mC:/Users/mdamo/OneDrive/Desktop/FaReM/web/src/pages/MarketIntelligence.jsx[31m
+    at getRollupError (file:///C:/Users/mdamo/OneDrive/Desktop/FaReM/web/node_modules/rollup/dist/es/shared/parseAst.js:406:41)
+    at error (file:///C:/Users/mdamo/OneDrive/Desktop/FaReM/web/node_modules/rollup/dist/es/shared/parseAst.js:402:42)
+    at ModuleLoader.handleInvalidResolvedId (file:///C:/Users/mdamo/OneDrive/Desktop/FaReM/web/node_modules/rollup/dist/es/shared/node-entry.js:22106:24)
+    at file:///C:/Users/mdamo/OneDrive/Desktop/FaReM/web/node_modules/rollup/dist/es/shared/node-entry.js:22066:26[39m

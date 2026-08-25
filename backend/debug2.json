@@ -1,0 +1,11 @@
+{
+  "new": [
+    "Vijay Birute | Valid: False | Hash_len: 0 | Manager: None | Terr: Shrirampur",
+    "Babasaheb Lage | Valid: False | Hash_len: 0 | Manager: None | Terr: Alephata",
+    "Mayur Waykar | Valid: False | Hash_len: 0 | Manager: None | Terr: None"
+  ],
+  "hierarchy": [
+    "sbade@plantnutrition.in | Role: TerritoryManager | Terr: Sahadev Bade | Parent: None | Manager: rahul@plantnutrition.in",
+    "anil@plantnutrition.in not found"
+  ]
+}

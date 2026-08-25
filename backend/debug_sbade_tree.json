@@ -1,0 +1,25 @@
+[
+  {
+    "id": "56410c97-ceab-4ca7-9a56-6401bb97e369",
+    "name": "Sahadev Bade",
+    "full_name": "Sahadev Bade",
+    "email": "sbade@plantnutrition.in",
+    "role": "TerritoryManager",
+    "territory_name": "Sahadev Bade",
+    "farmer_count": 1,
+    "farmers_count": 1,
+    "plot_count": 0,
+    "plots_count": 0,
+    "crop_count": 0,
+    "active_crops_count": 0,
+    "farmers_added_this_year": 1,
+    "recommendations_count": 0,
+    "visits_count": 0,
+    "calls_count": 0,
+    "whatsapp_count": 0,
+    "performance_pct": 0.0,
+    "last_sync": "2026-08-20 17:38",
+    "subordinates": [],
+    "subordinates_count": 0
+  }
+]
