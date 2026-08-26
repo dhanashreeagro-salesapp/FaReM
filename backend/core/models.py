@@ -557,6 +557,13 @@ class MarketPriceImportBatch(models.Model):
     records_processed = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=[('Success', 'Success'), ('Failed', 'Failed')], default='Success')
 
+class CommodityMapping(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    commodity_name = models.CharField(max_length=255, unique=True, help_text="The exact string imported from external data")
+    crop = models.ForeignKey(CropMaster, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 class MarketPriceRecord(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     import_batch = models.ForeignKey(MarketPriceImportBatch, on_delete=models.CASCADE, related_name='records')

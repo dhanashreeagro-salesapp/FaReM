@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage';
 import VisitPlanner from './pages/VisitPlanner';
 import RecommendationDashboard from './pages/RecommendationDashboard';
 import MarketIntelligence from './pages/MarketIntelligence';
+import CommodityMapping from './pages/CommodityMapping';
 import DataDebug from './pages/DataDebug';
 import FrontendDataDiagnostic from './pages/FrontendDataDiagnostic';
 
@@ -70,6 +71,7 @@ function ProtectedLayout() {
             <Route path="/promotions-management" element={<PromotionsManagement />} />
             <Route path="/recommendations-dashboard" element={<RecommendationDashboard />} />
             <Route path="/market-intelligence" element={<MarketIntelligence />} />
+            <Route path="/market-mapping" element={<CommodityMapping />} />
             <Route path="/dashboard" element={<DashboardV2 />} />
 
             <Route path="/audit-logs" element={<AuditLogs />} />

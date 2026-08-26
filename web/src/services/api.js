@@ -541,6 +541,17 @@ class ApiClient {
     });
   }
 
+  getUnmappedCommodities() {
+    return this.request('/market/mappings/');
+  }
+
+  mapCommodity(mapping_id, crop_id, action = 'link') {
+    return this.request('/market/mappings/', {
+      method: 'POST',
+      body: JSON.stringify({ mapping_id, crop_id, action })
+    });
+  }
+
   // Audience Targeting
   getFarmerIds(params = {}) {
     const qs = new URLSearchParams(params).toString();

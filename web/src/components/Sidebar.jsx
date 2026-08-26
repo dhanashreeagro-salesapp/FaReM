@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award } from 'lucide-react';
+import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award, Database } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
@@ -14,6 +14,7 @@ const navItems = [
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam', 'ContentAdmin'] },
   { path: '/promotions-management', label: 'Promotions Management', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff', 'ContentAdmin'] },
   { path: '/market-intelligence', label: 'Market Intelligence', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
+  { path: '/market-mapping', label: 'Commodity Mapping', icon: Database, roles: ['Admin'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Admin'] },
   { path: '/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];

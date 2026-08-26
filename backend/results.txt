@@ -1,0 +1,3 @@
+{'date': datetime.date(2024, 9, 6), 'market_name': 'PUNE', 'commodity_name': 'TOMATO', 'import_batch__filename': 'market_data_template.xlsx'}
+{'date': datetime.date(2024, 9, 6), 'market_name': 'MUMBAI', 'commodity_name': 'TOMATO', 'import_batch__filename': 'market_data_template.xlsx'}
+{'date': datetime.date(2024, 9, 6), 'market_name': 'NASHIK', 'commodity_name': 'BANANA', 'import_batch__filename': 'market_data_template.xlsx'}

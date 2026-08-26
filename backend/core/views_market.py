@@ -8,10 +8,47 @@ import pandas as pd
 
 from core.models import (
     MarketPriceImportBatch, MarketPriceRecord, CropMaster, User, Role,
-    CropSeason, Plot, Farmer
+    CropSeason, Plot, Farmer, CommodityMapping
 )
 from core.serializers_market import MarketPriceImportBatchSerializer, MarketTrendSerializer
 from core.permissions import IsAdminUser
+
+class CommodityMappingView(views.APIView):
+    """
+    API for Administrators to manually rationalise uploaded commodity names (e.g. 'Pomegranet') 
+    with existing system crops (e.g. 'Pomegranate').
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        # Fetch unmapped commodities
+        mappings = CommodityMapping.objects.filter(crop__isnull=True).values('id', 'commodity_name', 'created_at')
+        return Response(list(mappings))
+
+    def post(self, request, *args, **kwargs):
+        mapping_id = request.data.get('mapping_id')
+        crop_id = request.data.get('crop_id')
+        action = request.data.get('action') # 'link' or 'ignore'
+        
+        try:
+            mapping = CommodityMapping.objects.get(id=mapping_id)
+            
+            if action == 'ignore':
+                mapping.delete()
+                # Optionally delete records if user chooses to completely ignore? We leave records with crop=None
+                return Response({'message': 'Commodity mapping discarded'})
+            
+            crop = CropMaster.objects.get(id=crop_id)
+            mapping.crop = crop
+            mapping.save()
+            
+            # Retroactively link historically unmapped records
+            MarketPriceRecord.objects.filter(commodity_name=mapping.commodity_name, crop__isnull=True).update(crop=crop)
+            
+            return Response({'message': 'Commodity successfully linked to Crop'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
 
 class MarketDataImportView(views.APIView):
     """
@@ -83,16 +120,27 @@ class MarketDataImportView(views.APIView):
                         if not first_row_error: first_row_error = f"Row {index+1} invalid numeric format for modal price: '{modal_price}'"
                         continue
 
-                    # Match crop if exists
-                    crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
+                    # Match crop restrictively (no auto-creation)
+                    crop_name_stripped = commodity_name.strip()
+                    crop = CropMaster.objects.filter(crop_name__iexact=crop_name_stripped).first()
+                    
                     if not crop:
-                        # Auto-create basic CropMaster skeleton
-                        crop = CropMaster.objects.create(crop_name=commodity_name, category='Other', is_active=True)
+                        # Fallback to CommodityMapping rationalization
+                        mapping = CommodityMapping.objects.filter(commodity_name__iexact=crop_name_stripped).first()
+                        if mapping and mapping.crop:
+                            crop = mapping.crop
+                        elif not mapping:
+                            # Create unmapped placeholder for Admin rationalization screen
+                            try:
+                                CommodityMapping.objects.create(commodity_name=crop_name_stripped)
+                            except Exception: # In case of concurrent duplicates
+                                pass
+                            
                     
                     MarketPriceRecord.objects.update_or_create(
                         date=parsed_date,
                         market_name=market_name,
-                        commodity_name=commodity_name,
+                        commodity_name=crop_name_stripped,
                         defaults={
                             'import_batch': batch,
                             'crop': crop,
