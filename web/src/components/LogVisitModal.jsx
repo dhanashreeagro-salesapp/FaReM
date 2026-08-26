@@ -514,6 +514,7 @@ class LogVisitErrorBoundary extends React.Component {
 }
 
 export default function LogVisitModal(props) {
+  if (props.isOpen === false) return null;
   return (
     <LogVisitErrorBoundary onClose={props.onClose}>
       <LogVisitModalContent {...props} />
