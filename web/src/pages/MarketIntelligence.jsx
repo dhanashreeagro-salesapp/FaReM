@@ -42,7 +42,7 @@ export default function MarketIntelligence() {
       fetchSnapshot();
     } catch (error) {
       console.error(error);
-      alert('Failed to import market data: ' + (error.message || 'Unknown error'));
+      alert('Failed to import market data: ' + (error.error || error.message || 'Unknown error'));
     } finally {
       setUploading(false);
       e.target.value = null; // reset input

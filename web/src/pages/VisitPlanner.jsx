@@ -11,6 +11,8 @@ export default function VisitPlanner() {
   const [availableVillages, setAvailableVillages] = useState([]);
   const [selectedFarmer, setSelectedFarmer] = useState(null);
 
+  const [showBigFarmers, setShowBigFarmers] = useState(false);
+
   useEffect(() => {
     fetchVillages();
     fetchFarmers();
@@ -25,20 +27,32 @@ export default function VisitPlanner() {
     }
   };
 
-  const fetchFarmers = async (coords = null, selectedVillage = village) => {
+  const fetchFarmers = async (coords = null, selectedVillage = village, bigFarmersFlag = showBigFarmers) => {
     setLoading(true);
     try {
-      const params = {};
-      if (coords) {
-        params.lat = coords.latitude;
-        params.lng = coords.longitude;
+      if (bigFarmersFlag && selectedVillage) {
+        const data = await api.getBigFarmers(selectedVillage);
+        setFarmers(data.map(f => ({
+          farmer: { id: f.id, full_name: f.full_name, village: f.village },
+          smart_score: 'VIP',
+          tags: [`Highest Acreage: ${f.total_acreage} Acres`],
+          is_overdue: false,
+          overdue_days: 0,
+          distance: null
+        })));
+      } else {
+        const params = {};
+        if (coords) {
+          params.lat = coords.latitude;
+          params.lng = coords.longitude;
+        }
+        if (selectedVillage) {
+          params.village = selectedVillage;
+        }
+        
+        const data = await api.getDailyPlan(params);
+        setFarmers(data);
       }
-      if (selectedVillage) {
-        params.village = selectedVillage;
-      }
-      
-      const data = await api.getDailyPlan(params);
-      setFarmers(data);
     } catch (error) {
       console.error('Failed to fetch plan', error);
     } finally {
@@ -51,7 +65,7 @@ export default function VisitPlanner() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setLocation(position.coords);
-          fetchFarmers(position.coords, village);
+          fetchFarmers(position.coords, village, showBigFarmers);
         },
         (error) => {
           alert('Could not get location. Please ensure location services are enabled.');
@@ -64,7 +78,13 @@ export default function VisitPlanner() {
 
   const handleVillageChange = (e) => {
     setVillage(e.target.value);
-    fetchFarmers(location, e.target.value);
+    fetchFarmers(location, e.target.value, showBigFarmers);
+  };
+
+  const toggleBigFarmers = () => {
+    const newVal = !showBigFarmers;
+    setShowBigFarmers(newVal);
+    fetchFarmers(location, village, newVal);
   };
 
   const renderTags = (tags) => {
@@ -72,9 +92,9 @@ export default function VisitPlanner() {
       let colorClass = 'bg-surface text-text-muted border-border';
       if (tag === 'Overdue Visit') colorClass = 'bg-danger/10 text-danger border-danger/20';
       if (tag === 'Large Active Plot') colorClass = 'bg-primary/10 text-primary border-primary/20';
-      if (tag === 'High Value (Pre-Fruit Set)') colorClass = 'bg-accent/10 text-accent border-accent/20';
-      if (tag === 'Favorable Market Trend') colorClass = 'bg-success/10 text-success border-success/20';
-      if (tag === 'Expected Price Surge') colorClass = 'bg-accent/10 text-accent border-accent/20';
+      if (tag.includes('High Value') || tag.includes('Expected Price Surge')) colorClass = 'bg-accent/10 text-accent border-accent/20';
+      if (tag.includes('Favorable Market Trend')) colorClass = 'bg-success/10 text-success border-success/20';
+      if (tag.includes('Highest Acreage') || tag.includes('Top Acreage')) colorClass = 'bg-primary text-white border-primary';
 
       return (
         <span key={idx} className={`text-[10px] px-2 py-1 rounded-md border ${colorClass} font-medium`}>
@@ -92,15 +112,15 @@ export default function VisitPlanner() {
           <p className="text-text-muted text-sm mt-1">Plan your day based on location, crop stages, and market trends.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <input 
+             <input 
               type="text"
               list="village-list"
               value={village}
               onChange={handleVillageChange}
               placeholder="Search village..."
-              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-64"
+              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-48 sm:w-64"
             />
             <datalist id="village-list">
               {availableVillages.map((v, i) => (
@@ -112,11 +132,20 @@ export default function VisitPlanner() {
           </div>
           
           <button 
+            onClick={toggleBigFarmers}
+            disabled={!village}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${showBigFarmers ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-bg disabled:opacity-50'}`}
+          >
+            <TrendingUp size={16} />
+            Top Acreage
+          </button>
+
+          <button 
             onClick={useCurrentLocation}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${location ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface border border-border text-text-muted hover:bg-bg'}`}
           >
             <Navigation size={16} className={location ? 'animate-pulse' : ''} />
-            {location ? 'Location Active' : 'Use Current Location'}
+            {location ? 'Location Active' : 'Use Current'}
           </button>
         </div>
       </div>

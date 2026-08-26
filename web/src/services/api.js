@@ -477,6 +477,10 @@ class ApiClient {
     return this.request(`/planner/daily_plan/${qs ? `?${qs}` : ''}`);
   }
 
+  getBigFarmers(village) {
+    return this.request(`/route/big-farmers/?village=${encodeURIComponent(village)}`);
+  }
+
   // Activities
   logActivity(data) {
     return this.request('/activities/', { method: 'POST', body: JSON.stringify(data) });
