@@ -71,6 +71,12 @@ export default function MarketIntelligence() {
               onChange={handleFileUpload} 
             />
             <button 
+                onClick={() => window.location.href = api.baseURL.replace('/api/v1', '/api/v1/market/template/')}
+                className="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5"
+            >
+                Download Template
+            </button>
+            <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50"

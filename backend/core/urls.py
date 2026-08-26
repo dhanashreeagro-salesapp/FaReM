@@ -72,6 +72,7 @@ urlpatterns = [
     path('field_visits/', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('field_visits', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('market/import/', views_market.MarketDataImportView.as_view(), name='market_import'),
+    path('market/template/', views_market.MarketDataTemplateView.as_view(), name='market_template'),
     path('market/snapshot/', views_market.MarketSnapshotView.as_view(), name='market_snapshot'),
     path('route/big-farmers/', views_route.BigFarmerDirectoryView.as_view(), name='big_farmers'),
     path('', include(router.urls)),

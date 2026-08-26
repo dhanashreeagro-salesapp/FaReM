@@ -37,44 +37,95 @@ class MarketDataImportView(views.APIView):
             
             records_created = 0
             for index, row in df.iterrows():
-                # Extract using the precise column names provided
-                commodity_name = str(row.get('Commodity Name', '')).strip()
-                market_name = str(row.get('Market', '')).strip()
-                date_val = row.get('Date')
-                modal_price = row.get('Modal ( Rs/q)')
-                
-                # Check required fields
-                if not commodity_name or commodity_name == 'nan' or not market_name or market_name == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
-                    continue
-                
-                # Try falling back to alternative column names if the exact ones are missing
-                country = row.get('Country') if not pd.isna(row.get('Country')) else None
-                state = row.get('State') if not pd.isna(row.get('State')) else None
-                district = row.get('District') if not pd.isna(row.get('District')) else None
-                
-                # Match crop if exists
-                crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
-                
-                MarketPriceRecord.objects.update_or_create(
-                    date=date_val,
-                    market_name=market_name,
-                    commodity_name=commodity_name,
-                    defaults={
-                        'import_batch': batch,
-                        'crop': crop,
-                        'modal_price': modal_price,
-                        'min_price': row.get('Low (Rs/qt)') if not pd.isna(row.get('Low (Rs/qt)')) else None,
-                        'max_price': row.get('High ( Rs/q)') if not pd.isna(row.get('High ( Rs/q)')) else None,
-                    }
-                )
-                records_created += 1
+                try:
+                    # Clean column names by stripping whitespace in case excel headers have spaces
+                    clean_row = {str(k).strip(): v for k, v in row.items()}
+
+                    commodity_name = str(clean_row.get('Commodity Name', '')).strip()
+                    market_name = str(clean_row.get('Market', '')).strip()
+                    date_val = clean_row.get('Date')
+                    modal_price = clean_row.get('Modal ( Rs/q)')
+
+                    # Check required fields
+                    if not commodity_name or commodity_name.lower() == 'nan' or not market_name or market_name.lower() == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
+                        continue
+
+                    # Parse Date
+                    try:
+                        if isinstance(date_val, str):
+                            # Usually DD-MM-YYYY in India, or auto-parse
+                            parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
+                        else:
+                            parsed_date = pd.to_datetime(date_val).date()
+                    except:
+                        continue
+
+                    # Parse Prices securely
+                    def parse_price(val):
+                        if pd.isna(val) or str(val).strip().lower() == 'nan': return None
+                        try: return float(val)
+                        except: return None
+                        
+                    m_price = parse_price(modal_price)
+                    if m_price is None: continue
+
+                    # Match crop if exists (Create one if doesn't exist? Requirements: "New commodities appearing in an upload automatically become available in the app... The system must handle this automatically")
+                    # Ah! The requirement says automatic!
+                    crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
+                    if not crop:
+                        # Auto-create basic CropMaster skeleton
+                        crop = CropMaster.objects.create(crop_name=commodity_name, category='Other', is_active=True)
+                    
+                    MarketPriceRecord.objects.update_or_create(
+                        date=parsed_date,
+                        market_name=market_name,
+                        commodity_name=commodity_name,
+                        defaults={
+                            'import_batch': batch,
+                            'crop': crop,
+                            'modal_price': m_price,
+                            'min_price': parse_price(clean_row.get('Low (Rs/qt)')),
+                            'max_price': parse_price(clean_row.get('High ( Rs/q)')),
+                        }
+                    )
+                    records_created += 1
+                except Exception as row_e:
+                    print(f"Skipping row {index}: {row_e}")
+                    pass
                 
             batch.records_processed = records_created
+            batch.status = 'Success'
             batch.save()
             return Response({'message': f'Successfully processed {records_created} records', 'batch_id': batch.id})
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MarketDataTemplateView(views.APIView):
+    """
+    Downloads structural template for Market Intelligence Upload
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        import pandas as pd
+        from django.http import HttpResponse
+        from io import BytesIO
+
+        df = pd.DataFrame(columns=['Date', 'Country', 'State', 'District', 'Market', 'Commodity Name', 'Low (Rs/qt)', 'High ( Rs/q)', 'Modal ( Rs/q)'])
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="market_data_template.xlsx"'
+        return response
 
 
 class MarketSnapshotView(views.APIView):
