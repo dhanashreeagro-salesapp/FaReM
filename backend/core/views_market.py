@@ -36,15 +36,24 @@ class MarketDataImportView(views.APIView):
             )
             
             records_created = 0
+            
+            # Map columns fuzzily to handle variable spaces/casing in headers
+            header_map = {}
+            for k in df.columns:
+                k_clean = str(k).strip().lower().replace(' ', '').replace('(', '').replace(')', '').replace('/', '')
+                if 'commodity' in k_clean or 'crop' in k_clean: header_map['commodity'] = k
+                elif 'market' in k_clean: header_map['market'] = k
+                elif 'date' in k_clean: header_map['date'] = k
+                elif 'modal' in k_clean: header_map['modal'] = k
+                elif 'low' in k_clean or 'min' in k_clean: header_map['low'] = k
+                elif 'high' in k_clean or 'max' in k_clean: header_map['high'] = k
+
             for index, row in df.iterrows():
                 try:
-                    # Clean column names by stripping whitespace in case excel headers have spaces
-                    clean_row = {str(k).strip(): v for k, v in row.items()}
-
-                    commodity_name = str(clean_row.get('Commodity Name', '')).strip()
-                    market_name = str(clean_row.get('Market', '')).strip()
-                    date_val = clean_row.get('Date')
-                    modal_price = clean_row.get('Modal ( Rs/q)')
+                    commodity_name = str(row.get(header_map.get('commodity', '_miss_'), '')).strip()
+                    market_name = str(row.get(header_map.get('market', '_miss_'), '')).strip()
+                    date_val = row.get(header_map.get('date', '_miss_'))
+                    modal_price = row.get(header_map.get('modal', '_miss_'))
 
                     # Check required fields
                     if not commodity_name or commodity_name.lower() == 'nan' or not market_name or market_name.lower() == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
@@ -53,7 +62,6 @@ class MarketDataImportView(views.APIView):
                     # Parse Date
                     try:
                         if isinstance(date_val, str):
-                            # Usually DD-MM-YYYY in India, or auto-parse
                             parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
                         else:
                             parsed_date = pd.to_datetime(date_val).date()
@@ -62,15 +70,14 @@ class MarketDataImportView(views.APIView):
 
                     # Parse Prices securely
                     def parse_price(val):
-                        if pd.isna(val) or str(val).strip().lower() == 'nan': return None
+                        if pd.isna(val) or str(val).strip().lower() == 'nan' or val == '_miss_': return None
                         try: return float(val)
                         except: return None
                         
                     m_price = parse_price(modal_price)
                     if m_price is None: continue
 
-                    # Match crop if exists (Create one if doesn't exist? Requirements: "New commodities appearing in an upload automatically become available in the app... The system must handle this automatically")
-                    # Ah! The requirement says automatic!
+                    # Match crop if exists
                     crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
                     if not crop:
                         # Auto-create basic CropMaster skeleton
@@ -84,8 +91,8 @@ class MarketDataImportView(views.APIView):
                             'import_batch': batch,
                             'crop': crop,
                             'modal_price': m_price,
-                            'min_price': parse_price(clean_row.get('Low (Rs/qt)')),
-                            'max_price': parse_price(clean_row.get('High ( Rs/q)')),
+                            'min_price': parse_price(row.get(header_map.get('low', '_miss_'))),
+                            'max_price': parse_price(row.get(header_map.get('high', '_miss_'))),
                         }
                     )
                     records_created += 1
