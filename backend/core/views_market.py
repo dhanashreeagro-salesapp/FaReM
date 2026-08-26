@@ -138,11 +138,8 @@ class MarketSnapshotView(views.APIView):
         user = request.user
         
         # 1. Calculate acreage per crop for the user's assigned farmers
-        # Field Staff sees their own portfolio. Managers see their team's portfolio.
         users_to_query = user.get_team_users()
         
-        # Find active crop seasons for these users, grouped by crop
-        # Note: Added condition to ignore missing area_acres based on feedback
         acreage_qs = CropSeason.objects.filter(
             plot__farmer__assigned_staff__in=users_to_query,
             plot__is_active=True,
@@ -152,23 +149,32 @@ class MarketSnapshotView(views.APIView):
             total_acres=Sum('plot__area_acres')
         ).order_by('-total_acres')
         
-        top_crops = [item for item in acreage_qs if item['total_acres'] and item['total_acres'] > 0]
+        top_crops = [item['crop__crop_name'] for item in acreage_qs if item['total_acres'] and item['total_acres'] > 0]
         
         results = []
         
-        # 2. For each top crop, fetch latest market price and 7-day trend
-        for c in top_crops[:10]: # Top 10 relevant
-            crop_name = c['crop__crop_name']
-            
-            # Fetch latest record
+        # 2. Get the latest record for ALL distinct commodities we have data for
+        recent_market_commodities = MarketPriceRecord.objects.values_list('commodity_name', flat=True).distinct()
+        
+        # We will process portfolio crops first, then others
+        all_commodities_to_process = []
+        # Add portfolio crops first
+        for c in top_crops:
+            if c in recent_market_commodities or MarketPriceRecord.objects.filter(commodity_name__iexact=c).exists():
+                all_commodities_to_process.append(c)
+                
+        # Add the rest
+        for c in recent_market_commodities:
+            if c not in all_commodities_to_process:
+                all_commodities_to_process.append(c)
+                
+        for crop_name in all_commodities_to_process[:20]: # Show up to 20
             latest_record = MarketPriceRecord.objects.filter(commodity_name__iexact=crop_name).order_by('-date').first()
             if not latest_record:
                 continue
                 
-            # Fetch 7 days prior record
             seven_days_ago = latest_record.date - timedelta(days=7)
             
-            # Get nearest record around 7 days ago (+/- 2 days)
             prior_record = MarketPriceRecord.objects.filter(
                 commodity_name__iexact=crop_name,
                 market_name=latest_record.market_name,
@@ -181,11 +187,14 @@ class MarketSnapshotView(views.APIView):
                 
             results.append({
                 'commodity_name': crop_name,
-                'latest_price': latest_record.modal_price,
-                'latest_date': latest_record.date,
-                'price_7_days_ago': prior_record.modal_price if prior_record else None,
-                'change_7_day_percent': change_pct,
-                'total_managed_acreage': c['total_acres']
+                'market_name': latest_record.market_name,
+                'date': latest_record.date,
+                'modal_price': latest_record.modal_price,
+                'min_price': latest_record.min_price,
+                'max_price': latest_record.max_price,
+                'prior_price': prior_record.modal_price if prior_record else None,
+                'change_7_day_percent': round(change_pct, 2) if change_pct is not None else None,
+                'in_portfolio': crop_name in top_crops
             })
             
         serializer = MarketTrendSerializer(results, many=True)

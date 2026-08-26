@@ -93,10 +93,13 @@ export default function MarketIntelligence() {
           <div className="col-span-full py-12 text-center text-text-muted">No active crops with acreage to display.</div>
         ) : (
           snapshotData.map((item, idx) => (
-            <Card key={idx}>
+            <Card key={idx} className={item.in_portfolio ? "border-primary" : ""}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-bold font-heading text-text flex justify-between items-start">
-                  {item.commodity_name}
+                  <div className="flex flex-col">
+                    <span>{item.commodity_name}</span>
+                    <span className="text-xs text-text-muted mt-1 font-normal">{item.market_name}</span>
+                  </div>
                   {item.change_7_day_percent !== undefined && item.change_7_day_percent !== null && (
                     <span className={`text-xs font-bold flex items-center px-2 py-1 rounded-full ${
                       item.change_7_day_percent >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
@@ -109,16 +112,18 @@ export default function MarketIntelligence() {
               </CardHeader>
               <CardContent>
                 <div className="mt-2">
-                  <div className="text-3xl font-bold font-heading text-text">₹{item.latest_price || 'N/A'}</div>
-                  <div className="text-sm text-text-muted mt-1">Modal Price</div>
+                  <div className="text-3xl font-bold font-heading text-text">₹{item.modal_price || 'N/A'}</div>
+                  <div className="text-sm text-text-muted mt-1">Modal Price (per qt)</div>
                 </div>
                 
-                {item.total_managed_acreage && (
-                  <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
-                    <span className="text-sm font-medium text-text-muted">Managed Acreage</span>
-                    <span className="text-sm font-bold text-text">{Number(item.total_managed_acreage).toFixed(1)} Acres</span>
-                  </div>
-                )}
+                <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+                  {item.in_portfolio ? (
+                    <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-1 rounded-full">Portfolio Match</span>
+                  ) : (
+                    <span className="text-xs font-medium bg-bg text-text-muted px-2 py-1 rounded-full">Global Market</span>
+                  )}
+                  {item.date && <span className="text-[11px] text-text-muted font-mono">{item.date}</span>}
+                </div>
               </CardContent>
             </Card>
           ))

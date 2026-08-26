@@ -14,6 +14,7 @@ export default function DashboardV2() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [marketSnapshot, setMarketSnapshot] = useState(null);
   const [requestCount, setRequestCount] = useState(0);
   const [responseTimeMs, setResponseTimeMs] = useState(null);
   const [httpStatus, setHttpStatus] = useState(null);
@@ -30,8 +31,6 @@ export default function DashboardV2() {
   const fetchDashboard = async () => {
     if (!user || !user.email) return;
 
-    // We no longer abort manually since api.js doesn't easily support signals,
-    // but we can track mount state in the useEffect.
     setLoading(true);
     setError(null);
     const startTime = performance.now();
@@ -39,14 +38,17 @@ export default function DashboardV2() {
     try {
       setRequestCount(prev => prev + 1);
 
-      // standard wrapper with explicitly cache-busting url params
-      const json = await api.getDashboard({ refresh: 'true', _t: Date.now() });
+      const [json, snapshotJson] = await Promise.all([
+        api.getDashboard({ refresh: 'true', _t: Date.now() }),
+        api.request('/market/snapshot/').catch(() => [])
+      ]);
 
       const endTime = performance.now();
       setResponseTimeMs(Math.round(endTime - startTime));
-      setHttpStatus(200); // api.getDashboard throws on non-200
+      setHttpStatus(200);
 
       setData(json);
+      setMarketSnapshot(snapshotJson);
       setLoading(false);
     } catch (err) {
       console.error("[DashboardV2] Fetch error:", err);
@@ -294,31 +296,31 @@ export default function DashboardV2() {
                       </h3>
                       <button 
                           onClick={() => navigate('/market-intelligence')}
-                          className="text-xs text-primary font-bold hover:underline flex items-center"
+                          className="text-xs text-primary font-bold hover:underline flex items-center cursor-pointer"
                       >
                           View Full Dashboard <ChevronRight size={14} />
                       </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* For MVP Dashboard view, using static data. In full version, fetch from /market/snapshot/ */}
-                      <div className="p-3 bg-bg/60 rounded-xl">
-                        <p className="text-xs text-text-muted font-semibold">Grapes</p>
-                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
-                            ₹120 <span className="text-success text-[10px] bg-success/10 px-2 py-0.5 rounded-full">5.2% ↑</span>
-                        </p>
-                      </div>
-                      <div className="p-3 bg-bg/60 rounded-xl">
-                        <p className="text-xs text-text-muted font-semibold">Pomegranate</p>
-                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
-                            ₹150 <span className="text-danger text-[10px] bg-danger/10 px-2 py-0.5 rounded-full">-2.1% ↓</span>
-                        </p>
-                      </div>
-                      <div className="p-3 bg-bg/60 rounded-xl">
-                        <p className="text-xs text-text-muted font-semibold">Tomato</p>
-                        <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
-                            ₹40 <span className="text-success text-[10px] bg-success/10 px-2 py-0.5 rounded-full">15.0% ↑</span>
-                        </p>
-                      </div>
+                      {marketSnapshot && marketSnapshot.length > 0 ? (
+                        marketSnapshot.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="p-3 bg-bg/60 rounded-xl border border-border">
+                            <p className="text-xs text-text-muted font-semibold">{item.commodity_name}</p>
+                            <p className="text-lg font-bold text-text mt-1 flex justify-between items-center">
+                                ₹{item.modal_price || 'N/A'} 
+                                {item.change_7_day_percent !== null && item.change_7_day_percent !== undefined && (
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.change_7_day_percent >= 0 ? 'text-success bg-success/10' : 'text-danger bg-danger/10'}`}>
+                                    {Math.abs(item.change_7_day_percent).toFixed(1)}% {item.change_7_day_percent >= 0 ? '↑' : '↓'}
+                                  </span>
+                                )}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-3 py-4 text-center text-xs text-text-muted">
+                          No market snapshot data available.
+                        </div>
+                      )}
                   </div>
               </div>
 
