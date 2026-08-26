@@ -17,9 +17,9 @@ export default function MarketIntelligence() {
   const fetchSnapshot = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/market/snapshot/');
-      if (response && response.data) {
-          setSnapshotData(response.data);
+      const response = await api.request('/market/snapshot/');
+      if (response && response.length > 0) {
+          setSnapshotData(response);
       } else {
           setSnapshotData([]);
       }
@@ -37,8 +37,9 @@ export default function MarketIntelligence() {
 
     setUploading(true);
     try {
-      await api.importMarketData(file);
-      alert('Market data imported successfully!');
+      const response = await api.importMarketData(file);
+      const msg = response?.message || 'Market data imported successfully!';
+      alert(msg);
       fetchSnapshot();
     } catch (error) {
       console.error(error);

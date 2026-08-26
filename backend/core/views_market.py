@@ -48,6 +48,7 @@ class MarketDataImportView(views.APIView):
                 elif 'low' in k_clean or 'min' in k_clean: header_map['low'] = k
                 elif 'high' in k_clean or 'max' in k_clean: header_map['high'] = k
 
+            first_row_error = None
             for index, row in df.iterrows():
                 try:
                     commodity_name = str(row.get(header_map.get('commodity', '_miss_'), '')).strip()
@@ -57,6 +58,8 @@ class MarketDataImportView(views.APIView):
 
                     # Check required fields
                     if not commodity_name or commodity_name.lower() == 'nan' or not market_name or market_name.lower() == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
+                        if not first_row_error:
+                            first_row_error = f"Row {index+1} missing required data: commodity='{commodity_name}', market='{market_name}', date='{date_val}', modal_price='{modal_price}'"
                         continue
 
                     # Parse Date
@@ -65,7 +68,8 @@ class MarketDataImportView(views.APIView):
                             parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
                         else:
                             parsed_date = pd.to_datetime(date_val).date()
-                    except:
+                    except Exception as date_e:
+                        if not first_row_error: first_row_error = f"Row {index+1} invalid date format: '{date_val}' (Error: {str(date_e)})"
                         continue
 
                     # Parse Prices securely
@@ -75,7 +79,9 @@ class MarketDataImportView(views.APIView):
                         except: return None
                         
                     m_price = parse_price(modal_price)
-                    if m_price is None: continue
+                    if m_price is None:
+                        if not first_row_error: first_row_error = f"Row {index+1} invalid numeric format for modal price: '{modal_price}'"
+                        continue
 
                     # Match crop if exists
                     crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
@@ -96,25 +102,29 @@ class MarketDataImportView(views.APIView):
                         }
                     )
                     records_created += 1
-                except:
-                    continue  # Fail silently per row if error happens during mapping/inserting
+                except Exception as row_e:
+                    if not first_row_error: first_row_error = f"Row {index+1} database insertion failure: {str(row_e)}"
+                    continue
 
             if records_created == 0:
-                missing = [key for key in ['commodity', 'market', 'date', 'modal'] if key not in header_map]
                 batch.status = 'Failed'
                 batch.save()
-                error_msg = f"Failed to import any valid rows. Found columns: {list(df.columns)}. "
+                
+                missing = [key for key in ['commodity', 'market', 'date', 'modal'] if key not in header_map]
+                error_msg = f"Failed to import any valid rows from a total of {len(df)} rows. "
                 if missing:
-                    error_msg += f"Could not map required columns logically: {missing}. Please check spelling."
+                    error_msg += f"Could not securely map required columns: {missing}. Found Excel columns: {list(df.columns)}. "
                 else:
-                    error_msg += "Required columns mapped successfully, but all rows evaluated to missing or 'nan' for either Commodity Name, Market, Date, or Modal Price."
+                    error_msg += f"Columns mapped successfully, but parsing failed natively. First internal error: [{first_row_error}]"
                 
                 return Response({'error': error_msg}, status=400)
                 
             batch.records_processed = records_created
             batch.status = 'Success'
             batch.save()
-            return Response({'message': f'Successfully processed {records_created} records', 'batch_id': batch.id})
+            
+            # Explicitly return X of Y metric
+            return Response({'message': f'Successfully processed {records_created} rows out of a total {len(df)} rows in the file', 'batch_id': batch.id})
             
         except Exception as e:
             import traceback
