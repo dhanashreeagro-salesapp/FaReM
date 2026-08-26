@@ -42,7 +42,7 @@ export default function MarketIntelligence() {
       fetchSnapshot();
     } catch (error) {
       console.error(error);
-      alert('Failed to import market data. Make sure it follows the exact template.');
+      alert('Failed to import market data: ' + (error.message || 'Unknown error'));
     } finally {
       setUploading(false);
       e.target.value = null; // reset input
@@ -71,7 +71,7 @@ export default function MarketIntelligence() {
               onChange={handleFileUpload} 
             />
             <button 
-                onClick={() => window.location.href = api.baseURL.replace('/api/v1', '/api/v1/market/template/')}
+                onClick={() => window.location.href = `${api.baseUrl}/market/template/`}
                 className="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5"
             >
                 Download Template
