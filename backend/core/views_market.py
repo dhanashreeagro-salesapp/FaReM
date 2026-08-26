@@ -37,13 +37,20 @@ class MarketDataImportView(views.APIView):
             
             records_created = 0
             for index, row in df.iterrows():
-                commodity_name = str(row.get('Commodity', '')).strip()
+                # Extract using the precise column names provided
+                commodity_name = str(row.get('Commodity Name', '')).strip()
                 market_name = str(row.get('Market', '')).strip()
                 date_val = row.get('Date')
-                modal_price = row.get('Modal Price')
+                modal_price = row.get('Modal ( Rs/q)')
                 
-                if not commodity_name or not market_name or pd.isna(date_val) or pd.isna(modal_price):
+                # Check required fields
+                if not commodity_name or commodity_name == 'nan' or not market_name or market_name == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
                     continue
+                
+                # Try falling back to alternative column names if the exact ones are missing
+                country = row.get('Country') if not pd.isna(row.get('Country')) else None
+                state = row.get('State') if not pd.isna(row.get('State')) else None
+                district = row.get('District') if not pd.isna(row.get('District')) else None
                 
                 # Match crop if exists
                 crop = CropMaster.objects.filter(crop_name__iexact=commodity_name).first()
@@ -56,8 +63,8 @@ class MarketDataImportView(views.APIView):
                         'import_batch': batch,
                         'crop': crop,
                         'modal_price': modal_price,
-                        'min_price': row.get('Min Price') if not pd.isna(row.get('Min Price')) else None,
-                        'max_price': row.get('Max Price') if not pd.isna(row.get('Max Price')) else None,
+                        'min_price': row.get('Low (Rs/qt)') if not pd.isna(row.get('Low (Rs/qt)')) else None,
+                        'max_price': row.get('High ( Rs/q)') if not pd.isna(row.get('High ( Rs/q)')) else None,
                     }
                 )
                 records_created += 1

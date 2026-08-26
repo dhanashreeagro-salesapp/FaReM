@@ -7,6 +7,9 @@ export default function MarketIntelligence() {
   const [snapshotData, setSnapshotData] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fileInputRef = React.useRef(null);
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
     fetchSnapshot();
   }, []);
@@ -14,7 +17,6 @@ export default function MarketIntelligence() {
   const fetchSnapshot = async () => {
     setLoading(true);
     try {
-      // Calling the real backend endpoint we created
       const response = await api.get('/market/snapshot/');
       if (response && response.data) {
           setSnapshotData(response.data);
@@ -23,14 +25,27 @@ export default function MarketIntelligence() {
       }
     } catch (error) {
       console.error("Failed to fetch market snapshot", error);
-      // Fallback dummy data for MVP
-      setSnapshotData([
-        { commodity_name: 'Grapes', latest_price: 120, change_7_day_percent: 5.2, total_managed_acreage: 240 },
-        { commodity_name: 'Pomegranate', latest_price: 150, change_7_day_percent: -2.1, total_managed_acreage: 180 },
-        { commodity_name: 'Tomato', latest_price: 40, change_7_day_percent: 15.0, total_managed_acreage: 320 }
-      ]);
+      setSnapshotData([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      await api.importMarketData(file);
+      alert('Market data imported successfully!');
+      fetchSnapshot();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to import market data. Make sure it follows the exact template.');
+    } finally {
+      setUploading(false);
+      e.target.value = null; // reset input
     }
   };
 
@@ -48,10 +63,19 @@ export default function MarketIntelligence() {
             >
                 <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
             </button>
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+            />
             <button 
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
             >
-                <Upload size={16} /> Import Excel Data
+                <Upload size={16} /> {uploading ? 'Importing...' : 'Import Excel Data'}
             </button>
         </div>
       </div>

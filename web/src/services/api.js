@@ -527,6 +527,22 @@ class ApiClient {
   // Offline Sync
   syncOfflineBatch(data) { return this.request('/sync/offline_batch/', { method: 'POST', body: JSON.stringify(data) }); }
 
+  // Market Intelligence
+  importMarketData(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.request('/market/import/', {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  // Audience Targeting
+  getFarmerIds(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/farmers/all_ids/${qs ? `?${qs}` : ''}`);
+  }
+
   getStoredUser() {
     try {
       return JSON.parse(localStorage.getItem('user'));

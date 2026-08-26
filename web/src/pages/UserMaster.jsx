@@ -69,7 +69,12 @@ export default function UserMaster() {
       setForm({ mobile_number: '', email: '', first_name: '', last_name: '', employee_id: '', role: 'FieldStaff', territory: '', reporting_manager: '', password: '' });
       await fetchUsers(true);
     } catch (err) {
-      setError(err.error || err.mobile_number?.[0] || err.detail || 'Failed to save user');
+      if (typeof err === 'object' && err !== null) {
+        const errorMsg = err.error || err.detail || err.mobile_number?.[0] || err.email?.[0] || err.employee_id?.[0] || JSON.stringify(err).slice(0, 100);
+        setError(errorMsg || 'Failed to save user');
+      } else {
+        setError(String(err) || 'Failed to save user');
+      }
     }
   };
 

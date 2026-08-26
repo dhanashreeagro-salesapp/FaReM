@@ -103,6 +103,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
         enrolled = self.request.query_params.get('enrolled')
         has_active_crops = self.request.query_params.get('has_active_crops')
         has_plots = self.request.query_params.get('has_plots')
+        weather_forecast = self.request.query_params.get('weather_forecast')
 
         if enrolled:
             from django.utils import timezone
@@ -124,6 +125,9 @@ class FarmerViewSet(viewsets.ModelViewSet):
 
         if has_plots == 'true':
             queryset = queryset.filter(plots__isnull=False).distinct()
+
+        if weather_forecast:
+            queryset = queryset.filter(plots__weather_snapshots__forecast_summary__icontains=weather_forecast).distinct()
 
         if crop_name or stage_name:
             plot_filters = {'plots__is_active': True, 'plots__seasons__status': 'Active'}

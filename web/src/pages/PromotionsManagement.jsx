@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { CheckCircle, XCircle, Clock, Edit2, Copy, Trash2, StopCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Edit2, Copy, Trash2, StopCircle, Plus } from 'lucide-react';
 import SendMessageModal from '../components/SendMessageModal';
+import AudienceTargetingModal from '../components/AudienceTargetingModal';
 
 export default function PromotionsManagement() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('upcoming');
   
-  const [modalConfig, setModalConfig] = useState(null); // { mode: 'edit'|'duplicate', initialData: {...} }
+  const [modalConfig, setModalConfig] = useState(null);
 
   const fetchBatches = async () => {
     try {
@@ -70,9 +71,17 @@ export default function PromotionsManagement() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-xl font-heading font-bold text-text">Promotions Management</h2>
-        <p className="text-sm text-text-muted mt-1">Manage, edit, or duplicate your scheduled and past messaging campaigns.</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-heading font-bold text-text">Promotions Management</h2>
+          <p className="text-sm text-text-muted mt-1">Manage, edit, or duplicate your scheduled and past messaging campaigns.</p>
+        </div>
+        <button 
+          onClick={() => setModalConfig({ mode: 'create_audience' })}
+          className="flex items-center gap-2 bg-primary text-white hover:bg-primary-dark px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press"
+        >
+          <Plus size={16} /> New Campaign
+        </button>
       </div>
 
       <div className="flex gap-4 mb-6 border-b border-border">
@@ -149,11 +158,21 @@ export default function PromotionsManagement() {
         </table>
       </div>
 
-      {modalConfig && (
+      {modalConfig && modalConfig.mode === 'create_audience' ? (
+        <AudienceTargetingModal
+          onClose={() => setModalConfig(null)}
+          onAudienceSelected={(farmerIds) => {
+            setModalConfig({
+              mode: 'create',
+              initialData: { farmer_ids: farmerIds, content: '', channel: 'WhatsApp', scheduleMode: 'Immediate', startDate: '', endDate: '', frequency: 'Once' }
+            });
+          }}
+        />
+      ) : modalConfig && (
         <SendMessageModal
-          farmerIds={modalConfig.initialData.farmer_ids}
+          farmerIds={modalConfig.initialData.farmer_ids || []}
           initialData={modalConfig.initialData}
-          mode={modalConfig.mode}
+          mode={modalConfig.mode === 'create' ? 'create' : modalConfig.mode}
           onClose={() => setModalConfig(null)}
           onSuccess={() => {
             setModalConfig(null);
