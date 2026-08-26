@@ -256,8 +256,8 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-surface border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-8">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto pt-10 pb-10">
+      <div className="bg-surface border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-auto">
         
         {/* Header */}
         <div className="flex justify-between items-center border-b border-border pb-4">
