@@ -8,7 +8,13 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
   
   const [selectedTerritory, setSelectedTerritory] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
+  const [selectedStage, setSelectedStage] = useState('');
   const [selectedWeather, setSelectedWeather] = useState('');
+  
+  const [district, setDistrict] = useState('');
+  const [taluka, setTaluka] = useState('');
+  const [village, setVillage] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [matchedCount, setMatchedCount] = useState(null);
   const [matchedIds, setMatchedIds] = useState([]);
@@ -18,7 +24,7 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
       try {
         const [terrData, cropData] = await Promise.all([
           api.getTerritories(),
-          api.getCropMaster()
+          api.getCrops()
         ]);
         setTerritories(terrData.results || terrData);
         setCrops(cropData.results || cropData);
@@ -35,7 +41,12 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
       const params = {};
       if (selectedTerritory) params.territory = selectedTerritory;
       if (selectedCrop) params.crop = selectedCrop;
+      if (selectedStage) params.stage = selectedStage;
       if (selectedWeather) params.weather_forecast = selectedWeather;
+      
+      if (district) params.district = district;
+      if (taluka) params.taluka = taluka;
+      if (village) params.village = village;
       
       const ids = await api.getFarmerIds(params);
       setMatchedIds(ids);
@@ -55,33 +66,23 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
     onAudienceSelected(matchedIds);
   };
 
+  // Find the selected crop object to get its stages
+  const activeCropObj = crops.find(c => c.crop_name === selectedCrop);
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-bg rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-stagger-in">
+      <div className="bg-bg rounded-xl shadow-xl w-full max-w-2xl overflow-hidden animate-stagger-in">
         <div className="flex justify-between items-center p-4 border-b border-border bg-surface">
           <h3 className="font-heading font-semibold text-text flex items-center gap-2"><Users size={18}/> Target Audience</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text"><X size={18} /></button>
         </div>
         
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
           <p className="text-sm text-text-muted">Select filters to build an audience for your campaign.</p>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-text mb-1">Crop</label>
-              <select 
-                value={selectedCrop}
-                onChange={e => { setSelectedCrop(e.target.value); setMatchedCount(null); }}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
-              >
-                <option value="">Any Crop</option>
-                {crops.map(c => (
-                  <option key={c.id} value={c.crop_name}>{c.crop_name}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Primary Demographics */}
+            <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-semibold text-text mb-1">Region / Territory</label>
               <select 
                 value={selectedTerritory}
@@ -95,7 +96,74 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
               </select>
             </div>
 
-            <div className="col-span-2">
+            <div>
+              <label className="block text-sm font-semibold text-text mb-1">Crop</label>
+              <select 
+                value={selectedCrop}
+                onChange={e => { 
+                  setSelectedCrop(e.target.value); 
+                  setSelectedStage(''); 
+                  setMatchedCount(null); 
+                }}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+              >
+                <option value="">Any Crop</option>
+                {crops.map(c => (
+                  <option key={c.id} value={c.crop_name}>{c.crop_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-text mb-1">Crop Stage (Optional)</label>
+              <select 
+                value={selectedStage}
+                onChange={e => { setSelectedStage(e.target.value); setMatchedCount(null); }}
+                disabled={!selectedCrop}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Any Stage</option>
+                {activeCropObj?.stages?.map(s => (
+                  <option key={s.id} value={s.stage_name}>{s.stage_name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Geographical Granularity */}
+            <div>
+              <label className="block text-sm font-semibold text-text mb-1">District</label>
+              <input 
+                type="text" 
+                value={district}
+                onChange={e => { setDistrict(e.target.value); setMatchedCount(null); }}
+                placeholder="e.g. Nashik"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-text mb-1">Taluka</label>
+              <input 
+                type="text" 
+                value={taluka}
+                onChange={e => { setTaluka(e.target.value); setMatchedCount(null); }}
+                placeholder="e.g. Sinnar"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-sm font-semibold text-text mb-1">Village</label>
+              <input 
+                type="text" 
+                value={village}
+                onChange={e => { setVillage(e.target.value); setMatchedCount(null); }}
+                placeholder="e.g. Dongargaon"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-semibold text-text mb-1">Weather Condition (Forecast)</label>
               <select 
                 value={selectedWeather}
@@ -111,12 +179,12 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
             </div>
           </div>
           
-          <div className="flex gap-2 justify-center mt-2">
+          <div className="flex gap-2 justify-center mt-6">
             <button 
               type="button" 
               onClick={handleSearch} 
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary hover:bg-primary/5 text-sm font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary hover:bg-primary/5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
             >
               <Search size={16} />
               {loading ? 'Calculating...' : 'Calculate Audience Size'}
@@ -130,15 +198,15 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
             </div>
           )}
 
-          <div className="flex justify-end pt-4 border-t border-border gap-2 mt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text transition-colors">
+          <div className="flex justify-end pt-4 border-t border-border gap-2 mt-6">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text transition-colors cursor-pointer">
               Cancel
             </button>
             <button 
               type="button" 
               onClick={handleContinue}
               disabled={matchedCount === null || matchedCount === 0} 
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 btn-press"
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 cursor-pointer"
             >
               Continue to Message
             </button>
