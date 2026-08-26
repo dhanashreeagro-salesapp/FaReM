@@ -21,7 +21,7 @@ class MarketDataImportView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        if request.user.role != Role.ADMIN:
+        if request.user.role not in [Role.ADMIN, Role.CONTENT_ADMIN]:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
             
         file = request.FILES.get('file')
