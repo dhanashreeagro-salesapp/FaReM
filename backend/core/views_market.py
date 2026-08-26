@@ -96,9 +96,20 @@ class MarketDataImportView(views.APIView):
                         }
                     )
                     records_created += 1
-                except Exception as row_e:
-                    print(f"Skipping row {index}: {row_e}")
-                    pass
+                except:
+                    continue  # Fail silently per row if error happens during mapping/inserting
+
+            if records_created == 0:
+                missing = [key for key in ['commodity', 'market', 'date', 'modal'] if key not in header_map]
+                batch.status = 'Failed'
+                batch.save()
+                error_msg = f"Failed to import any valid rows. Found columns: {list(df.columns)}. "
+                if missing:
+                    error_msg += f"Could not map required columns logically: {missing}. Please check spelling."
+                else:
+                    error_msg += "Required columns mapped successfully, but all rows evaluated to missing or 'nan' for either Commodity Name, Market, Date, or Modal Price."
+                
+                return Response({'error': error_msg}, status=400)
                 
             batch.records_processed = records_created
             batch.status = 'Success'
@@ -204,5 +215,4 @@ class MarketSnapshotView(views.APIView):
                 'in_portfolio': crop_name in top_crops
             })
             
-        serializer = MarketTrendSerializer(results, many=True)
-        return Response(serializer.data)
+        return Response(results)
