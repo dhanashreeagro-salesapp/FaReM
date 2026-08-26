@@ -108,7 +108,7 @@ class MarketDataTemplateView(views.APIView):
     """
     Downloads structural template for Market Intelligence Upload
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request, *args, **kwargs):
         import pandas as pd
