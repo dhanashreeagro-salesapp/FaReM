@@ -41,10 +41,12 @@ class PlannerViewSet(viewsets.ViewSet):
                     if p.location:
                         village_points.append(p.location.centroid)
             
-            if user_point and village_points:
+            if village_points:
                 x = sum(p.x for p in village_points) / len(village_points)
                 y = sum(p.y for p in village_points) / len(village_points)
                 village_centroid = Point(x, y, srid=4326)
+                
+            if user_point and village_centroid:
                 route_line = LineString(user_point, village_centroid, srid=4326)
                 
         farmers = farmers.prefetch_related('activities', 'plots', 'plots__seasons', 'plots__seasons__crop', 'plots__seasons__current_stage').distinct()
@@ -66,17 +68,19 @@ class PlannerViewSet(viewsets.ViewSet):
             large_plot_threshold = max(all_areas)
             
         market_trends = {}
-        for rate in MarketRate.objects.all().order_by('-date'):
-            if rate.crop_id not in market_trends:
-                market_trends[rate.crop_id] = [rate]
-            elif len(market_trends[rate.crop_id]) < 3:
-                market_trends[rate.crop_id].append(rate)
+        for rate in MarketRate.objects.values('crop_id', 'avg_price', 'inward_quantity', 'date').order_by('-date'):
+            if rate['crop_id'] not in market_trends:
+                market_trends[rate['crop_id']] = [rate]
+            elif len(market_trends[rate['crop_id']]) < 3:
+                market_trends[rate['crop_id']].append(rate)
                 
         for farmer in farmers:
-            last_visit = farmer.activities.filter(activity_type='Visit').order_by('-date').first()
+            visits = [a for a in farmer.activities.all() if a.activity_type == 'Visit']
+            last_visit = max(visits, key=lambda a: a.date) if visits else None
             days_since = (today - last_visit.date).days if last_visit else (today - farmer.date_added.date()).days
             
             min_distance = 999999 
+            min_distance_from_village = 999999
             is_in_corridor = False
             
             total_active_area = 0
@@ -86,19 +90,22 @@ class PlannerViewSet(viewsets.ViewSet):
             
             for plot in farmer.plots.all():
                 if plot.location:
-                    d = 999999
                     if user_point:
                         d = user_point.distance(plot.location) * 111
-                    if d < min_distance:
-                        min_distance = d
-                        
-                    if village and user_point and village_points and route_line and village_centroid:
-                        if route_line.distance(plot.location) * 111 <= 10 or village_centroid.distance(plot.location) * 111 <= 10:
-                            is_in_corridor = True
+                        if d < min_distance:
+                            min_distance = d
+                            
+                    if village and village_points and village_centroid:
+                        dist_to_village = village_centroid.distance(plot.location) * 111
+                        if dist_to_village < min_distance_from_village:
+                            min_distance_from_village = dist_to_village
+                        if user_point and route_line:
+                            if route_line.distance(plot.location) * 111 <= 10 or dist_to_village <= 10:
+                                is_in_corridor = True
                 
                 if plot.is_active:
                     total_active_area += float(plot.area_acres or plot.calculated_area_acres or 0)
-                    for season in plot.seasons.filter(status='Active'):
+                    for season in [s for s in plot.seasons.all() if s.status == 'Active']:
                         crop = season.crop
                         stage = season.current_stage
                         if crop and stage:
@@ -114,12 +121,12 @@ class PlannerViewSet(viewsets.ViewSet):
                             elif len(rates) == 2:
                                 prev = rates[1]
                                 
-                            if prev and len(rates) > 0 and rates[0].avg_price and prev.avg_price and rates[0].avg_price > prev.avg_price:
+                            if prev and len(rates) > 0 and rates[0]['avg_price'] and prev['avg_price'] and rates[0]['avg_price'] > prev['avg_price']:
                                 has_high_market_trend = True
                                 
                             if len(rates) == 3:
-                                if rates[0].inward_quantity and rates[1].inward_quantity and rates[2].inward_quantity:
-                                    if rates[2].inward_quantity > rates[1].inward_quantity > rates[0].inward_quantity:
+                                if rates[0]['inward_quantity'] and rates[1]['inward_quantity'] and rates[2]['inward_quantity']:
+                                    if rates[2]['inward_quantity'] > rates[1]['inward_quantity'] > rates[0]['inward_quantity']:
                                         has_consistent_inward_drop = True
                                     
             if user_point:
@@ -129,6 +136,9 @@ class PlannerViewSet(viewsets.ViewSet):
                 else:
                     if min_distance > 10:
                         continue
+            elif village and village_points and village_centroid:
+                if min_distance_from_village > 10:
+                    continue
             
             score = 0
             tags = []

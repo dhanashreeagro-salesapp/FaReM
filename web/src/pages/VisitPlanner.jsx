@@ -114,21 +114,18 @@ export default function VisitPlanner() {
         
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-             <input 
-              type="text"
-              list="village-list"
+             <select
               value={village}
               onChange={handleVillageChange}
-              placeholder="Search village..."
-              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-48 sm:w-64"
-            />
-            <datalist id="village-list">
+              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-48 sm:w-64 appearance-none"
+            >
+              <option value="">Select a village...</option>
               {availableVillages.map((v, i) => (
                 <option key={i} value={v.village}>
-                  {v.village} ({v.taluka}, {v.district})
+                  {v.village} {v.taluka && v.district ? `(${v.taluka}, ${v.district})` : ''}
                 </option>
               ))}
-            </datalist>
+            </select>
           </div>
           
           <button 
