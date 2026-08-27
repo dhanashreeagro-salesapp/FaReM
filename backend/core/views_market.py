@@ -88,13 +88,17 @@ class MarketDataImportView(views.APIView):
             first_row_error = None
             for index, row in df.iterrows():
                 try:
-                    commodity_name = str(row.get(header_map.get('commodity', '_miss_'), '')).strip()
-                    market_name = str(row.get(header_map.get('market', '_miss_'), '')).strip()
+                    def get_clean_str(key):
+                        val = row.get(header_map.get(key, '_miss_'))
+                        return '' if pd.isna(val) else str(val).strip()
+                    
+                    commodity_name = get_clean_str('commodity')
+                    market_name = get_clean_str('market')
                     date_val = row.get(header_map.get('date', '_miss_'))
                     modal_price = row.get(header_map.get('modal', '_miss_'))
 
                     # Check required fields
-                    if not commodity_name or commodity_name.lower() == 'nan' or not market_name or market_name.lower() == 'nan' or pd.isna(date_val) or pd.isna(modal_price):
+                    if not commodity_name or commodity_name.lower() == 'nan' or commodity_name == 'None' or not market_name or market_name.lower() == 'nan' or market_name == 'None' or pd.isna(date_val) or pd.isna(modal_price):
                         if not first_row_error:
                             first_row_error = f"Row {index+1} missing required data: commodity='{commodity_name}', market='{market_name}', date='{date_val}', modal_price='{modal_price}'"
                         continue
@@ -109,10 +113,17 @@ class MarketDataImportView(views.APIView):
                         if not first_row_error: first_row_error = f"Row {index+1} invalid date format: '{date_val}' (Error: {str(date_e)})"
                         continue
 
-                    # Parse Prices securely
+                    # Parse Prices securely (handling commas and spaces)
                     def parse_price(val):
-                        if pd.isna(val) or str(val).strip().lower() == 'nan' or val == '_miss_': return None
-                        try: return float(val)
+                        if pd.isna(val) or str(val).strip().lower() == 'nan' or str(val) == '_miss_': return None
+                        try:
+                            # Strip commas and any whitespace
+                            import re
+                            val_str = str(val).replace(',', '').strip()
+                            match = re.search(r'[-+]?\d*\.\d+|\d+', val_str)
+                            if match:
+                                return float(match.group())
+                            return None
                         except: return None
                         
                     m_price = parse_price(modal_price)
