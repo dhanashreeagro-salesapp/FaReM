@@ -183,8 +183,8 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
       setError("Please select a farmer");
       return;
     }
-    if (!notes || notes.trim().length < 10) {
-      setError("Please enter detailed visit notes (at least 10 characters)");
+    if (notes && notes.length > 3000) {
+      setError("Visit notes cannot exceed 3000 characters.");
       return;
     }
 
@@ -391,9 +391,9 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
         {/* Multiline Notes */}
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <label className="text-xs font-semibold text-text">Visit Notes & Observations</label>
-            <span className={`text-[11px] ${notes.length < 10 || notes.length > 3000 ? 'text-danger' : 'text-emerald-600'}`}>
-              {notes.length} / 3000 chars (Min 10)
+            <label className="text-xs font-semibold text-text">Visit Notes & Observations (Optional)</label>
+            <span className={`text-[11px] ${notes.length > 3000 ? 'text-danger' : 'text-text-muted'}`}>
+              {notes.length} / 3000 chars
             </span>
           </div>
           <textarea
@@ -445,7 +445,7 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
           </button>
           <button
             type="button"
-            disabled={loading || notes.length < 10 || notes.length > 3000}
+            disabled={loading || notes.length > 3000}
             onClick={handleSaveVisit}
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all cursor-pointer"
           >
