@@ -357,9 +357,8 @@ class FarmerViewSet(viewsets.ModelViewSet):
     def villages(self, request):
         queryset = self.get_queryset()
         villages = queryset.exclude(village='').exclude(village__isnull=True)\
-            .values('village', 'taluka', 'district')\
-            .distinct().order_by('village')
-        return Response(list(villages))
+            .values_list('village', flat=True).distinct().order_by('village')
+        return Response([{'village': v} for v in villages])
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def all_ids(self, request):

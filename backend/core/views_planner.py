@@ -21,6 +21,8 @@ class PlannerViewSet(viewsets.ViewSet):
         lat = params.get('lat')
         lng = params.get('lng')
         village = params.get('village')
+        crop_id = params.get('crop')
+        stage_id = params.get('stage')
         
         from .models import AppConfiguration
         config = AppConfiguration.get_config()
@@ -28,15 +30,31 @@ class PlannerViewSet(viewsets.ViewSet):
         
         farmers = Farmer.objects.filter(assigned_staff=request.user, status='Active')
         
-        user_point = Point(float(lng), float(lat), srid=4326) if lat and lng else None
+        if crop_id or stage_id:
+            plot_filters = {'plots__is_active': True, 'plots__seasons__status': 'Active'}
+            if crop_id:
+                plot_filters['plots__seasons__crop__id'] = crop_id
+            if stage_id:
+                plot_filters['plots__seasons__current_stage__id'] = stage_id
+            farmers = farmers.filter(**plot_filters).distinct()
+            
+        if village:
+            farmers = farmers.filter(village__icontains=village)
+            
+        try:
+            lat_float = float(lat) if lat else None
+            lng_float = float(lng) if lng else None
+        except ValueError:
+            lat_float = lng_float = None
+            
+        user_point = Point(lng_float, lat_float, srid=4326) if lat_float and lng_float else None
         
-        village_farmers = farmers.filter(village__icontains=village) if village else farmers
         village_points = []
         route_line = None
         village_centroid = None
         
         if village:
-            for vf in village_farmers.prefetch_related('plots'):
+            for vf in farmers.prefetch_related('plots'):
                 for p in vf.plots.all():
                     if p.location:
                         village_points.append(p.location.centroid)

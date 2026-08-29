@@ -2,33 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Calendar, CheckCircle, AlertTriangle, TrendingUp, Search } from 'lucide-react';
 import api from '../services/api';
 import LogVisitModal from '../components/LogVisitModal';
+import FarmerProfileModal from '../components/FarmerProfileModal';
 
 export default function VisitPlanner() {
   const [farmers, setFarmers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState(null);
   const [village, setVillage] = useState('');
+  const [crop, setCrop] = useState('');
+  const [stage, setStage] = useState('');
   const [availableVillages, setAvailableVillages] = useState([]);
+  const [availableCrops, setAvailableCrops] = useState([]);
+  const [availableStages, setAvailableStages] = useState([]);
   const [selectedFarmer, setSelectedFarmer] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
 
   const [showBigFarmers, setShowBigFarmers] = useState(false);
 
   useEffect(() => {
-    fetchVillages();
+    fetchFilters();
     fetchFarmers();
   }, []);
 
-  const fetchVillages = async () => {
+  const fetchFilters = async () => {
     try {
-      const data = await api.getVillages();
-      setAvailableVillages(data);
+      const [vData, cData, sData] = await Promise.all([
+        api.getVillages(),
+        api.getCrops(),
+        api.getCropStages()
+      ]);
+      setAvailableVillages(vData);
+      setAvailableCrops(cData?.results || cData || []);
+      setAvailableStages(sData?.results || sData || []);
     } catch (error) {
-      console.error('Failed to fetch villages', error);
+      console.error('Failed to fetch filters', error);
     }
   };
 
-  const fetchFarmers = async (coords = null, selectedVillage = village, bigFarmersFlag = showBigFarmers) => {
+  const fetchFarmers = async (coords = location, selectedVillage = village, selectedCrop = crop, selectedStage = stage, bigFarmersFlag = showBigFarmers) => {
     setLoading(true);
+    setFarmers([]); // Clear existing list on fetch
     try {
       if (bigFarmersFlag && selectedVillage) {
         const data = await api.getBigFarmers(selectedVillage);
@@ -48,6 +61,12 @@ export default function VisitPlanner() {
         }
         if (selectedVillage) {
           params.village = selectedVillage;
+        }
+        if (selectedCrop) {
+          params.crop = selectedCrop;
+        }
+        if (selectedStage) {
+          params.stage = selectedStage;
         }
         
         const data = await api.getDailyPlan(params);
@@ -78,13 +97,43 @@ export default function VisitPlanner() {
 
   const handleVillageChange = (e) => {
     setVillage(e.target.value);
-    fetchFarmers(location, e.target.value, showBigFarmers);
+    fetchFarmers(location, e.target.value, crop, stage, showBigFarmers);
+  };
+
+  const handleCropChange = (e) => {
+    setCrop(e.target.value);
+    fetchFarmers(location, village, e.target.value, stage, showBigFarmers);
+  };
+
+  const handleStageChange = (e) => {
+    setStage(e.target.value);
+    fetchFarmers(location, village, crop, e.target.value, showBigFarmers);
   };
 
   const toggleBigFarmers = () => {
     const newVal = !showBigFarmers;
     setShowBigFarmers(newVal);
-    fetchFarmers(location, village, newVal);
+    fetchFarmers(location, village, crop, stage, newVal);
+  };
+
+  const createRoutePlan = () => {
+    if (farmers.length === 0) return;
+    
+    // Attempt to collect coordinates from farmers' plots or just use village names
+    // Given the Google Maps URL constraints, we'll try to find coordinates from plots 
+    // or fallback to just location search
+    const waypoints = farmers.slice(0, 9).map(f => {
+        // If we have actual coordinates in the frontend, we would use them. 
+        // For now, we can use Village + Taluka + District as a waypoint search string
+        return encodeURIComponent(`${f.farmer.village} ${f.farmer.taluka || ''} ${f.farmer.district || ''}`);
+    }).join('|');
+    
+    const origin = location ? `${location.latitude},${location.longitude}` : (farmers[0] ? encodeURIComponent(farmers[0].farmer.village) : '');
+    
+    if (!origin && !waypoints) return;
+    
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&waypoints=${waypoints}&destination=${origin}`;
+    window.open(url, '_blank');
   };
 
   const renderTags = (tags) => {
@@ -122,7 +171,37 @@ export default function VisitPlanner() {
               <option value="">Select a village...</option>
               {availableVillages.map((v, i) => (
                 <option key={i} value={v.village}>
-                  {v.village} {v.taluka && v.district ? `(${v.taluka}, ${v.district})` : ''}
+                  {v.village}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="relative">
+             <select
+              value={crop}
+              onChange={handleCropChange}
+              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-32 sm:w-40 appearance-none"
+            >
+              <option value="">All Crops</option>
+              {availableCrops.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.crop_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative">
+             <select
+              value={stage}
+              onChange={handleStageChange}
+              className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors w-32 sm:w-40 appearance-none"
+            >
+              <option value="">All Stages</option>
+              {availableStages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.stage_name}
                 </option>
               ))}
             </select>
@@ -144,6 +223,16 @@ export default function VisitPlanner() {
             <Navigation size={16} className={location ? 'animate-pulse' : ''} />
             {location ? 'Location Active' : 'Use Current'}
           </button>
+
+          {farmers.length > 0 && (
+             <button 
+               onClick={createRoutePlan}
+               className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors"
+             >
+               <MapPin size={16} />
+               Create Route Plan
+             </button>
+          )}
         </div>
       </div>
 
@@ -167,7 +256,10 @@ export default function VisitPlanner() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {farmers.map((item) => (
             <div key={item.farmer.id} className="bg-surface rounded-2xl p-5 border border-border hover:border-primary/30 transition-all shadow-sm hover:shadow-md flex flex-col justify-between group">
-              <div>
+              <div 
+                className="cursor-pointer" 
+                onClick={() => setSelectedProfile({ ...item.farmer, smartScore: item.smart_score, tags: item.tags })}
+              >
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="text-lg font-heading font-semibold text-text group-hover:text-primary transition-colors">{item.farmer.full_name}</h3>
@@ -214,7 +306,19 @@ export default function VisitPlanner() {
         isOpen={!!selectedFarmer} 
         farmer={selectedFarmer} 
         onClose={() => setSelectedFarmer(null)} 
-        onVisitLogged={() => fetchFarmers(location, village)}
+        onVisitLogged={() => fetchFarmers(location, village, crop, stage, showBigFarmers)}
+      />
+
+      <FarmerProfileModal
+        isOpen={!!selectedProfile}
+        farmer={selectedProfile}
+        smartScore={selectedProfile?.smartScore}
+        tags={selectedProfile?.tags}
+        onClose={() => setSelectedProfile(null)}
+        onLogVisit={(f) => {
+            setSelectedProfile(null);
+            setSelectedFarmer(f);
+        }}
       />
     </div>
   );
