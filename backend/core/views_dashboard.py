@@ -373,8 +373,6 @@ class HierarchyAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        if user.role not in [Role.ADMIN, Role.ZONAL_MANAGER, Role.TERRITORY_MANAGER]:
-            return Response({"error": "Hierarchy tab restricted to Managers and Admin"}, status=status.HTTP_403_FORBIDDEN)
 
         from collections import defaultdict
         from django.utils import timezone
