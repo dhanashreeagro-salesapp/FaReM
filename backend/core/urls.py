@@ -55,6 +55,8 @@ urlpatterns = [
     path('dashboard/active_crops/', views_dashboard.ActiveCropsAPIView.as_view(), name='dashboard_active_crops'),
     path('dashboard/active_crops', views_dashboard.ActiveCropsAPIView.as_view()),
     path('active-crops/', views_dashboard.ActiveCropsAPIView.as_view(), name='active_crops_alias'),
+    path('dashboard/overdue_visits/', views_dashboard.OverdueVisitsAPIView.as_view(), name='dashboard_overdue_visits'),
+    path('dashboard/overdue_visits', views_dashboard.OverdueVisitsAPIView.as_view()),
     path('dashboard/farmer_plots/', views_dashboard.FarmerPlotsAPIView.as_view(), name='dashboard_farmer_plots'),
     path('dashboard/farmer_plots', views_dashboard.FarmerPlotsAPIView.as_view()),
     path('farmer-plots/', views_dashboard.FarmerPlotsAPIView.as_view(), name='farmer_plots_alias'),

@@ -3,6 +3,7 @@ import { useAuth } from '../components/AuthProvider';
 import api from '../services/api';
 import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PlotsModal, CropsModal, VisitsModal, CallsModal, OverdueModal } from '../components/DashboardModals';
 
 const GIT_SHA = 'bd393dc';
 
@@ -19,6 +20,11 @@ export default function DashboardV2() {
   const [responseTimeMs, setResponseTimeMs] = useState(null);
   const [httpStatus, setHttpStatus] = useState(null);
   const [activeTab, setActiveTab] = useState('metrics'); // 'metrics' or 'hierarchy'
+
+  // Modal State
+  const [modalType, setModalType] = useState(null);
+  const [modalData, setModalData] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   // Hierarchy State (Loaded independently)
   const [hierarchyData, setHierarchyData] = useState(null);
@@ -80,6 +86,35 @@ export default function DashboardV2() {
       setHierarchyError(err.message || 'Failed to load hierarchy');
     } finally {
       setHierarchyLoading(false);
+    }
+  };
+
+  const handleOpenModal = async (type) => {
+    setModalType(type);
+    setModalLoading(true);
+    setModalData([]);
+    
+    try {
+      let res;
+      if (type === 'plots') {
+        res = await api.getFarmerPlots();
+      } else if (type === 'crops') {
+        res = await api.getActiveCrops();
+      } else if (type === 'visits') {
+        res = await api.getFieldVisits();
+      } else if (type === 'calls') {
+        res = await api.getCallLogs();
+      } else if (type === 'overdue') {
+        res = await api.getOverdueVisits();
+      }
+      
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      setModalData(list);
+    } catch (err) {
+      console.error(`Failed loading ${type}:`, err);
+      setModalData([]);
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -199,41 +234,47 @@ export default function DashboardV2() {
                   label="Total Active Farmers"
                   value={data.total_farmers ?? 0}
                   color="bg-emerald-50 text-emerald-700 border-emerald-200"
+                  onClick={() => navigate('/farmers')}
                 />
                 <StatCard
                   id="stat-plots"
                   icon={MapPin}
                   label="Total Plots"
                   value={data.total_plots ?? 0}
-                  color="bg-blue-50 text-blue-700 border-blue-200"
+                  color="bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-500 cursor-pointer"
+                  onClick={() => handleOpenModal('plots')}
                 />
                 <StatCard
                   id="stat-crops"
                   icon={Sprout}
                   label="Active Crops"
                   value={data.active_crop_seasons ?? 0}
-                  color="bg-amber-50 text-amber-700 border-amber-200"
+                  color="bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-500 cursor-pointer"
+                  onClick={() => handleOpenModal('crops')}
                 />
                 <StatCard
                   id="stat-visits"
                   icon={Calendar}
                   label="Total Visits"
                   value={data.total_visits ?? 0}
-                  color="bg-purple-50 text-purple-700 border-purple-200"
+                  color="bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-500 cursor-pointer"
+                  onClick={() => handleOpenModal('visits')}
                 />
                 <StatCard
                   id="stat-calls"
                   icon={Calendar}
                   label="Total Calls"
                   value={data.total_calls ?? 0}
-                  color="bg-teal-50 text-teal-700 border-teal-200"
+                  color="bg-teal-50 text-teal-700 border-teal-200 hover:border-teal-500 cursor-pointer"
+                  onClick={() => handleOpenModal('calls')}
                 />
                 <StatCard
                   id="stat-overdue"
                   icon={AlertTriangle}
                   label="Overdue Visits"
                   value={data.overdue_visits ?? 0}
-                  color="bg-red-50 text-red-700 border-red-200"
+                  color="bg-red-50 text-red-700 border-red-200 hover:border-red-500 cursor-pointer"
+                  onClick={() => handleOpenModal('overdue')}
                 />
               </div>
 
@@ -359,15 +400,23 @@ export default function DashboardV2() {
           )}
         </div>
       )}
+      
+      {/* Modals */}
+      <PlotsModal isOpen={modalType === 'plots'} onClose={() => setModalType(null)} data={modalData} loading={modalLoading} />
+      <CropsModal isOpen={modalType === 'crops'} onClose={() => setModalType(null)} data={modalData} loading={modalLoading} />
+      <VisitsModal isOpen={modalType === 'visits'} onClose={() => setModalType(null)} data={modalData} loading={modalLoading} />
+      <CallsModal isOpen={modalType === 'calls'} onClose={() => setModalType(null)} data={modalData} loading={modalLoading} />
+      <OverdueModal isOpen={modalType === 'overdue'} onClose={() => setModalType(null)} data={modalData} loading={modalLoading} />
 
     </div>
   );
 }
 
-function StatCard({ id, icon: Icon, label, value, color }) {
+function StatCard({ id, icon: Icon, label, value, color, onClick }) {
   return (
     <div
       id={id}
+      onClick={onClick}
       className={`p-4 rounded-2xl border ${color} transition-all duration-200 shadow-sm flex flex-col justify-between h-28`}
     >
       <div className="flex justify-between items-center">

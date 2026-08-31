@@ -493,3 +493,88 @@ class ExportReportAPIView(APIView):
             
         return Response({'error': 'Invalid type'}, status=status.HTTP_400_BAD_REQUEST)
 
+class OverdueVisitsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        farmers = Farmer.objects.filter(status='Active')
+        
+        if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
+            team_users = user.get_team_users()
+            territories = []
+            if user.territory:
+                territories.extend(user.territory.get_all_sub_territories())
+            for managed_territory in user.managed_territories.all():
+                territories.extend(managed_territory.get_all_sub_territories())
+            territories = list(set(territories))
+            if territories:
+                farmers = farmers.filter(Q(assigned_staff__in=team_users) | Q(territory__in=territories))
+            else:
+                farmers = farmers.filter(assigned_staff__in=team_users)
+
+        from .models import AppConfiguration, FieldVisit, CropSeason
+        import datetime
+        from django.utils import timezone
+        from django.db.models import Max
+        config = AppConfiguration.get_config()
+        threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
+        cutoff_date = timezone.now().date() - datetime.timedelta(days=threshold_days)
+
+        recent_visited_farmer_ids = set(FieldVisit.objects.filter(
+            farmer__in=farmers, created_at__gte=cutoff_date
+        ).values_list('farmer_id', flat=True))
+
+        overdue_farmers = farmers.exclude(id__in=recent_visited_farmer_ids)
+        
+        results = []
+        last_visits = dict(
+            FieldVisit.objects.filter(farmer__in=overdue_farmers)
+            .values('farmer_id')
+            .annotate(max_date=Max('created_at'))
+            .values_list('farmer_id', 'max_date')
+        )
+        
+        today = timezone.now().date()
+
+        for farmer in overdue_farmers:
+            last_visit_date = last_visits.get(farmer.id)
+            if last_visit_date:
+                overdue_days = (today - last_visit_date.date()).days
+            else:
+                overdue_days = (today - farmer.date_added.date()).days if farmer.date_added else threshold_days
+
+            active_seasons = CropSeason.objects.filter(
+                plot__farmer=farmer, plot__is_active=True, status='Active'
+            ).select_related('crop', 'current_stage', 'plot')
+            
+            if not active_seasons.exists():
+                results.append({
+                    'id': f"{farmer.id}_nocrop",
+                    'farmer_name': farmer.full_name,
+                    'farmer_id': str(farmer.id),
+                    'village': farmer.village,
+                    'district': farmer.district,
+                    'crop_name': 'N/A',
+                    'crop_stage': 'N/A',
+                    'farmer_score': getattr(farmer, 'score', 0),
+                    'acreage': 0,
+                    'overdue_days': overdue_days
+                })
+            else:
+                for season in active_seasons:
+                    results.append({
+                        'id': str(season.id),
+                        'farmer_name': farmer.full_name,
+                        'farmer_id': str(farmer.id),
+                        'village': farmer.village,
+                        'district': farmer.district,
+                        'crop_name': season.crop.crop_name if season.crop else 'General',
+                        'crop_stage': season.current_stage.stage_name if season.current_stage else 'Active',
+                        'farmer_score': getattr(farmer, 'score', 0),
+                        'acreage': float(season.area_acres or season.plot.area_acres or 0),
+                        'overdue_days': overdue_days
+                    })
+                    
+        return Response(results)
+

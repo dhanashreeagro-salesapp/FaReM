@@ -465,6 +465,9 @@ class ApiClient {
   getFarmerPlots() {
     return this.request('/dashboard/farmer_plots/').catch(() => this.request('/farmer-plots/'));
   }
+  getOverdueVisits() {
+    return this.request('/dashboard/overdue_visits/');
+  }
   getHierarchy() {
     return this.request('/hierarchy/').catch(() => this.request('/dashboard/hierarchy/')).catch(() => this.request('/hierarchy'));
   }
