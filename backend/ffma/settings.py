@@ -157,3 +157,6 @@ if os.name == 'nt':
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Weather API Configuration
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', '')

@@ -949,16 +949,96 @@ def process_weather_bulk_push():
     """
     Evaluates weather forecast for active plots against WeatherRiskRule.
     Queues advisories as needed.
-    (MVP Implementation - logs execution)
     """
-    from .models import WeatherRiskRule, CropSeason, Plot
+    from .models import WeatherRiskRule, CropSeason, Plot, WeatherSnapshot, Recommendation
     from django.utils import timezone
+    from django.conf import settings
+    import requests
+
+    api_key = getattr(settings, 'WEATHER_API_KEY', '')
+    if not api_key:
+        print(f"[{timezone.now()}] Weather-Triggered Bulk Push: WEATHER_API_KEY not configured.")
+        return {"status": "error", "message": "WEATHER_API_KEY not configured"}
+
+    # 1. Group active plots geographically by district to minimize API calls
+    active_plots = Plot.objects.filter(is_active=True).select_related('farmer')
+    districts = set(p.farmer.district for p in active_plots if p.farmer and p.farmer.district)
+
+    weather_data = {}
+    for district in districts:
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/weather?q={district},IN&appid={api_key}&units=metric"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                weather_data[district] = {
+                    'temperature': data.get('main', {}).get('temp'),
+                    'rainfall_mm': data.get('rain', {}).get('1h', 0.0),
+                    'summary': data.get('weather', [{}])[0].get('description', '')
+                }
+        except Exception as e:
+            print(f"Error fetching weather for {district}: {e}")
+
+    # 2. Process plots and save snapshots
+    snapshots_created = 0
+    advisories_created = 0
     
-    # In a full implementation, this would:
-    # 1. Group active plots geographically
-    # 2. Fetch IMD weather for each group
-    # 3. Check WeatherRiskRule for crop/stage matches
-    # 4. Queue advisory for those farmers
-    
-    print(f"[{timezone.now()}] Weather-Triggered Bulk Push evaluated. Waiting for IMD API integration.")
-    return {"status": "success", "message": "Weather checks evaluated"}
+    for plot in active_plots:
+        district = plot.farmer.district
+        if not district or district not in weather_data:
+            continue
+            
+        wd = weather_data[district]
+        
+        # Save snapshot
+        snapshot = WeatherSnapshot.objects.create(
+            plot=plot,
+            temperature=wd['temperature'],
+            rainfall_mm=wd['rainfall_mm'],
+            forecast_summary=wd['summary'],
+            provider='OpenWeatherMap'
+        )
+        snapshots_created += 1
+
+        # 3. Check WeatherRiskRule for crop/stage matches
+        active_seasons = CropSeason.objects.filter(plot=plot, status='Active').select_related('crop', 'current_stage')
+        for season in active_seasons:
+            if not season.crop:
+                continue
+                
+            rules = WeatherRiskRule.objects.filter(crop=season.crop)
+            for rule in rules:
+                if rule.stage and rule.stage != season.current_stage:
+                    continue
+                
+                val_to_check = wd['temperature'] if rule.condition_type.lower() == 'temperature' else wd['rainfall_mm']
+                if val_to_check is None:
+                    continue
+                    
+                triggered = False
+                if rule.operator == '>' and val_to_check > float(rule.threshold_value): triggered = True
+                elif rule.operator == '<' and val_to_check < float(rule.threshold_value): triggered = True
+                elif rule.operator == '==' and val_to_check == float(rule.threshold_value): triggered = True
+                elif rule.operator == '>=' and val_to_check >= float(rule.threshold_value): triggered = True
+                elif rule.operator == '<=' and val_to_check <= float(rule.threshold_value): triggered = True
+                
+                if triggered:
+                    Recommendation.objects.create(
+                        farmer=plot.farmer,
+                        plot=plot,
+                        crop=season.crop,
+                        stage=season.current_stage,
+                        product_name="Weather Advisory",
+                        dose="N/A",
+                        timing="Immediate",
+                        application_method="N/A",
+                        notes=rule.advisory_message,
+                        priority="High",
+                        review_status="Approved",
+                        channel="Internal"
+                    )
+                    advisories_created += 1
+
+    msg = f"Weather bulk push complete. Snapshots: {snapshots_created}, Advisories: {advisories_created}"
+    print(f"[{timezone.now()}] {msg}")
+    return {"status": "success", "message": msg}
