@@ -139,12 +139,41 @@ export default function MarketIntelligence() {
     try {
       const response = await api.request('/market/snapshot/');
       if (response && response.length > 0) {
-          // Response is already expected to be ordered by acreage descending based on API spec
-          setSnapshotData(response);
-          if (!selectedCropId || !response.find(r => r.crop_id === selectedCropId)) {
-             setSelectedCropId(response[0].crop_id);
+          if (!response[0].hasOwnProperty('crop_id')) {
+              // Legacy backend API polyfill
+              const polyfilled = response.map((item, idx) => ({
+                  crop_id: `legacy-${idx}`,
+                  crop_name: item.commodity_name,
+                  total_acres: null,
+                  latest_price: {
+                      modal: item.modal_price,
+                      high: item.max_price,
+                      low: item.min_price,
+                      date: item.date,
+                      market: item.market_name
+                  },
+                  trend_1_week: item.change_7_day_percent != null ? {
+                      change_pct: item.change_7_day_percent,
+                      prior_price: item.prior_price,
+                      prior_date: '7 days ago'
+                  } : null,
+                  trend_1_month: null,
+                  same_month_last_year: null,
+                  chart_data: null,
+                  festival_intelligence: []
+              }));
+              setSnapshotData(polyfilled);
+              if (!selectedCropId || !polyfilled.find(r => r.crop_id === selectedCropId)) {
+                 setSelectedCropId(polyfilled[0].crop_id);
+              }
+              setStatus('Data loaded (Legacy API)');
+          } else {
+              setSnapshotData(response);
+              if (!selectedCropId || !response.find(r => r.crop_id === selectedCropId)) {
+                 setSelectedCropId(response[0].crop_id);
+              }
+              setStatus('Data loaded');
           }
-          setStatus('Data loaded');
       } else {
           setSnapshotData([]);
           setStatus('No data available');
