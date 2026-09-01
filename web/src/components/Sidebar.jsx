@@ -9,7 +9,7 @@ const navItems = [
   { path: '/territories', label: 'Territory Hierarchy', icon: Map, roles: ['Admin', 'ContentTeam', 'ContentAdmin'] },
   { path: '/crops', label: 'Crop Master', icon: Wheat, roles: ['Admin', 'ContentTeam', 'ContentAdmin'] },
   { path: '/farmers', label: 'Farmer Management', icon: UserCheck, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
-  { path: '/planner', label: 'Smart Planner', icon: Map, roles: ['Admin', 'FieldStaff'] },
+  { path: '/planner', label: 'Smart Planner', icon: Map, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff', 'ContentTeam', 'ContentAdmin', 'RegionalManager', 'MarketingManager'] },
   { path: '/recommendations-dashboard', label: 'Recommendation Engine', icon: Award, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
   { path: '/promotions', label: 'Promotion Library', icon: Megaphone, roles: ['Admin', 'ContentTeam', 'ContentAdmin'] },
   { path: '/promotions-management', label: 'Promotions Management', icon: Send, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff', 'ContentAdmin'] },

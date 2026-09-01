@@ -14,46 +14,57 @@ class PlannerViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def daily_plan(self, request):
-        if request.user.role != Role.FIELD_STAFF:
-            return Response({"error": "Only field staff can access visit planner"}, status=status.HTTP_403_FORBIDDEN)
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        dest_lat = request.query_params.get('dest_lat')
+        dest_lng = request.query_params.get('dest_lng')
+        
+        villages = request.query_params.getlist('village') or request.query_params.getlist('village[]')
+        if len(villages) == 1 and ',' in villages[0]:
+            villages = [v.strip() for v in villages[0].split(',') if v.strip()]
             
-        params = request.query_params
-        lat = params.get('lat')
-        lng = params.get('lng')
-        village = params.get('village')
-        crop_id = params.get('crop')
-        stage_id = params.get('stage')
+        crop_ids = request.query_params.getlist('crop') or request.query_params.getlist('crop[]')
+        if len(crop_ids) == 1 and ',' in crop_ids[0]:
+            crop_ids = [c.strip() for c in crop_ids[0].split(',') if c.strip()]
+            
+        stage_ids = request.query_params.getlist('stage') or request.query_params.getlist('stage[]')
+        if len(stage_ids) == 1 and ',' in stage_ids[0]:
+            stage_ids = [s.strip() for s in stage_ids[0].split(',') if s.strip()]
         
         from .models import AppConfiguration
         config = AppConfiguration.get_config()
         threshold_days = config.visit_frequency_norm_days
         
-        farmers = Farmer.objects.filter(assigned_staff=request.user, status='Active')
+        users_to_query = request.user.get_team_users()
+        farmers = Farmer.objects.filter(assigned_staff__in=users_to_query, status='Active')
         
-        if crop_id or stage_id:
+        if crop_ids or stage_ids:
             plot_filters = {'plots__is_active': True, 'plots__seasons__status': 'Active'}
-            if crop_id:
-                plot_filters['plots__seasons__crop__id'] = crop_id
-            if stage_id:
-                plot_filters['plots__seasons__current_stage__id'] = stage_id
+            if crop_ids:
+                plot_filters['plots__seasons__crop__id__in'] = crop_ids
+            if stage_ids:
+                plot_filters['plots__seasons__current_stage__id__in'] = stage_ids
             farmers = farmers.filter(**plot_filters).distinct()
             
-        if village:
-            farmers = farmers.filter(village__icontains=village)
+        if villages:
+            farmers = farmers.filter(village__in=villages)
             
         try:
             lat_float = float(lat) if lat else None
             lng_float = float(lng) if lng else None
+            dest_lat_float = float(dest_lat) if dest_lat else None
+            dest_lng_float = float(dest_lng) if dest_lng else None
         except ValueError:
-            lat_float = lng_float = None
+            lat_float = lng_float = dest_lat_float = dest_lng_float = None
             
         user_point = Point(lng_float, lat_float, srid=4326) if lat_float and lng_float else None
+        dest_point = Point(dest_lng_float, dest_lat_float, srid=4326) if dest_lat_float and dest_lng_float else None
         
         village_points = []
         route_line = None
         village_centroid = None
         
-        if village:
+        if villages:
             for vf in farmers.prefetch_related('plots'):
                 for p in vf.plots.all():
                     if p.location:
@@ -64,8 +75,10 @@ class PlannerViewSet(viewsets.ViewSet):
                 y = sum(p.y for p in village_points) / len(village_points)
                 village_centroid = Point(x, y, srid=4326)
                 
-            if user_point and village_centroid:
-                route_line = LineString(user_point, village_centroid, srid=4326)
+        if user_point and dest_point:
+            route_line = LineString(user_point, dest_point, srid=4326)
+        elif user_point and village_centroid:
+            route_line = LineString(user_point, village_centroid, srid=4326)
                 
         farmers = farmers.prefetch_related('activities', 'plots', 'plots__seasons', 'plots__seasons__crop', 'plots__seasons__current_stage').distinct()
         
@@ -113,13 +126,16 @@ class PlannerViewSet(viewsets.ViewSet):
                         if d < min_distance:
                             min_distance = d
                             
-                    if village and village_points and village_centroid:
+                    if villages and village_points and village_centroid:
                         dist_to_village = village_centroid.distance(plot.location) * 111
                         if dist_to_village < min_distance_from_village:
                             min_distance_from_village = dist_to_village
-                        if user_point and route_line:
+                        if route_line:
                             if route_line.distance(plot.location) * 111 <= 10 or dist_to_village <= 10:
                                 is_in_corridor = True
+                    elif route_line:
+                        if route_line.distance(plot.location) * 111 <= 10:
+                            is_in_corridor = True
                 
                 if plot.is_active:
                     total_active_area += float(plot.area_acres or plot.calculated_area_acres or 0)
@@ -147,14 +163,17 @@ class PlannerViewSet(viewsets.ViewSet):
                                     if rates[2]['inward_quantity'] > rates[1]['inward_quantity'] > rates[0]['inward_quantity']:
                                         has_consistent_inward_drop = True
                                     
-            if user_point:
-                if village and village_points:
+            if route_line:
+                if not is_in_corridor and min_distance > 10:
+                    continue
+            elif user_point:
+                if villages and village_points:
                     if not is_in_corridor and min_distance > 10:
                         continue
                 else:
                     if min_distance > 10:
                         continue
-            elif village and village_points and village_centroid:
+            elif villages and village_points and village_centroid:
                 if min_distance_from_village > 10:
                     continue
             
