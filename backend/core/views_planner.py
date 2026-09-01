@@ -18,6 +18,8 @@ class PlannerViewSet(viewsets.ViewSet):
         lng = request.query_params.get('lng')
         dest_lat = request.query_params.get('dest_lat')
         dest_lng = request.query_params.get('dest_lng')
+        start_village = request.query_params.get('start_village')
+        dest_village = request.query_params.get('dest_village')
         
         villages = request.query_params.getlist('village') or request.query_params.getlist('village[]')
         if len(villages) == 1 and ',' in villages[0]:
@@ -31,7 +33,7 @@ class PlannerViewSet(viewsets.ViewSet):
         if len(stage_ids) == 1 and ',' in stage_ids[0]:
             stage_ids = [s.strip() for s in stage_ids[0].split(',') if s.strip()]
         
-        from .models import AppConfiguration
+        from .models import AppConfiguration, Plot
         config = AppConfiguration.get_config()
         threshold_days = config.visit_frequency_norm_days
         
@@ -60,6 +62,20 @@ class PlannerViewSet(viewsets.ViewSet):
         user_point = Point(lng_float, lat_float, srid=4326) if lat_float and lng_float else None
         dest_point = Point(dest_lng_float, dest_lat_float, srid=4326) if dest_lat_float and dest_lng_float else None
         
+        if not user_point and start_village:
+            start_plots = Plot.objects.filter(farmer__village__iexact=start_village, location__isnull=False)[:50]
+            if start_plots:
+                points = [p.location.centroid for p in start_plots]
+                if points:
+                    user_point = Point(sum(p.x for p in points)/len(points), sum(p.y for p in points)/len(points), srid=4326)
+                    
+        if not dest_point and dest_village:
+            dest_plots = Plot.objects.filter(farmer__village__iexact=dest_village, location__isnull=False)[:50]
+            if dest_plots:
+                points = [p.location.centroid for p in dest_plots]
+                if points:
+                    dest_point = Point(sum(p.x for p in points)/len(points), sum(p.y for p in points)/len(points), srid=4326)
+                
         village_points = []
         route_line = None
         village_centroid = None

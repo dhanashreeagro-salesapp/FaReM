@@ -137,18 +137,6 @@ export default function VisitPlanner() {
     }
   };
 
-  const geocode = async (query) => {
-    if (!query) return null;
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)},India`);
-      const data = await res.json();
-      if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch (e) {
-      console.error(e);
-    }
-    return null;
-  };
-
   const useCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -164,29 +152,36 @@ export default function VisitPlanner() {
   const executeSearch = async () => {
     setLoading(true);
     try {
-      let sCoords = startCoords;
-      if (startQuery && startQuery !== 'Current Location') {
-        sCoords = await geocode(startQuery);
-        setStartCoords(sCoords);
-      }
-      let eCoords = endCoords;
-      if (endQuery) {
-        eCoords = await geocode(endQuery);
-        setEndCoords(eCoords);
-      }
-
       const params = {};
-      if (sCoords) { params.lat = sCoords.lat; params.lng = sCoords.lng; }
-      if (eCoords) { params.dest_lat = eCoords.lat; params.dest_lng = eCoords.lng; }
+      
+      if (startCoords) { 
+          params.lat = startCoords.lat; params.lng = startCoords.lng; 
+      } else if (startQuery && startQuery !== 'Current Location') {
+          params.start_village = startQuery;
+      }
+      
+      if (endCoords) { 
+          params.dest_lat = endCoords.lat; params.dest_lng = endCoords.lng; 
+      } else if (endQuery) {
+          params.dest_village = endQuery;
+      }
       
       if (villages.length) params['village[]'] = villages;
       if (crops.length) params['crop[]'] = crops;
       if (stages.length) params['stage[]'] = stages;
       
       const data = await api.getDailyPlan(params);
-      setFarmers(data);
+      
+      // Prevent crash if API returns HTML or error object instead of array
+      if (Array.isArray(data)) {
+        setFarmers(data);
+      } else {
+        console.error("API did not return an array:", data);
+        setFarmers([]);
+      }
     } catch (error) {
       console.error('Failed to fetch plan', error);
+      setFarmers([]);
     } finally {
       setLoading(false);
     }
