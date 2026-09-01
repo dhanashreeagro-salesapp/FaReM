@@ -173,9 +173,6 @@ class PlannerViewSet(viewsets.ViewSet):
                 else:
                     if min_distance > 10:
                         continue
-            elif villages and village_points and village_centroid:
-                if min_distance_from_village > 10:
-                    continue
             
             score = 0
             tags = []
