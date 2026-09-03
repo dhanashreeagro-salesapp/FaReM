@@ -216,16 +216,12 @@ class MarketDataTemplateView(views.APIView):
 
 
 class MarketSnapshotView(views.APIView):
-    """
-    Returns Commodity Market Snapshot tailored to the logged-in user's assigned farmers' acreage.
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         user = request.user
         users_to_query = user.get_team_users()
         
-        # 1. Calculate acreage per crop for the user's assigned farmers
         acreage_qs = CropSeason.objects.filter(
             plot__farmer__assigned_staff__in=users_to_query,
             plot__is_active=True,
@@ -236,131 +232,89 @@ class MarketSnapshotView(views.APIView):
             total_acres=Sum('plot__area_acres')
         ).order_by('-total_acres')
         
-        portfolio_crops = [
-            {
-                'crop_id': item['crop_id'],
-                'crop_name': item['crop__crop_name'],
-                'total_acres': float(item['total_acres'])
-            }
-            for item in acreage_qs if item['total_acres'] and item['total_acres'] > 0
-        ]
+        portfolio_crops = []
+        seen_crop_ids = set()
         
+        for item in acreage_qs:
+            if item['total_acres'] and item['total_acres'] > 0 and item['crop_id'] not in seen_crop_ids:
+                portfolio_crops.append({'crop_id': item['crop_id'], 'crop_name': item['crop__crop_name'], 'total_acres': float(item['total_acres'])})
+                seen_crop_ids.add(item['crop_id'])
+                
+        other_mapped_ids = MarketPriceRecord.objects.exclude(crop__isnull=True).values_list('crop_id', flat=True).distinct()
+        for cid in other_mapped_ids:
+            if cid not in seen_crop_ids:
+                crop = CropMaster.objects.filter(id=cid).first()
+                if crop:
+                    portfolio_crops.append({'crop_id': crop.id, 'crop_name': crop.crop_name, 'total_acres': 0})
+                    seen_crop_ids.add(crop.id)
+                    
         search_query = request.query_params.get('search', '').lower()
         if search_query:
-            matched_crops = CropMaster.objects.filter(crop_name__icontains=search_query)
-            for mc in matched_crops:
-                if not any(pc['crop_id'] == mc.id for pc in portfolio_crops):
-                    portfolio_crops.append({
-                        'crop_id': mc.id,
-                        'crop_name': mc.crop_name,
-                        'total_acres': 0
-                    })
-        
+            portfolio_crops = [pc for pc in portfolio_crops if search_query in pc['crop_name'].lower()]
+            
         results = []
+        from datetime import timedelta
+        from django.db.models.functions import TruncMonth
+        from django.db.models import Avg
+        from .models import Festival
+        
         for p_crop in portfolio_crops:
             crop_id = p_crop['crop_id']
-            latest_record = MarketPriceRecord.objects.filter(crop_id=crop_id).order_by('-date').first()
-            if not latest_record:
-                results.append({
-                    'crop_id': crop_id,
-                    'crop_name': p_crop['crop_name'],
-                    'total_acres': p_crop['total_acres'],
-                    'latest_price': None,
-                    'chart_data': None
-                })
+            markets = MarketPriceRecord.objects.filter(crop_id=crop_id).values_list('market_name', flat=True).distinct()
+            
+            if not markets:
+                results.append({'crop_id': crop_id, 'crop_name': p_crop['crop_name'], 'total_acres': p_crop['total_acres'], 'markets_data': {}, 'festival_intelligence': []})
                 continue
                 
-            seven_days_ago = latest_record.date - timedelta(days=7)
-            prior_record_1w = MarketPriceRecord.objects.filter(
-                crop_id=crop_id,
-                market_name=latest_record.market_name,
-                date__range=[seven_days_ago - timedelta(days=3), seven_days_ago + timedelta(days=3)]
-            ).order_by('-date').first()
+            markets_data = {}
+            global_latest = None
             
-            trend_1w = None
-            if prior_record_1w and prior_record_1w.modal_price > 0:
-                change = ((latest_record.modal_price - prior_record_1w.modal_price) / prior_record_1w.modal_price) * 100
-                trend_1w = {'change_pct': round(change, 2), 'prior_price': prior_record_1w.modal_price, 'prior_date': prior_record_1w.date}
-                
-            one_month_ago = latest_record.date - timedelta(days=30)
-            prior_record_1m = MarketPriceRecord.objects.filter(
-                crop_id=crop_id,
-                market_name=latest_record.market_name,
-                date__range=[one_month_ago - timedelta(days=5), one_month_ago + timedelta(days=5)]
-            ).order_by('-date').first()
-            
-            trend_1m = None
-            if prior_record_1m and prior_record_1m.modal_price > 0:
-                change = ((latest_record.modal_price - prior_record_1m.modal_price) / prior_record_1m.modal_price) * 100
-                trend_1m = {'change_pct': round(change, 2), 'prior_price': prior_record_1m.modal_price, 'prior_date': prior_record_1m.date}
-                
-            try:
-                sml_date = latest_record.date.replace(year=latest_record.date.year - 1)
-            except ValueError:
-                # Handle leap year Feb 29
-                sml_date = latest_record.date.replace(year=latest_record.date.year - 1, day=28)
-                
-            sml_record = MarketPriceRecord.objects.filter(
-                crop_id=crop_id,
-                market_name=latest_record.market_name,
-                date__year=sml_date.year,
-                date__month=sml_date.month
-            ).order_by('-date').first()
-            
-            sml = None
-            if sml_record and sml_record.modal_price > 0:
-                change = ((latest_record.modal_price - sml_record.modal_price) / sml_record.modal_price) * 100
-                sml = {
-                    'current_month': latest_record.date.strftime("%B %Y"),
-                    'current_price': latest_record.modal_price,
-                    'last_year_month': sml_record.date.strftime("%B %Y"),
-                    'last_year_price': sml_record.modal_price,
-                    'change_pct': round(change, 2)
-                }
-                
-            from django.db.models.functions import TruncMonth
-            from django.db.models import Avg
-            
-            current_year = latest_record.date.year
-            chart_raw = MarketPriceRecord.objects.filter(
-                crop_id=crop_id,
-                date__year__gte=current_year - 2
-            ).annotate(month=TruncMonth('date')).values('month').annotate(avg_modal=Avg('modal_price')).order_by('month')
-            
-            chart_data = {
-                'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                'current_year': [None]*12,
-                'last_year': [None]*12,
-                'two_years_ago': [None]*12,
-                'current_year_label': current_year,
-                'last_year_label': current_year - 1,
-                'two_years_ago_label': current_year - 2
-            }
-            
-            for cr in chart_raw:
-                if not cr['month']: continue
-                y = cr['month'].year
-                m = cr['month'].month - 1
-                if y == current_year: chart_data['current_year'][m] = round(cr['avg_modal'], 2)
-                elif y == current_year - 1: chart_data['last_year'][m] = round(cr['avg_modal'], 2)
-                elif y == current_year - 2: chart_data['two_years_ago'][m] = round(cr['avg_modal'], 2)
+            for m in markets:
+                latest_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m).order_by('-date').first()
+                if not latest_record: continue
+                if not global_latest or latest_record.date > global_latest.date: global_latest = latest_record
 
-            results.append({
-                'crop_id': crop_id,
-                'crop_name': p_crop['crop_name'],
-                'total_acres': p_crop['total_acres'],
-                'latest_price': {
-                    'modal': latest_record.modal_price,
-                    'high': latest_record.max_price,
-                    'low': latest_record.min_price,
-                    'date': latest_record.date,
-                    'market': latest_record.market_name
-                },
-                'trend_1_week': trend_1w,
-                'trend_1_month': trend_1m,
-                'same_month_last_year': sml,
-                'chart_data': chart_data,
-                'festival_intelligence': []
-            })
-            
+                seven_days_ago = latest_record.date - timedelta(days=7)
+                prior_record_1w = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[seven_days_ago - timedelta(days=3), seven_days_ago + timedelta(days=3)]).order_by('-date').first()
+                trend_1w = None
+                if prior_record_1w and prior_record_1w.modal_price > 0:
+                    change = ((latest_record.modal_price - prior_record_1w.modal_price) / prior_record_1w.modal_price) * 100
+                    trend_1w = {'change_pct': round(change, 2), 'prior_price': prior_record_1w.modal_price, 'prior_date': prior_record_1w.date}
+
+                one_month_ago = latest_record.date - timedelta(days=30)
+                prior_record_1m = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[one_month_ago - timedelta(days=5), one_month_ago + timedelta(days=5)]).order_by('-date').first()
+                trend_1m = None
+                if prior_record_1m and prior_record_1m.modal_price > 0:
+                    change = ((latest_record.modal_price - prior_record_1m.modal_price) / prior_record_1m.modal_price) * 100
+                    trend_1m = {'change_pct': round(change, 2), 'prior_price': prior_record_1m.modal_price, 'prior_date': prior_record_1m.date}
+
+                current_year = latest_record.date.year
+                chart_raw = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__year__gte=current_year - 2).annotate(month=TruncMonth('date')).values('month').annotate(avg_modal=Avg('modal_price')).order_by('month')
+                chart_data = {'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], 'current_year': [None]*12, 'last_year': [None]*12, 'two_years_ago': [None]*12, 'current_year_label': current_year, 'last_year_label': current_year - 1, 'two_years_ago_label': current_year - 2}
+                for cr in chart_raw:
+                    if not cr['month']: continue
+                    y, month_idx = cr['month'].year, cr['month'].month - 1
+                    if y == current_year: chart_data['current_year'][month_idx] = round(cr['avg_modal'], 2)
+                    elif y == current_year - 1: chart_data['last_year'][month_idx] = round(cr['avg_modal'], 2)
+                    elif y == current_year - 2: chart_data['two_years_ago'][month_idx] = round(cr['avg_modal'], 2)
+
+                markets_data[m] = {'latest_price': {'modal': latest_record.modal_price, 'high': latest_record.max_price, 'low': latest_record.min_price, 'date': latest_record.date}, 'trend_1_week': trend_1w, 'trend_1_month': trend_1m, 'chart_data': chart_data}
+
+            festival_intel = []
+            if global_latest:
+                recent_festivals = Festival.objects.filter(date__lte=global_latest.date + timedelta(days=30), date__gte=global_latest.date - timedelta(days=365*2)).order_by('-date')
+                for fest in recent_festivals:
+                    fest_obs = {}
+                    has_sufficient_data = False
+                    for m in markets:
+                        before_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date - timedelta(days=15), fest.date - timedelta(days=2)]).order_by('-date').first()
+                        during_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date - timedelta(days=1), fest.date + timedelta(days=3)]).order_by('-date').first()
+                        after_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date + timedelta(days=4), fest.date + timedelta(days=15)]).order_by('date').first()
+                        if before_record and during_record:
+                            change = ((during_record.modal_price - before_record.modal_price) / before_record.modal_price) * 100
+                            fest_obs[m] = {'price_before': before_record.modal_price, 'price_during': during_record.modal_price, 'price_after': after_record.modal_price if after_record else None, 'change_pct': round(change, 2)}
+                            has_sufficient_data = True
+                    if has_sufficient_data:
+                        festival_intel.append({'festival_name': fest.name, 'date': fest.date, 'year': fest.year, 'observations': fest_obs})
+            results.append({'crop_id': crop_id, 'crop_name': p_crop['crop_name'], 'total_acres': p_crop['total_acres'], 'markets_data': markets_data, 'festival_intelligence': festival_intel[:3]})
         return Response(results)

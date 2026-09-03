@@ -564,6 +564,20 @@ class CommodityMapping(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+class Festival(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    date = models.DateField()
+    year = models.IntegerField()
+    region_applicability = models.CharField(max_length=255, blank=True, null=True, help_text="States or regions where this festival heavily impacts markets (e.g. 'Maharashtra', 'All India')")
+    
+    class Meta:
+        unique_together = ('name', 'year')
+        ordering = ['date']
+        
+    def __str__(self):
+        return f"{self.name} ({self.year})"
+
 class MarketPriceRecord(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     import_batch = models.ForeignKey(MarketPriceImportBatch, on_delete=models.CASCADE, related_name='records')

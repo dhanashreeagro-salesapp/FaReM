@@ -3,14 +3,17 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { TrendingUp, TrendingDown, RefreshCw, Upload, Calendar, MapPin, AlertCircle, Info } from 'lucide-react';
 import api from '../services/api';
 
-const LineChart = ({ data }) => {
-  if (!data || !data.months || !data.months.length) return <div className="p-4 text-center text-text-muted">No chart data available</div>;
+const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+const MultiLineChart = ({ datasets, labels }) => {
+  if (!datasets || datasets.length === 0) return <div className="p-4 text-center text-text-muted">No chart data available</div>;
   
-  const { months, current_year, last_year, two_years_ago, current_year_label, last_year_label, two_years_ago_label } = data;
-  
-  // Flatten to find min/max, ignoring zeros which we consider as missing data
   const extractValid = (arr) => (arr || []).filter(v => v !== null && v !== undefined && v !== 0);
-  const allValues = [...extractValid(current_year), ...extractValid(last_year), ...extractValid(two_years_ago)];
+  
+  let allValues = [];
+  datasets.forEach(ds => {
+      allValues = [...allValues, ...extractValid(ds.data)];
+  });
   
   if (allValues.length === 0) return <div className="p-4 text-center text-text-muted">No valid prices to chart</div>;
   
@@ -21,11 +24,10 @@ const LineChart = ({ data }) => {
   const height = 240;
   const paddingX = 45;
   const paddingY = 20;
-  
   const chartWidth = width - 2 * paddingX;
   const chartHeight = height - 2 * paddingY;
   
-  const getX = (index) => paddingX + (index * (chartWidth / Math.max(months.length - 1, 1)));
+  const getX = (index) => paddingX + (index * (chartWidth / Math.max(labels.length - 1, 1)));
   const getY = (value) => height - paddingY - ((value - minVal) / (maxVal - minVal) * chartHeight);
 
   const createPath = (series) => {
@@ -34,70 +36,49 @@ const LineChart = ({ data }) => {
     let isFirst = true;
     series.forEach((val, i) => {
       if (val === null || val === undefined || val === 0) {
-        isFirst = true; // Break line
+        isFirst = true;
       } else {
-        const prefix = isFirst ? "M" : "L";
-        d += `${prefix} ${getX(i)} ${getY(val)} `;
+        d += `${isFirst ? "M" : "L"} ${getX(i)} ${getY(val)} `;
         isFirst = false;
       }
     });
     return d.trim();
   };
 
-  const currentYearPath = createPath(current_year);
-  const lastYearPath = createPath(last_year);
-  const twoYearsAgoPath = createPath(two_years_ago);
-
   return (
-    <div className="w-full overflow-x-auto hide-scrollbar pb-2">
+    <div className="w-full overflow-x-auto hide-scrollbar">
       <div className="min-w-[500px]">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto text-xs font-mono select-none">
-          {/* Grid lines */}
-          <line x1={paddingX} y1={paddingY} x2={width - paddingX} y2={paddingY} stroke="#e5e7eb" strokeDasharray="3,3" />
-          <line x1={paddingX} y1={height/2} x2={width - paddingX} y2={height/2} stroke="#e5e7eb" strokeDasharray="3,3" />
-          <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="#e5e7eb" />
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-sm bg-white rounded-lg">
+          {[0, 0.5, 1].map((pct, i) => {
+            const y = paddingY + (pct * chartHeight);
+            const val = maxVal - (pct * (maxVal - minVal));
+            return (
+              <g key={`y-${i}`}>
+                <line x1={paddingX} y1={y} x2={width - 5} y2={y} stroke="#e5e7eb" strokeDasharray="4,4" />
+                <text x={paddingX - 5} y={y + 3} textAnchor="end" fill="#9ca3af" fontSize="10 font-medium">₹{Math.round(val)}</text>
+              </g>
+            );
+          })}
           
-          <text x={paddingX - 8} y={paddingY + 4} textAnchor="end" fill="#9ca3af">{Math.round(maxVal)}</text>
-          <text x={paddingX - 8} y={height/2 + 4} textAnchor="end" fill="#9ca3af">{Math.round((maxVal+minVal)/2)}</text>
-          <text x={paddingX - 8} y={height - paddingY + 4} textAnchor="end" fill="#9ca3af">{Math.round(minVal)}</text>
-          
-          {/* X axis labels */}
-          {months.map((m, i) => (
+          {labels.map((m, i) => (
             <text key={i} x={getX(i)} y={height - 2} textAnchor="middle" fill="#9ca3af" fontSize="10">{m}</text>
           ))}
           
-          {/* Lines */}
-          {two_years_agoPath && <path d={two_years_agoPath} fill="none" stroke="#d1d5db" strokeWidth="2" strokeDasharray="4,4" />}
-          {lastYearPath && <path d={lastYearPath} fill="none" stroke="#9ca3af" strokeWidth="2" />}
-          {currentYearPath && <path d={currentYearPath} fill="none" stroke="#16a34a" strokeWidth="3" />}
-          
-          {/* Data points for current year */}
-          {current_year && current_year.map((val, i) => val ? (
-            <circle key={`cy-${i}`} cx={getX(i)} cy={getY(val)} r="4" fill="#16a34a" stroke="#fff" strokeWidth="1.5" />
-          ) : null)}
+          {datasets.map((ds, dsIdx) => {
+             const pathD = createPath(ds.data);
+             return (
+               <g key={ds.name}>
+                 {pathD && <path d={pathD} fill="none" stroke={ds.color} strokeWidth="2.5" className="drop-shadow-sm" />}
+                 {ds.data.map((val, i) => val ? (
+                   <g key={`pt-${dsIdx}-${i}`} className="group cursor-pointer">
+                       <circle cx={getX(i)} cy={getY(val)} r="4" fill={ds.color} stroke="#fff" strokeWidth="1.5" />
+                       <text x={getX(i)} y={getY(val)-10} textAnchor="middle" fontSize="9" fill="#4b5563" className="opacity-0 group-hover:opacity-100 font-bold bg-white drop-shadow-sm">₹{val}</text>
+                   </g>
+                 ) : null)}
+               </g>
+             );
+          })}
         </svg>
-        
-        {/* Legend */}
-        <div className="flex justify-center flex-wrap gap-4 mt-3 text-xs text-text-muted">
-          {current_year_label && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-success"></div>
-              {current_year_label}
-            </div>
-          )}
-          {last_year_label && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0 border-t-2 border-gray-400"></div>
-              {last_year_label}
-            </div>
-          )}
-          {two_years_ago_label && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0 border-t-2 border-dashed border-gray-300"></div>
-              {two_years_ago_label}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -108,7 +89,7 @@ const TrendBadge = ({ label, trend }) => {
   const isPositive = trend.change_pct >= 0;
   return (
     <div className="flex flex-col p-3 rounded-xl bg-surface border border-border">
-      <span className="text-xs text-text-muted">{label}</span>
+      <span className="text-[11px] text-text-muted">{label}</span>
       <div className="flex items-center mt-1 gap-1.5">
         <span className={`text-sm font-bold flex items-center ${isPositive ? 'text-success' : 'text-danger'}`}>
           {isPositive ? <TrendingUp size={14} className="mr-0.5" /> : <TrendingDown size={14} className="mr-0.5" />}
@@ -116,7 +97,6 @@ const TrendBadge = ({ label, trend }) => {
         </span>
         <span className="text-sm font-bold text-text ml-auto">₹{trend.prior_price || 'N/A'}</span>
       </div>
-      <span className="text-[10px] text-text-muted mt-1 opacity-70">Vs {trend.prior_date}</span>
     </div>
   );
 };
@@ -126,6 +106,7 @@ export default function MarketIntelligence() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('Loading...');
   const [selectedCropId, setSelectedCropId] = useState(null);
+  const [selectedMarkets, setSelectedMarkets] = useState({});
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -139,41 +120,11 @@ export default function MarketIntelligence() {
     try {
       const response = await api.request('/market/snapshot/');
       if (response && response.length > 0) {
-          if (!response[0].hasOwnProperty('crop_id')) {
-              // Legacy backend API polyfill
-              const polyfilled = response.map((item, idx) => ({
-                  crop_id: `legacy-${idx}`,
-                  crop_name: item.commodity_name,
-                  total_acres: null,
-                  latest_price: {
-                      modal: item.modal_price,
-                      high: item.max_price,
-                      low: item.min_price,
-                      date: item.date,
-                      market: item.market_name
-                  },
-                  trend_1_week: item.change_7_day_percent != null ? {
-                      change_pct: item.change_7_day_percent,
-                      prior_price: item.prior_price,
-                      prior_date: '7 days ago'
-                  } : null,
-                  trend_1_month: null,
-                  same_month_last_year: null,
-                  chart_data: null,
-                  festival_intelligence: []
-              }));
-              setSnapshotData(polyfilled);
-              if (!selectedCropId || !polyfilled.find(r => r.crop_id === selectedCropId)) {
-                 setSelectedCropId(polyfilled[0].crop_id);
-              }
-              setStatus('Data loaded (Legacy API)');
-          } else {
-              setSnapshotData(response);
-              if (!selectedCropId || !response.find(r => r.crop_id === selectedCropId)) {
-                 setSelectedCropId(response[0].crop_id);
-              }
-              setStatus('Data loaded');
+          setSnapshotData(response);
+          if (!selectedCropId || !response.find(r => r.crop_id === selectedCropId)) {
+             setSelectedCropId(response[0].crop_id);
           }
+          setStatus('Data loaded');
       } else {
           setSnapshotData([]);
           setStatus('No data available');
@@ -206,6 +157,47 @@ export default function MarketIntelligence() {
   };
 
   const selectedData = snapshotData.find(c => c.crop_id === selectedCropId);
+  const availableMarkets = selectedData ? Object.keys(selectedData.markets_data || {}) : [];
+  
+  useEffect(() => {
+      if (selectedData && availableMarkets.length > 0) {
+          if (!selectedMarkets[selectedCropId]) {
+              setSelectedMarkets(prev => ({ ...prev, [selectedCropId]: [availableMarkets[0]] }));
+          }
+      }
+  }, [selectedCropId, availableMarkets, selectedMarkets, selectedData]);
+
+  const currentActiveMarkets = selectedMarkets[selectedCropId] || [];
+  
+  const toggleMarket = (market) => {
+      setSelectedMarkets(prev => {
+          const current = prev[selectedCropId] || [];
+          let updated;
+          if (current.includes(market)) {
+              updated = current.filter(m => m !== market);
+              if (updated.length === 0) updated = [market];
+          } else {
+              updated = [...current, market];
+          }
+          return { ...prev, [selectedCropId]: updated };
+      });
+  };
+
+  let chartDatasets = [];
+  let chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  if (selectedData) {
+      currentActiveMarkets.forEach((m, idx) => {
+          const mData = selectedData.markets_data[m];
+          if (mData && mData.chart_data && mData.chart_data.current_year) {
+              chartDatasets.push({
+                  name: m,
+                  data: mData.chart_data.current_year,
+                  color: COLORS[idx % COLORS.length]
+              });
+          }
+      });
+  }
 
   return (
     <div className="space-y-4 md:space-y-6 pb-20">
@@ -231,13 +223,7 @@ export default function MarketIntelligence() {
                 <RefreshCw size={16} className={loading ? "animate-spin text-primary" : ""} />
                 <span className="hidden sm:inline">Refresh</span>
             </button>
-            <input 
-              type="file" 
-              accept=".xlsx, .xls" 
-              className="hidden" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-            />
+            <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
             <button 
                 onClick={() => window.location.href = `${api.baseUrl}/market/template/`}
                 className="flex items-center gap-2 px-3 py-2 bg-surface border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5 active:scale-95 transition-transform"
@@ -271,8 +257,8 @@ export default function MarketIntelligence() {
                 }`}
               >
                 <span className="font-bold">{crop.crop_name}</span>
-                {crop.total_acres ? (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedCropId === crop.crop_id ? 'bg-white/20' : 'bg-gray-100'}`}>
+                {crop.total_acres > 0 ? (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedCropId === crop.crop_id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
                     {crop.total_acres} ac
                   </span>
                 ) : null}
@@ -282,150 +268,163 @@ export default function MarketIntelligence() {
         </div>
       )}
 
-      {loading && snapshotData.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center text-text-muted">
-          <RefreshCw size={32} className="animate-spin text-primary mb-4" />
-          <p>Fetching market intelligence...</p>
-        </div>
-      ) : snapshotData.length === 0 ? (
-        <div className="py-20 text-center text-text-muted bg-surface rounded-xl border border-dashed border-border">
-          <Info size={32} className="mx-auto mb-3 opacity-50" />
-          <p>{status === 'Failed to load' ? 'Failed to fetch market data.' : 'No crop market data available.'}</p>
-        </div>
-      ) : selectedData ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      {selectedData ? (
+        <div className="space-y-4">
           
-          <div className="lg:col-span-1 flex flex-col gap-4">
-            <Card className="border-t-4 border-t-primary shadow-sm">
-              <CardHeader className="pb-3 border-b border-border bg-gray-50/50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg font-bold font-heading text-text">Latest Prices</CardTitle>
-                    <div className="flex flex-col text-xs text-text-muted mt-1.5 gap-1">
-                      {selectedData.latest_price?.market && (
-                        <span className="flex items-center gap-1.5"><MapPin size={12} className="text-primary"/> {selectedData.latest_price.market}</span>
-                      )}
-                      {selectedData.latest_price?.date && (
-                        <span className="flex items-center gap-1.5"><Calendar size={12} className="text-primary"/> {selectedData.latest_price.date}</span>
-                      )}
+          {availableMarkets.length > 0 && (
+             <div className="flex flex-wrap gap-2 mb-2 items-center">
+                <span className="text-sm font-medium text-text-muted mr-2 flex items-center gap-1"><MapPin size={14}/> Markets:</span>
+                {availableMarkets.map((m, idx) => {
+                    const isActive = currentActiveMarkets.includes(m);
+                    const color = COLORS[idx % COLORS.length];
+                    return (
+                        <button 
+                            key={m} 
+                            onClick={() => toggleMarket(m)}
+                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all flex items-center gap-2`}
+                            style={{ 
+                                backgroundColor: isActive ? `${color}15` : 'transparent', 
+                                borderColor: isActive ? color : '#e5e7eb',
+                                color: isActive ? color : '#6b7280'
+                            }}
+                        >
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: isActive ? color : '#d1d5db' }}></div>
+                            {m}
+                        </button>
+                    )
+                })}
+             </div>
+          )}
+
+          {currentActiveMarkets.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {currentActiveMarkets.map(m => {
+                    const mData = selectedData.markets_data[m];
+                    if (!mData || !mData.latest_price) return null;
+                    return (
+                        <Card key={`price-${m}`} className="col-span-1 shadow-sm border border-border">
+                          <CardContent className="p-4 md:p-5">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="font-bold text-text flex items-center gap-1.5">
+                                    <MapPin size={16} className="text-primary"/> {m}
+                                </h3>
+                                <p className="text-xs text-text-muted mt-0.5">As of {mData.latest_price.date}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 mb-4">
+                              <div className="text-center p-2 rounded-lg bg-surface">
+                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">High</p>
+                                <p className="font-bold text-text">₹{mData.latest_price.high || 'N/A'}</p>
+                              </div>
+                              <div className="text-center p-2 rounded-lg bg-primary/5 border border-primary/20">
+                                <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Modal</p>
+                                <p className="text-lg font-bold text-primary">₹{mData.latest_price.modal || 'N/A'}</p>
+                              </div>
+                              <div className="text-center p-2 rounded-lg bg-surface">
+                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Low</p>
+                                <p className="font-bold text-text">₹{mData.latest_price.low || 'N/A'}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <TrendBadge label="1 Week Trend" trend={mData.trend_1_week} />
+                              <TrendBadge label="1 Month Trend" trend={mData.trend_1_month} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                    );
+                })}
+              </div>
+          ) : (
+              <div className="p-6 bg-surface border border-border rounded-xl text-center">
+                  <p className="text-text-muted">Please select at least one market to view prices.</p>
+              </div>
+          )}
+
+          <Card className="shadow-sm border border-border">
+            <CardHeader className="p-4 md:p-5 pb-0 border-b-0">
+              <CardTitle className="text-base font-bold text-text">Historical Price Trends (YTD)</CardTitle>
+              <p className="text-xs text-text-muted mt-1">Modal price comparison across selected markets</p>
+            </CardHeader>
+            <CardContent className="p-4 md:p-5">
+              <MultiLineChart datasets={chartDatasets} labels={chartLabels} />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border border-border">
+            <CardHeader className="p-4 md:p-5 border-b border-border bg-surface/30">
+              <CardTitle className="text-sm font-bold text-text flex items-center gap-2">
+                <Calendar size={16} className="text-primary" />
+                Historical Festival Intelligence
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-5">
+              {selectedData.festival_intelligence && selectedData.festival_intelligence.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedData.festival_intelligence.map((fest, idx) => (
+                    <div key={idx} className="border border-border rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-3">
+                          <h4 className="font-bold text-sm text-text">{fest.festival_name} {fest.year}</h4>
+                          <span className="text-xs text-text-muted bg-surface px-2 py-1 rounded-md border">{fest.date}</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                          {currentActiveMarkets.map(m => {
+                              const obs = fest.observations?.[m];
+                              if (!obs) return null;
+                              
+                              const isPositive = obs.change_pct >= 0;
+                              return (
+                                  <div key={`fest-${m}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
+                                      <div className="font-bold text-sm flex items-center gap-2 text-text">
+                                          <MapPin size={14} className="text-gray-400"/> {m}
+                                      </div>
+                                      <div className="flex items-center gap-4 text-sm">
+                                          <div className="text-center">
+                                              <p className="text-[10px] text-text-muted uppercase">Before</p>
+                                              <p className="font-medium text-gray-700">₹{obs.price_before}</p>
+                                          </div>
+                                          <div className="text-gray-300">→</div>
+                                          <div className="text-center">
+                                              <p className="text-[10px] text-text-muted uppercase">During</p>
+                                              <p className="font-bold text-primary">₹{obs.price_during}</p>
+                                          </div>
+                                          <div className="text-gray-300">→</div>
+                                          <div className="text-center">
+                                              <p className="text-[10px] text-text-muted uppercase">After</p>
+                                              <p className="font-medium text-gray-700">₹{obs.price_after || 'N/A'}</p>
+                                          </div>
+                                      </div>
+                                      <div className={`flex items-center gap-1 font-bold text-sm ${isPositive ? 'text-success' : 'text-danger'}`}>
+                                          {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                          {Math.abs(obs.change_pct)}%
+                                      </div>
+                                  </div>
+                              )
+                          })}
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              </CardHeader>
-              <CardContent className="pt-5 pb-5">
-                <div className="flex justify-between items-end">
-                  <div className="text-center flex-1">
-                    <div className="text-xs text-text-muted mb-1 uppercase tracking-wider font-semibold">High</div>
-                    <div className="text-lg font-bold text-text">
-                      {selectedData.latest_price?.high ? `₹${selectedData.latest_price.high}` : 'N/A'}
-                    </div>
-                  </div>
-                  <div className="text-center flex-1 border-x border-border/50 px-2">
-                    <div className="text-xs text-primary mb-1 uppercase tracking-wider font-bold">Modal</div>
-                    <div className="text-3xl font-bold text-primary">
-                      {selectedData.latest_price?.modal ? `₹${selectedData.latest_price.modal}` : 'N/A'}
-                    </div>
-                  </div>
-                  <div className="text-center flex-1">
-                    <div className="text-xs text-text-muted mb-1 uppercase tracking-wider font-semibold">Low</div>
-                    <div className="text-lg font-bold text-text">
-                      {selectedData.latest_price?.low ? `₹${selectedData.latest_price.low}` : 'N/A'}
-                    </div>
-                  </div>
+              ) : (
+                <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <AlertCircle size={24} className="mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm font-medium text-gray-600">Insufficient historical data available for reliable analysis.</p>
+                  <p className="text-xs text-gray-400 mt-1">Festival and seasonal patterns are only shown when supported by uploaded historical data.</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-2 gap-3">
-              <TrendBadge label="1 Week Trend" trend={selectedData.trend_1_week} />
-              <TrendBadge label="1 Month Trend" trend={selectedData.trend_1_month} />
-            </div>
-            
-            <Card className="shadow-sm">
-              <CardHeader className="py-3 px-4 border-b border-border">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <AlertCircle size={16} className="text-primary"/> Festival Intelligence
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {selectedData.festival_intelligence && selectedData.festival_intelligence.length > 0 ? (
-                   <ul className="space-y-3">
-                     {selectedData.festival_intelligence.map((fest, idx) => (
-                       <li key={idx} className="flex gap-3 items-start">
-                         <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                         <div>
-                           <div className="text-sm font-bold">{fest.name}</div>
-                           <div className="text-xs text-text-muted mt-0.5">{fest.impact_summary}</div>
-                         </div>
-                       </li>
-                     ))}
-                   </ul>
-                ) : (
-                  <div className="py-4 text-center text-xs text-text-muted bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                     No upcoming festival impacts identified.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-2 flex flex-col gap-4">
-            <Card className="shadow-sm">
-              <CardHeader className="py-4 border-b border-border">
-                <CardTitle className="text-md">Historical Price Trends</CardTitle>
-                <p className="text-xs text-text-muted mt-1">Monthly modal price comparison across years</p>
-              </CardHeader>
-              <CardContent className="pt-4 pb-2 px-2 md:px-4">
-                {selectedData.chart_data ? (
-                  <LineChart data={selectedData.chart_data} />
-                ) : (
-                  <div className="py-12 text-center text-sm text-text-muted">Chart data not available</div>
-                )}
-              </CardContent>
-            </Card>
-
-            {selectedData.same_month_last_year && (
-              <Card className="shadow-sm bg-gradient-to-br from-surface to-gray-50">
-                <CardHeader className="py-3 px-4 border-b border-border/50">
-                  <CardTitle className="text-sm">Year over Year Comparison</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                     <div className="flex-1">
-                        <div className="text-xs text-text-muted mb-1">{selectedData.same_month_last_year.current_month || 'Current Month'}</div>
-                        <div className="text-xl font-bold text-text">
-                          {selectedData.same_month_last_year.current_price ? `₹${selectedData.same_month_last_year.current_price}` : 'N/A'}
-                        </div>
-                     </div>
-                     
-                     <div className="flex-1 flex justify-center">
-                        {selectedData.same_month_last_year.change_pct !== undefined && selectedData.same_month_last_year.change_pct !== null && (
-                          <div className={`flex flex-col items-center px-4 py-1.5 rounded-full shadow-sm ${
-                              selectedData.same_month_last_year.change_pct >= 0 ? 'bg-success/10 border border-success/20 text-success' : 'bg-danger/10 border border-danger/20 text-danger'
-                            }`}>
-                              <span className="text-sm font-bold flex items-center">
-                                {selectedData.same_month_last_year.change_pct >= 0 ? <TrendingUp size={16} className="mr-1" /> : <TrendingDown size={16} className="mr-1" />}
-                                {Math.abs(selectedData.same_month_last_year.change_pct).toFixed(1)}%
-                              </span>
-                              <span className="text-[9px] uppercase tracking-wider opacity-80 font-semibold mt-0.5">YoY Change</span>
-                          </div>
-                        )}
-                     </div>
-                     
-                     <div className="flex-1 text-right">
-                        <div className="text-xs text-text-muted mb-1">{selectedData.same_month_last_year.last_year_month || 'Last Year'}</div>
-                        <div className="text-lg font-bold text-text">
-                          {selectedData.same_month_last_year.last_year_price ? `₹${selectedData.same_month_last_year.last_year_price}` : 'N/A'}
-                        </div>
-                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          
+              )}
+            </CardContent>
+          </Card>
         </div>
-      ) : null}
+      ) : !loading && status !== 'Loading...' && (
+        <div className="text-center py-12 px-4 border border-dashed rounded-xl border-border">
+          <Info className="mx-auto text-text-muted mb-3" size={32} />
+          <h3 className="text-lg font-medium text-text mb-1">No crops available</h3>
+          <p className="text-sm text-text-muted">Import market data to see intelligence insights.</p>
+        </div>
+      )}
     </div>
   );
 }
