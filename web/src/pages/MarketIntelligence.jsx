@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { TrendingUp, TrendingDown, RefreshCw, Upload, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Upload, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize, Sprout } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthProvider';
 
@@ -324,7 +324,7 @@ export default function MarketIntelligence() {
               </div>
               <div className="bg-white p-4 rounded-xl shadow-sm border border-border flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
-                      <span className="text-xl">🕉️</span>
+                      <span className="text-xl">???</span>
                   </div>
                   <div>
                       <p className="text-[10px] font-bold text-text">Approaching Festival<br/>Ganesh Chaturthi</p>
