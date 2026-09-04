@@ -161,7 +161,7 @@ class CropMaster(models.Model):
     crop_category = models.CharField(max_length=255)
     scientific_name = models.CharField(max_length=255, blank=True, null=True)
     crop_schedule_pdf = models.URLField(max_length=500, blank=True, null=True)
-    reference_image = models.ImageField(upload_to='crop_images/', blank=True, null=True)
+    reference_image = models.TextField(blank=True, null=True) # Base64 encoded image
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
 
     def __str__(self):

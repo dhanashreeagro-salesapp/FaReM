@@ -10,6 +10,7 @@ const HOST_BASE = API_BASE.replace('/api', '');
 const getImageUrl = (path) => {
   if (!path) return '';
   if (path.startsWith('http')) return path;
+  if (path.startsWith('data:image')) return path;
   const baseUrl = HOST_BASE.replace(/\/$/, "");
   const imagePath = path.startsWith('/') ? path : `/${path}`;
   return `${baseUrl}${imagePath}`;
