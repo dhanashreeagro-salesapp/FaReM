@@ -6,6 +6,17 @@ import { useAuth } from '../components/AuthProvider';
 
 const COLORS = ['#16a34a', '#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#06b6d4'];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const HOST_BASE = API_BASE.replace('/api', '');
+
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const baseUrl = HOST_BASE.replace(/\/$/, "");
+  const imagePath = path.startsWith('/') ? path : `/${path}`;
+  return `${baseUrl}${imagePath}`;
+};
+
 export default function MarketIntelligence() {
   const { user } = useAuth();
   const [snapshotData, setSnapshotData] = useState([]);
@@ -118,7 +129,7 @@ export default function MarketIntelligence() {
                               </span>
                               <div className="w-12 h-12 mb-2 rounded-full overflow-hidden bg-white border border-border shadow-sm flex items-center justify-center p-1">
                                   {crop.reference_image ? (
-                                      <img src={crop.reference_image} alt={crop.crop_name} className="w-full h-full object-contain" />
+                                      <img src={getImageUrl(crop.reference_image)} alt={crop.crop_name} className="w-full h-full object-contain" />
                                   ) : (
                                       <Sprout className="text-gray-300" size={24}/>
                                   )}
@@ -155,7 +166,7 @@ export default function MarketIntelligence() {
                           <div key={crop.crop_id} onClick={() => handleCropSelect(crop.crop_id)} className="flex flex-col items-center gap-2 cursor-pointer group shrink-0">
                               <div className={`w-16 h-16 rounded-full overflow-hidden border-2 flex items-center justify-center p-1 transition-all ${isSelected ? 'border-primary shadow-md bg-green-50' : 'border-gray-200 bg-white group-hover:border-gray-300'}`}>
                                   {crop.reference_image ? (
-                                      <img src={crop.reference_image} alt={crop.crop_name} className="w-full h-full object-contain" />
+                                      <img src={getImageUrl(crop.reference_image)} alt={crop.crop_name} className="w-full h-full object-contain" />
                                   ) : (
                                       <span className="text-xs text-gray-400">No Img</span>
                                   )}
@@ -183,6 +194,17 @@ export default function MarketIntelligence() {
           }
           return { name: m, data: dataArray, color: COLORS[i % COLORS.length] };
       });
+      
+      let maxDataValue = 100;
+      activeData.forEach(dataset => {
+          if (dataset.data) {
+              dataset.data.forEach(val => {
+                  if (val && val > maxDataValue) maxDataValue = val;
+              });
+          }
+      });
+      const maxDomain = Math.ceil((maxDataValue * 1.1) / 100) * 100;
+      const yAxisValues = [0, maxDomain * 0.33, maxDomain * 0.66, maxDomain].map(v => Math.round(v));
       
       return (
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-border mb-6">
@@ -219,8 +241,8 @@ export default function MarketIntelligence() {
               <div className="h-[250px] w-full mt-8">
                   {/* Pseudo SVG Chart replacing complex D3 logic for demonstration of layout perfection */}
                   <svg viewBox="0 0 800 250" className="w-full h-full overflow-visible">
-                      {[0, 1000, 2000, 3000].map((val, i) => {
-                          const y = 220 - (val / 3000) * 200;
+                      {yAxisValues.map((val, i) => {
+                          const y = 220 - (val / maxDomain) * 200;
                           return (
                               <g key={i}>
                                   <line x1="40" y1={y} x2="780" y2={y} stroke="#f3f4f6" strokeWidth="1" />
@@ -240,7 +262,7 @@ export default function MarketIntelligence() {
                           dataset.data.forEach((val, i) => {
                               if (val) {
                                   const x = 60 + (i * 65);
-                                  const y = 220 - (val / 3000) * 200;
+                                  const y = 220 - (val / maxDomain) * 200;
                                   d += `${i===0?'M':'L'} ${x} ${y} `;
                               }
                           });
@@ -258,10 +280,20 @@ export default function MarketIntelligence() {
       );
   };
 
+  const getPreferredMarket = () => {
+      if (!marketDetails || !marketDetails.markets_data) return null;
+      const allMarkets = Object.keys(marketDetails.markets_data);
+      if (allMarkets.length === 0) return null;
+      for (const pref of ['Mumbai', 'Pune', 'Nashik', 'Nagpur']) {
+          if (allMarkets.includes(pref)) return pref;
+      }
+      return allMarkets[0];
+  };
+
   const renderStatsGrid = () => {
       if (!marketDetails || !selectedMarkets.length) return null;
-      const topMarket = selectedMarkets[0];
-      const mData = marketDetails.markets_data[topMarket];
+      const prefMarket = getPreferredMarket() || selectedMarkets[0];
+      const mData = marketDetails.markets_data[prefMarket];
       if (!mData || !mData.latest_price) return null;
       
       const { modal, high, low, date } = mData.latest_price;
@@ -271,7 +303,7 @@ export default function MarketIntelligence() {
       return (
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-border mb-6">
               <h3 className="text-sm font-bold text-text uppercase mb-4 flex items-center gap-2">
-                  Latest Available <span className="text-xs font-normal text-text-muted normal-case">({date})</span>
+                  Latest Available <span className="text-xs font-normal text-text-muted normal-case">({date} • {prefMarket})</span>
               </h3>
               
               <div className="grid grid-cols-2 md:grid-cols-5 gap-6 items-center">
@@ -312,11 +344,36 @@ export default function MarketIntelligence() {
 
   const renderContextCards = () => {
       if (!marketDetails) return null;
+      const prefMarket = getPreferredMarket();
+      const mData = prefMarket ? marketDetails.markets_data[prefMarket] : null;
+      const sml = mData?.sml;
+      
+      let festivalData = null;
+      if (marketDetails.festival_intelligence?.length > 0) {
+          const fest = marketDetails.festival_intelligence[0];
+          if (fest.observations && prefMarket && fest.observations[prefMarket]) {
+              festivalData = { festival: fest, obs: fest.observations[prefMarket], market: prefMarket };
+          } else if (fest.observations && Object.keys(fest.observations).length > 0) {
+              const anyMarket = Object.keys(fest.observations)[0];
+              festivalData = { festival: fest, obs: fest.observations[anyMarket], market: anyMarket };
+          }
+      }
+
       return (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-border flex flex-col justify-between">
-                  <p className="text-[10px] font-bold text-text mb-1">Same Month<br/><span className="font-normal text-text-muted">Last Year</span></p>
-                  <p className="text-lg font-bold text-text">₹1,610</p>
+                  <p className="text-[10px] font-bold text-text mb-1">
+                      Same Month<br/><span className="font-normal text-text-muted">Last Year {prefMarket ? `(${prefMarket})` : ''}</span>
+                  </p>
+                  {sml ? (
+                      <div>
+                          <p className="text-lg font-bold text-text">₹{sml.prior_price?.toLocaleString() || 'N/A'}</p>
+                          <div className={`flex items-center gap-1 text-[10px] font-bold mt-1 ${sml.change_pct >= 0 ? 'text-success' : 'text-danger'}`}>
+                              {sml.change_pct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />} 
+                              {Math.abs(sml.change_pct)}% vs now
+                          </div>
+                      </div>
+                  ) : <p className="text-sm font-bold text-text-muted">N/A</p>}
               </div>
               <div className="bg-white p-4 rounded-xl shadow-sm border border-border flex flex-col justify-between">
                   <p className="text-[10px] font-bold text-text mb-1">YTD Avg {marketDetails.global_latest_date?.substring(0,4)}<br/><span className="font-normal text-text-muted">(Up to current)</span></p>
@@ -324,18 +381,23 @@ export default function MarketIntelligence() {
               </div>
               <div className="bg-white p-4 rounded-xl shadow-sm border border-border flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
-                      <span className="text-xl">???</span>
+                      <span className="text-xl">🎊</span>
                   </div>
                   <div>
-                      <p className="text-[10px] font-bold text-text">Approaching Festival<br/>Ganesh Chaturthi</p>
-                      <p className="text-[10px] font-bold text-orange-500 mt-1">In 7 days</p>
+                      <p className="text-[10px] font-bold text-text">Approaching Festival<br/>{festivalData ? festivalData.festival.festival_name : 'No upcoming'}</p>
+                      {festivalData && (
+                          <p className="text-[10px] font-bold text-orange-500 mt-1">Found market behavior</p>
+                      )}
                   </div>
               </div>
               <div className="bg-white p-4 rounded-xl shadow-sm border border-border flex flex-col justify-between">
-                  <p className="text-[10px] font-bold text-text mb-1">Last Year Trend<br/><span className="font-normal text-text-muted">7 days before festival</span></p>
-                  <div className="flex items-center gap-1 text-success font-bold text-lg">
-                      <TrendingUp size={18} /> 11.5%
-                  </div>
+                  <p className="text-[10px] font-bold text-text mb-1">Last Year Trend<br/><span className="font-normal text-text-muted">Around Festival {festivalData ? `(${festivalData.market})` : ''}</span></p>
+                  {festivalData ? (
+                      <div className={`flex items-center gap-1 font-bold text-lg ${festivalData.obs.change_pct >= 0 ? 'text-success' : 'text-danger'}`}>
+                          {festivalData.obs.change_pct >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                          {Math.abs(festivalData.obs.change_pct)}%
+                      </div>
+                  ) : <p className="text-sm font-bold text-text-muted">N/A</p>}
               </div>
           </div>
       );
