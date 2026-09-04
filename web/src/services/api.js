@@ -303,23 +303,45 @@ class ApiClient {
   getCrops() { return this.requestWithCache('/crops/', {}, 'cache_crops'); }
   getCrop(id) { return this.request(`/crops/${id}/`); }
   createCrop(data) {
+    localStorage.removeItem('cache_crops');
     return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
   updateCrop(id, data) {
+    localStorage.removeItem('cache_crops');
     return this.request(`/crops/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
-  deleteCrop(id) { return this.request(`/crops/${id}/`, { method: 'DELETE' }); }
+  deleteCrop(id) { 
+    localStorage.removeItem('cache_crops');
+    return this.request(`/crops/${id}/`, { method: 'DELETE' }); 
+  }
   getCropStages(params = {}) {
     const qs = new URLSearchParams(params).toString();
     return this.request(`/crop-stages/${qs ? `?${qs}` : ''}`);
   }
-  createVariety(data) { return this.request('/crop-varieties/', { method: 'POST', body: JSON.stringify(data) }); }
-
-  updateVariety(id, data) { return this.request(`/crop-varieties/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
-  deleteVariety(id) { return this.request(`/crop-varieties/${id}/`, { method: 'DELETE' }); }
-  createStage(data) { return this.request('/crop-stages/', { method: 'POST', body: JSON.stringify(data) }); }
-  updateStage(id, data) { return this.request(`/crop-stages/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
-  deleteStage(id) { return this.request(`/crop-stages/${id}/`, { method: 'DELETE' }); }
+  createVariety(data) { 
+    localStorage.removeItem('cache_crops');
+    return this.request('/crop-varieties/', { method: 'POST', body: JSON.stringify(data) }); 
+  }
+  updateVariety(id, data) { 
+    localStorage.removeItem('cache_crops');
+    return this.request(`/crop-varieties/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); 
+  }
+  deleteVariety(id) { 
+    localStorage.removeItem('cache_crops');
+    return this.request(`/crop-varieties/${id}/`, { method: 'DELETE' }); 
+  }
+  createStage(data) { 
+    localStorage.removeItem('cache_crops');
+    return this.request('/crop-stages/', { method: 'POST', body: JSON.stringify(data) }); 
+  }
+  updateStage(id, data) { 
+    localStorage.removeItem('cache_crops');
+    return this.request(`/crop-stages/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); 
+  }
+  deleteStage(id) { 
+    localStorage.removeItem('cache_crops');
+    return this.request(`/crop-stages/${id}/`, { method: 'DELETE' }); 
+  }
 
   // Farmers
   getFarmers(params = {}) {

@@ -66,13 +66,20 @@ class MarketDataImportView(views.APIView):
             return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            df = pd.read_excel(file)
+            xls = pd.ExcelFile(file)
+            dfs = []
+            for sheet_name in xls.sheet_names:
+                df_sheet = pd.read_excel(xls, sheet_name=sheet_name)
+                dfs.append(df_sheet)
+            df = pd.concat(dfs, ignore_index=True)
+            
             batch = MarketPriceImportBatch.objects.create(
                 imported_by=request.user,
                 filename=file.name
             )
             
             records_created = 0
+            failed_rows = 0
             
             # Map columns fuzzily to handle variable spaces/casing in headers
             header_map = {}
@@ -101,6 +108,7 @@ class MarketDataImportView(views.APIView):
                     if not commodity_name or commodity_name.lower() == 'nan' or commodity_name == 'None' or not market_name or market_name.lower() == 'nan' or market_name == 'None' or pd.isna(date_val) or pd.isna(modal_price):
                         if not first_row_error:
                             first_row_error = f"Row {index+1} missing required data: commodity='{commodity_name}', market='{market_name}', date='{date_val}', modal_price='{modal_price}'"
+                        failed_rows += 1
                         continue
 
                     # Parse Date
@@ -111,6 +119,7 @@ class MarketDataImportView(views.APIView):
                             parsed_date = pd.to_datetime(date_val).date()
                     except Exception as date_e:
                         if not first_row_error: first_row_error = f"Row {index+1} invalid date format: '{date_val}' (Error: {str(date_e)})"
+                        failed_rows += 1
                         continue
 
                     # Parse Prices securely (handling commas and spaces)
@@ -129,6 +138,7 @@ class MarketDataImportView(views.APIView):
                     m_price = parse_price(modal_price)
                     if m_price is None:
                         if not first_row_error: first_row_error = f"Row {index+1} invalid numeric format for modal price: '{modal_price}'"
+                        failed_rows += 1
                         continue
 
                     # Match crop restrictively (no auto-creation)
@@ -163,6 +173,7 @@ class MarketDataImportView(views.APIView):
                     records_created += 1
                 except Exception as row_e:
                     if not first_row_error: first_row_error = f"Row {index+1} database insertion failure: {str(row_e)}"
+                    failed_rows += 1
                     continue
 
             if records_created == 0:
@@ -183,7 +194,10 @@ class MarketDataImportView(views.APIView):
             batch.save()
             
             # Explicitly return X of Y metric
-            return Response({'message': f'Successfully processed {records_created} rows out of a total {len(df)} rows in the file', 'batch_id': batch.id})
+            msg = f'Successfully processed {records_created} rows out of a total {len(df)} rows.'
+            if failed_rows > 0:
+                msg += f' {failed_rows} rows were skipped due to errors. First error: {first_row_error}'
+            return Response({'message': msg, 'batch_id': batch.id})
             
         except Exception as e:
             import traceback
@@ -218,9 +232,10 @@ class MarketDataTemplateView(views.APIView):
 
 from rest_framework import views, permissions, status
 from rest_framework.response import Response
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, Max
 from django.db.models.functions import TruncMonth
 from datetime import timedelta
+from django.utils import timezone
 from core.models import MarketPriceRecord, CropMaster, CropSeason, Festival
 
 class MarketSnapshotView(views.APIView):
@@ -266,16 +281,30 @@ class MarketSnapshotView(views.APIView):
             
         if not target_crop_id:
             # ONLY return lightweight overview when target_crop_id is absent
+            cids = [pc['crop_id'] for pc in portfolio_crops]
+            latest_dates_qs = MarketPriceRecord.objects.filter(crop_id__in=cids).values('crop_id').annotate(latest_date=Max('date'))
+            latest_dates_map = {str(item['crop_id']): item['latest_date'] for item in latest_dates_qs}
+            
+            latest_records = []
+            for cid_str, ldate in latest_dates_map.items():
+                record = MarketPriceRecord.objects.filter(crop_id=cid_str, date=ldate).first()
+                if record: latest_records.append(record)
+                
+            latest_map = {str(r.crop_id): r for r in latest_records}
+            
+            prior_records_map = {}
+            for r in latest_records:
+                seven_days_ago = r.date - timedelta(days=7)
+                prior = MarketPriceRecord.objects.filter(crop_id=r.crop_id, market_name=r.market_name, date__range=[seven_days_ago - timedelta(days=3), seven_days_ago + timedelta(days=3)]).order_by('-date').first()
+                if prior: prior_records_map[str(r.crop_id)] = prior
+
             for pc in portfolio_crops:
                 cid = pc['crop_id']
-                latest_record = MarketPriceRecord.objects.filter(crop_id=cid).order_by('-date').first()
+                latest_record = latest_map.get(cid)
                 if latest_record:
-                    # Provide lightweight latest price for Dashboard rendering
                     pc['commodity_name'] = pc['crop_name']
                     pc['modal_price'] = latest_record.modal_price
-                    # simple 7-day trailing calc
-                    seven_days_ago = latest_record.date - timedelta(days=7)
-                    prior_record_1w = MarketPriceRecord.objects.filter(crop_id=cid, market_name=latest_record.market_name, date__range=[seven_days_ago - timedelta(days=3), seven_days_ago + timedelta(days=3)]).order_by('-date').first()
+                    prior_record_1w = prior_records_map.get(cid)
                     if prior_record_1w and prior_record_1w.modal_price > 0:
                         pc['change_7_day_percent'] = round(((latest_record.modal_price - prior_record_1w.modal_price) / prior_record_1w.modal_price) * 100, 2)
                     else:
@@ -336,21 +365,25 @@ class MarketSnapshotView(views.APIView):
             markets_data[m] = {'latest_price': {'modal': latest_record.modal_price, 'high': latest_record.max_price, 'low': latest_record.min_price, 'date': latest_record.date}, 'trend_1_week': trend_1w, 'trend_1_month': trend_1m, 'sml': sml, 'chart_data': chart_data}
 
         festival_intel = []
-        if global_latest:
-            recent_festivals = Festival.objects.filter(date__lte=global_latest.date + timedelta(days=90), date__gte=global_latest.date - timedelta(days=365*2)).order_by('-date')
-            for fest in recent_festivals:
-                fest_obs = {}
-                has_sufficient_data = False
-                for m in markets:
-                    before_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date - timedelta(days=15), fest.date - timedelta(days=2)]).order_by('-date').first()
-                    during_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date - timedelta(days=1), fest.date + timedelta(days=3)]).order_by('-date').first()
-                    after_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest.date + timedelta(days=4), fest.date + timedelta(days=15)]).order_by('date').first()
-                    if before_record and during_record:
-                        change = ((during_record.modal_price - before_record.modal_price) / before_record.modal_price) * 100
-                        fest_obs[m] = {'price_before': before_record.modal_price, 'price_during': during_record.modal_price, 'price_after': after_record.modal_price if after_record else None, 'change_pct': round(change, 2)}
-                        has_sufficient_data = True
-                if has_sufficient_data:
-                    festival_intel.append({'festival_name': fest.name, 'date': fest.date, 'year': fest.year, 'observations': fest_obs})
+        current_date_val = timezone.now().date()
+        approaching_festivals = Festival.objects.filter(date__gte=current_date_val).order_by('date')[:5]
+        
+        for fest in approaching_festivals:
+            fest_obs = {}
+            has_sufficient_data = False
+            for m in markets:
+                # Look at same festival last year
+                fest_last_year_date = fest.date - timedelta(days=365)
+                before_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest_last_year_date - timedelta(days=15), fest_last_year_date - timedelta(days=2)]).order_by('-date').first()
+                during_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest_last_year_date - timedelta(days=1), fest_last_year_date + timedelta(days=3)]).order_by('-date').first()
+                after_record = MarketPriceRecord.objects.filter(crop_id=crop_id, market_name=m, date__range=[fest_last_year_date + timedelta(days=4), fest_last_year_date + timedelta(days=15)]).order_by('date').first()
+                
+                if before_record and during_record:
+                    change = ((during_record.modal_price - before_record.modal_price) / before_record.modal_price) * 100
+                    fest_obs[m] = {'price_before': before_record.modal_price, 'price_during': during_record.modal_price, 'price_after': after_record.modal_price if after_record else None, 'change_pct': round(change, 2)}
+                    has_sufficient_data = True
+            
+            festival_intel.append({'festival_name': fest.name, 'date': fest.date, 'year': fest.year, 'observations': fest_obs if has_sufficient_data else {}})
         
         # Calculate YTD Average across markets (simple mean of modal prices this year)
         ytd_avg = MarketPriceRecord.objects.filter(crop_id=crop_id, date__year=global_latest.date.year if global_latest else current_year).aggregate(Avg('modal_price'))['modal_price__avg'] if global_latest else None
@@ -375,7 +408,7 @@ class MarketSnapshotView(views.APIView):
             'global_latest_date': global_latest.date if global_latest else None,
             'ytd_avg': round(ytd_avg, 2) if ytd_avg else None,
             'markets_data': markets_data,
-            'festival_intelligence': festival_intel[:3],
+            'festival_intelligence': festival_intel,
             'supply_snapshot': supply_snapshot
         }
         
