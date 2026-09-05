@@ -21,6 +21,7 @@ export default function CropMaster() {
   const [crops, setCrops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const formRef = React.useRef(null);
 
   
   // Crop UI State
@@ -44,7 +45,9 @@ export default function CropMaster() {
     try {
       const data = await api.getCrops();
       setCrops(Array.isArray(data) ? data : data.results || []);
-    } catch { setCrops([]); }
+    } catch (err) { 
+        console.error("Failed to fetch crops:", err);
+    }
     setLoading(false);
   };
 
@@ -85,7 +88,9 @@ export default function CropMaster() {
     });
     setImageFile(null);
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleDeleteCrop = async (crop) => {
@@ -224,7 +229,7 @@ export default function CropMaster() {
 
       {/* Main Crop Form */}
       {isAdmin && showForm && (
-        <div className="card p-6 mb-6 animate-stagger-in border-2 border-primary/20">
+        <div ref={formRef} className="card p-6 mb-6 animate-stagger-in border-2 border-primary/20">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-heading font-semibold text-text">{editingCrop ? `Edit Crop: ${editingCrop.crop_name}` : 'New Crop'}</h3>
             <button onClick={() => { setShowForm(false); setEditingCrop(null); }} className="text-text-muted hover:text-text"><X size={18} /></button>

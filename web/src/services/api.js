@@ -147,6 +147,9 @@ class ApiClient {
         if (attempt < retries && (err.name === 'TypeError' || (err.message && err.message.includes('fetch')))) {
           await new Promise((res) => setTimeout(res, (attempt + 1) * 2000));
         } else {
+          if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+             throw new Error("Network connection dropped or server is busy. Please try again.");
+          }
           throw err;
         }
       }
