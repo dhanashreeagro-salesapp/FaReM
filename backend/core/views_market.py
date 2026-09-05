@@ -407,6 +407,17 @@ class MarketSnapshotView(views.APIView):
                 'max': round(aggs['max_price__avg'], 2) if aggs['max_price__avg'] else None,
             }
 
+        # Calculate global chart data for heatmap fallback
+        current_year_global = global_latest.date.year if global_latest else timezone.now().date().year
+        global_chart_raw = MarketPriceRecord.objects.filter(crop_id=crop_id, date__year__gte=current_year_global - 2).annotate(month=TruncMonth('date')).values('month').annotate(avg_modal=Avg('modal_price')).order_by('month')
+        global_chart_data = {'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], 'current_year': [None]*12, 'last_year': [None]*12, 'two_years_ago': [None]*12, 'current_year_label': current_year_global, 'last_year_label': current_year_global - 1, 'two_years_ago_label': current_year_global - 2}
+        for cr in global_chart_raw:
+            if not cr['month']: continue
+            y, month_idx = cr['month'].year, cr['month'].month - 1
+            if y == current_year_global: global_chart_data['current_year'][month_idx] = round(cr['avg_modal'], 2)
+            elif y == current_year_global - 1: global_chart_data['last_year'][month_idx] = round(cr['avg_modal'], 2)
+            elif y == current_year_global - 2: global_chart_data['two_years_ago'][month_idx] = round(cr['avg_modal'], 2)
+
         response_data = {
             'crop_id': crop_id,
             'crop_name': p_crop['crop_name'],
@@ -414,6 +425,7 @@ class MarketSnapshotView(views.APIView):
             'global_latest_date': global_latest.date if global_latest else None,
             'ytd_avg': round(ytd_avg, 2) if ytd_avg else None,
             'markets_data': markets_data,
+            'global_chart_data': global_chart_data,
             'festival_intelligence': festival_intel,
             'supply_snapshot': supply_snapshot
         }

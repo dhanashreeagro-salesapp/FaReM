@@ -162,13 +162,31 @@ export default function MarketIntelligence() {
       if (!marketDetails || !selectedMarkets.length) return null;
       const prefMarket = getPreferredMarket() || selectedMarkets[0];
       const mData = marketDetails.markets_data[prefMarket]?.chart_data;
-      if (!mData) return null;
+      const gData = marketDetails.global_chart_data;
+      if (!mData && !gData) return null;
+      
+      const getVal = (yearKey, idx) => {
+          if (mData && mData[yearKey] && mData[yearKey][idx] != null) {
+              return mData[yearKey][idx];
+          }
+          if (gData && gData[yearKey] && gData[yearKey][idx] != null) {
+              return gData[yearKey][idx];
+          }
+          return null;
+      };
       
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      const two_years_ago = Array.from({length: 12}, (_, i) => getVal('two_years_ago', i));
+      const last_year = Array.from({length: 12}, (_, i) => getVal('last_year', i));
+      const current_year = Array.from({length: 12}, (_, i) => getVal('current_year', i));
+      
+      const activeData = mData || gData;
+      
       const years = [
-          { label: mData.two_years_ago_label || '2024', data: mData.two_years_ago },
-          { label: mData.last_year_label || '2025', data: mData.last_year },
-          { label: (mData.current_year_label || '2026') + ' (YTD)', data: mData.current_year }
+          { label: activeData.two_years_ago_label || '2024', data: two_years_ago },
+          { label: activeData.last_year_label || '2025', data: last_year },
+          { label: (activeData.current_year_label || '2026') + ' (YTD)', data: current_year }
       ];
       
       // Find min and max for color scaling
