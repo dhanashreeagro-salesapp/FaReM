@@ -88,7 +88,7 @@ export function PlotsModal({ isOpen, onClose, data, loading }) {
                           <div className="p-2 bg-gray-50 flex justify-between items-center">
                             <div className="flex items-center gap-2 cursor-pointer flex-1" onClick={() => toggleFarmer(fId)}>
                               {expandedFarmers[fId] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
-                              <Link to={`/farmers/${fId}`} className="font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                              <Link to={`/farmers?search=${farmerData.mobile_number || encodeURIComponent(farmerData.farmer_name)}`} className="font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
                                 {farmerData.farmer_name}
                               </Link>
                             </div>
@@ -103,7 +103,7 @@ export function PlotsModal({ isOpen, onClose, data, loading }) {
                                   <Phone size={14} />
                                 </button>
                                 <Link 
-                                  to={`/visits/new?farmer_id=${fId}`} 
+                                  to={`/farmers?search=${farmerData.mobile_number || encodeURIComponent(farmerData.farmer_name)}`} 
                                   className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100"
                                   title="Log Visit"
                                 >
