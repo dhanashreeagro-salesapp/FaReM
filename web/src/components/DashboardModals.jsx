@@ -1,30 +1,62 @@
 import React, { useState, useMemo } from 'react';
-import { X, ChevronRight, ChevronDown } from 'lucide-react';
+import { X, ChevronRight, ChevronDown, Phone, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function PlotsModal({ isOpen, onClose, data, loading }) {
-  if (!isOpen) return null;
+  const [expandedVillages, setExpandedVillages] = useState({});
+  const [expandedFarmers, setExpandedFarmers] = useState({});
 
-  const sortedData = useMemo(() => {
-    return [...data].sort((a, b) => {
-      const vA = a.village || '';
-      const vB = b.village || '';
-      if (vA !== vB) return vA.localeCompare(vB);
-      
-      const fA = a.farmer_name || '';
-      const fB = b.farmer_name || '';
-      if (fA !== fB) return fA.localeCompare(fB);
-      
-      const cA = a.active_crops_count || 0;
-      const cB = b.active_crops_count || 0;
-      return cB - cA;
+  const groupedData = useMemo(() => {
+    const villages = {};
+    data.forEach(item => {
+      const v = item.village || 'Unknown Village';
+      const fId = item.farmer_id || 'unknown';
+      if (!villages[v]) villages[v] = { farmers: {}, totalPlots: 0 };
+      if (!villages[v].farmers[fId]) {
+        villages[v].farmers[fId] = { 
+          farmer_name: item.farmer_name, 
+          mobile_number: item.mobile_number, 
+          plots: [] 
+        };
+      }
+      villages[v].farmers[fId].plots.push(item);
+      villages[v].totalPlots++;
     });
+    return villages;
   }, [data]);
+
+  const toggleVillage = (v) => setExpandedVillages(prev => ({ ...prev, [v]: !prev[v] }));
+  const toggleFarmer = (f) => setExpandedFarmers(prev => ({ ...prev, [f]: !prev[f] }));
+
+  const expandAll = () => {
+    const allV = {};
+    const allF = {};
+    Object.keys(groupedData).forEach(v => {
+      allV[v] = true;
+      Object.keys(groupedData[v].farmers).forEach(f => { allF[f] = true; });
+    });
+    setExpandedVillages(allV);
+    setExpandedFarmers(allF);
+  };
+
+  const collapseAll = () => {
+    setExpandedVillages({});
+    setExpandedFarmers({});
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-surface border border-border rounded-2xl max-w-5xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
         <div className="flex justify-between items-center border-b border-border pb-3 shrink-0">
-          <h3 className="text-lg font-heading font-bold text-text">Total Plots</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-heading font-bold text-text">Total Plots</h3>
+            <div className="flex gap-2">
+              <button onClick={expandAll} className="text-xs px-2 py-1 bg-surface border border-border rounded hover:bg-bg">Expand All</button>
+              <button onClick={collapseAll} className="text-xs px-2 py-1 bg-surface border border-border rounded hover:bg-bg">Collapse All</button>
+            </div>
+          </div>
           <button onClick={onClose} className="p-1.5 text-text-muted hover:text-text rounded-lg">
             <X size={18} />
           </button>
@@ -32,32 +64,84 @@ export function PlotsModal({ isOpen, onClose, data, loading }) {
         {loading ? (
           <div className="py-12 text-center text-xs text-text-muted">Loading plots...</div>
         ) : (
-          <div className="overflow-y-auto flex-1 border border-border rounded-xl">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-bg text-text-muted sticky top-0 border-b border-border font-semibold">
-                <tr>
-                  <th className="p-3">Village</th>
-                  <th className="p-3">Farmer</th>
-                  <th className="p-3">Plot Name</th>
-                  <th className="p-3">Area (Acres)</th>
-                  <th className="p-3">Active Crops</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {sortedData.map((item, idx) => (
-                  <tr key={item.id || idx} className="hover:bg-bg/50">
-                    <td className="p-3">{item.village}</td>
-                    <td className="p-3 font-bold">{item.farmer_name}</td>
-                    <td className="p-3">{item.plot_name}</td>
-                    <td className="p-3">{item.area_acres}</td>
-                    <td className="p-3">{item.active_crops_count}</td>
-                  </tr>
-                ))}
-                {sortedData.length === 0 && (
-                  <tr><td colSpan="5" className="p-4 text-center">No plots found.</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div className="overflow-y-auto flex-1 space-y-2">
+            {Object.keys(groupedData).length === 0 ? (
+              <div className="p-4 text-center text-xs">No plots found.</div>
+            ) : (
+              Object.keys(groupedData).sort().map(village => (
+                <div key={village} className="border border-border rounded-lg overflow-hidden">
+                  <div 
+                    className="p-3 bg-bg flex justify-between items-center cursor-pointer hover:bg-bg/80"
+                    onClick={() => toggleVillage(village)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {expandedVillages[village] ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+                      <span className="font-bold text-sm text-text">{village}</span>
+                    </div>
+                    <span className="text-sm font-semibold">{groupedData[village].totalPlots} Plots</span>
+                  </div>
+                  
+                  {expandedVillages[village] && (
+                    <div className="bg-surface border-t border-border p-2 space-y-2">
+                      {Object.entries(groupedData[village].farmers).map(([fId, farmerData]) => (
+                        <div key={fId} className="border border-border/60 rounded-md overflow-hidden ml-4">
+                          <div className="p-2 bg-gray-50 flex justify-between items-center">
+                            <div className="flex items-center gap-2 cursor-pointer flex-1" onClick={() => toggleFarmer(fId)}>
+                              {expandedFarmers[fId] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+                              <Link to={`/farmers/${fId}`} className="font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                                {farmerData.farmer_name}
+                              </Link>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-semibold text-text-muted">{farmerData.plots.length} Plots</span>
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  onClick={() => window.open(`tel:${farmerData.mobile_number || ''}`)} 
+                                  className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" 
+                                  title="Call"
+                                >
+                                  <Phone size={14} />
+                                </button>
+                                <Link 
+                                  to={`/visits/new?farmer_id=${fId}`} 
+                                  className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100"
+                                  title="Log Visit"
+                                >
+                                  <MapPin size={14} />
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {expandedFarmers[fId] && (
+                            <div className="p-2 bg-white">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="text-text-muted border-b border-border/50">
+                                    <th className="pb-1 pl-2">Plot Name</th>
+                                    <th className="pb-1">Area (Acres)</th>
+                                    <th className="pb-1">Active Crops</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {farmerData.plots.map((plot, idx) => (
+                                    <tr key={plot.id || idx} className="border-b border-border/30 last:border-0">
+                                      <td className="py-1.5 pl-2">{plot.plot_name}</td>
+                                      <td className="py-1.5">{plot.area_acres}</td>
+                                      <td className="py-1.5">{plot.active_crops_count}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

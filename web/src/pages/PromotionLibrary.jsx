@@ -108,12 +108,12 @@ export default function PromotionLibrary() {
   const filteredPromos = promos.filter(p => {
     const lowSearch = searchTerm.toLowerCase();
     return (
-      p.title.toLowerCase().includes(lowSearch) ||
-      p.category?.toLowerCase().includes(lowSearch) ||
-      p.content_type.toLowerCase().includes(lowSearch) ||
+      (p.title || '').toLowerCase().includes(lowSearch) ||
+      (p.category || '').toLowerCase().includes(lowSearch) ||
+      (p.content_type || '').toLowerCase().includes(lowSearch) ||
       (p.product_names && p.product_names.some(n => n.toLowerCase().includes(lowSearch))) ||
-      p.crop_name?.toLowerCase().includes(lowSearch) ||
-      p.stage_name?.toLowerCase().includes(lowSearch)
+      (p.crop_name || '').toLowerCase().includes(lowSearch) ||
+      (p.stage_name || '').toLowerCase().includes(lowSearch)
     );
   });
 

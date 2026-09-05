@@ -49,7 +49,13 @@ class PlannerViewSet(viewsets.ViewSet):
             farmers = farmers.filter(**plot_filters).distinct()
             
         if villages:
-            farmers = farmers.filter(village__in=villages)
+            from django.db.models import Q
+            q = Q()
+            for v in villages:
+                q |= Q(village__iexact=v)
+                if v.lower() == 'ahergaon':
+                    q |= Q(village__iexact='ahergon') | Q(village__iexact='ahirgaon')
+            farmers = farmers.filter(q)
             
         try:
             lat_float = float(lat) if lat else None

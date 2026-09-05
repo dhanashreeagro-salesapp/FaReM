@@ -158,7 +158,7 @@ class DashboardAPIView(APIView):
             CropSeason.objects.filter(plot__farmer_id__in=farmer_ids, plot__is_active=True, status='Active')
             .select_related('crop', 'current_stage')
         )
-        data['active_crop_seasons'] = len(active_seasons)
+        data['active_crop_seasons'] = len(set(s.crop_id for s in active_seasons if s.crop_id))
 
         # Pre-fetch all crop stages in 1 single query to eliminate N+1 loop queries
         all_crop_stages = CropStage.objects.all().order_by('crop_id', 'sequence_number')
@@ -387,7 +387,7 @@ class HierarchyAPIView(APIView):
         # Pre-aggregate direct stats in bulk 5 queries total
         farmer_counts = dict(Farmer.objects.exclude(status__iexact='Inactive').values('assigned_staff_id').annotate(c=Count('id')).values_list('assigned_staff_id', 'c'))
         plot_counts = dict(Plot.objects.filter(is_active=True).exclude(farmer__status__iexact='Inactive').values('farmer__assigned_staff_id').annotate(c=Count('id')).values_list('farmer__assigned_staff_id', 'c'))
-        crop_counts = dict(CropSeason.objects.filter(status='Active').exclude(plot__farmer__status__iexact='Inactive').values('plot__farmer__assigned_staff_id').annotate(c=Count('id')).values_list('plot__farmer__assigned_staff_id', 'c'))
+        crop_counts = dict(CropSeason.objects.filter(status='Active').exclude(plot__farmer__status__iexact='Inactive').values('plot__farmer__assigned_staff_id').annotate(c=Count('crop_id', distinct=True)).values_list('plot__farmer__assigned_staff_id', 'c'))
         
         recs_counts = dict(Recommendation.objects.values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
         wa_counts = dict(Recommendation.objects.filter(channel='WhatsApp').values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))

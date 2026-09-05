@@ -27,6 +27,7 @@ const customIcon = (color) => new L.Icon({
 
 const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labelKey = 'name' }) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef();
 
   useEffect(() => {
@@ -40,6 +41,21 @@ const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labe
     else onChange([...selected, val]);
   };
 
+  const filteredOptions = options.filter(opt => (opt[labelKey] || '').toLowerCase().includes(search.toLowerCase()));
+
+  const selectAllFiltered = () => {
+    const newSelected = [...selected];
+    filteredOptions.forEach(opt => {
+      if (!newSelected.includes(opt[valueKey])) newSelected.push(opt[valueKey]);
+    });
+    onChange(newSelected);
+  };
+
+  const clearAllFiltered = () => {
+    const filteredVals = filteredOptions.map(opt => opt[valueKey]);
+    onChange(selected.filter(val => !filteredVals.includes(val)));
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen(!open)} className="bg-bg border border-border text-text rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary flex items-center justify-between min-w-[150px]">
@@ -47,9 +63,22 @@ const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labe
         <Filter size={14} className="ml-2 text-text-muted" />
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 w-64 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-          <div className="p-2">
-            {options.map((opt, i) => {
+        <div className="absolute top-full mt-1 left-0 w-64 bg-surface border border-border rounded-xl shadow-lg z-50 flex flex-col max-h-80">
+          <div className="p-2 border-b border-border sticky top-0 bg-surface z-10">
+            <input 
+              type="search" 
+              placeholder={`Search ${label}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary mb-2"
+            />
+            <div className="flex justify-between gap-2">
+              <button onClick={selectAllFiltered} className="text-xs flex-1 py-1 bg-bg hover:bg-gray-100 rounded text-primary font-medium">Select All</button>
+              <button onClick={clearAllFiltered} className="text-xs flex-1 py-1 bg-bg hover:bg-gray-100 rounded text-text-muted font-medium">Clear All</button>
+            </div>
+          </div>
+          <div className="p-2 overflow-y-auto flex-1">
+            {filteredOptions.map((opt, i) => {
               const val = opt[valueKey];
               const lbl = opt[labelKey];
               const isSel = selected.includes(val);
@@ -60,6 +89,7 @@ const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labe
                 </div>
               );
             })}
+            {filteredOptions.length === 0 && <div className="text-xs text-center p-2 text-text-muted">No results found.</div>}
           </div>
         </div>
       )}
@@ -187,6 +217,18 @@ export default function VisitPlanner() {
     }
   };
 
+  const clearSelections = () => {
+    setVillages([]);
+    setCrops([]);
+    setStages([]);
+    setStartQuery('');
+    setStartCoords(null);
+    setEndQuery('');
+    setEndCoords(null);
+    setFarmers([]);
+    setSelectedFarmers([]);
+  };
+
   const toggleFarmerSelection = (id) => {
     if (selectedFarmers.includes(id)) setSelectedFarmers(selectedFarmers.filter(fid => fid !== id));
     else setSelectedFarmers([...selectedFarmers, id]);
@@ -248,6 +290,9 @@ export default function VisitPlanner() {
           <p className="text-text-muted text-sm mt-1">Plan your day based on location, crop stages, and market trends.</p>
         </div>
         <div className="flex gap-2">
+            <button onClick={clearSelections} className="flex items-center gap-2 px-6 py-2 bg-surface text-text border border-border rounded-xl text-sm font-medium hover:bg-bg transition-colors">
+                <X size={16} /> Clear Selections
+            </button>
             <button onClick={executeSearch} className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
                 <Search size={16} /> Find Farmers
             </button>
