@@ -42,6 +42,11 @@ class ApiClient {
     });
   }
 
+  clearCache(cacheKey) {
+    const userEmail = localStorage.getItem('ffma_email') || 'anon';
+    localStorage.removeItem(`ffma_cache_${userEmail}_${cacheKey}`);
+  }
+
   clearTokens() {
     localStorage.removeItem('ffma_access_token');
     localStorage.removeItem('ffma_refresh_token');
@@ -200,7 +205,7 @@ class ApiClient {
   // Users
   getUsers(forceFresh = false) {
     if (forceFresh) {
-      localStorage.removeItem('cache_users');
+      this.clearCache('cache_users');
       return this.request('/users/').then(data => {
         if (data) localStorage.setItem('cache_users', JSON.stringify(data));
         return data;
@@ -210,19 +215,19 @@ class ApiClient {
   }
   getUser(id) { return this.request(`/users/${id}/`); }
   createUser(data) {
-    localStorage.removeItem('cache_users');
+    this.clearCache('cache_users');
     return this.request('/users/', { method: 'POST', body: JSON.stringify(data) });
   }
   updateUser(id, data) {
-    localStorage.removeItem('cache_users');
+    this.clearCache('cache_users');
     return this.request(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
   }
   deleteUser(id) {
-    localStorage.removeItem('cache_users');
+    this.clearCache('cache_users');
     return this.request(`/users/${id}/`, { method: 'DELETE' });
   }
   enableUser(id) {
-    localStorage.removeItem('cache_users');
+    this.clearCache('cache_users');
     return this.request(`/users/${id}/enable/`, { method: 'PATCH' });
   }
 
@@ -277,7 +282,7 @@ class ApiClient {
   // Territories
   getTerritories(forceFresh = false) {
     if (forceFresh) {
-      localStorage.removeItem('cache_territories');
+      this.clearCache('cache_territories');
       return this.request('/territories/').then(data => {
         if (data) localStorage.setItem('cache_territories', JSON.stringify(data));
         return data;
@@ -286,15 +291,15 @@ class ApiClient {
     return this.requestWithCache('/territories/', {}, 'cache_territories');
   }
   createTerritory(data) {
-    localStorage.removeItem('cache_territories');
+    this.clearCache('cache_territories');
     return this.request('/territories/', { method: 'POST', body: JSON.stringify(data) });
   }
   updateTerritory(id, data) {
-    localStorage.removeItem('cache_territories');
+    this.clearCache('cache_territories');
     return this.request(`/territories/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
   }
   deleteTerritory(id) {
-    localStorage.removeItem('cache_territories');
+    this.clearCache('cache_territories');
     return this.request(`/territories/${id}/`, { method: 'DELETE' });
   }
 
@@ -303,15 +308,15 @@ class ApiClient {
   getCrops() { return this.requestWithCache('/crops/', {}, 'cache_crops'); }
   getCrop(id) { return this.request(`/crops/${id}/`); }
   createCrop(data) {
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request('/crops/', { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
   updateCrop(id, data) {
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crops/${id}/`, { method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) });
   }
   deleteCrop(id) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crops/${id}/`, { method: 'DELETE' }); 
   }
   getCropStages(params = {}) {
@@ -319,27 +324,27 @@ class ApiClient {
     return this.request(`/crop-stages/${qs ? `?${qs}` : ''}`);
   }
   createVariety(data) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request('/crop-varieties/', { method: 'POST', body: JSON.stringify(data) }); 
   }
   updateVariety(id, data) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crop-varieties/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); 
   }
   deleteVariety(id) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crop-varieties/${id}/`, { method: 'DELETE' }); 
   }
   createStage(data) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request('/crop-stages/', { method: 'POST', body: JSON.stringify(data) }); 
   }
   updateStage(id, data) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crop-stages/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); 
   }
   deleteStage(id) { 
-    localStorage.removeItem('cache_crops');
+    this.clearCache('cache_crops');
     return this.request(`/crop-stages/${id}/`, { method: 'DELETE' }); 
   }
 

@@ -21,7 +21,8 @@ class CropMasterViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return CropMaster.objects.all().prefetch_related('varieties', 'stages')
         
-    @action(detail=True, methods=['get'])
+    from rest_framework.permissions import AllowAny
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def image(self, request, pk=None):
         crop = self.get_object()
         if not crop.reference_image or not crop.reference_image.startswith('data:image'):
