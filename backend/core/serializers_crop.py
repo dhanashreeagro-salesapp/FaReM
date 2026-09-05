@@ -37,9 +37,11 @@ class CropMasterSerializer(serializers.ModelSerializer):
             encoded = base64.b64encode(file_obj.read()).decode('utf-8')
             mime_type = getattr(file_obj, 'content_type', 'image/jpeg')
             
-            # data might be immutable (QueryDict)
-            if hasattr(data, 'copy'):
-                data = data.copy()
+            # Avoid QueryDict.copy() deepcopy crash for TemporaryUploadedFiles (>2.5MB)
+            if hasattr(data, 'dict'):
+                data = data.dict()
+            else:
+                data = dict(data)
             data['reference_image'] = f"data:{mime_type};base64,{encoded}"
             
         return super().to_internal_value(data)
