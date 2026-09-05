@@ -264,7 +264,10 @@ class MarketSnapshotView(views.APIView):
         for item in acreage_qs:
             if item['total_acres'] and item['total_acres'] > 0 and item['crop_id'] not in seen_crop_ids:
                 img = item.get('crop__reference_image', '')
-                portfolio_crops.append({'crop_id': str(item['crop_id']), 'crop_name': item['crop__crop_name'], 'reference_image': f"/media/{img}" if img else None, 'total_acres': float(item['total_acres'])})
+                img_url = None
+                if img and str(img).startswith('data:image'):
+                    img_url = f"/api/crops/{item['crop_id']}/image/"
+                portfolio_crops.append({'crop_id': str(item['crop_id']), 'crop_name': item['crop__crop_name'], 'reference_image': img_url, 'total_acres': float(item['total_acres'])})
                 seen_crop_ids.add(item['crop_id'])
                 
         other_mapped_ids = MarketPriceRecord.objects.exclude(crop__isnull=True).values_list('crop_id', flat=True).distinct()
@@ -272,7 +275,10 @@ class MarketSnapshotView(views.APIView):
             if cid not in seen_crop_ids:
                 crop = CropMaster.objects.filter(id=cid).first()
                 if crop:
-                    portfolio_crops.append({'crop_id': str(crop.id), 'crop_name': crop.crop_name, 'reference_image': crop.reference_image.url if crop.reference_image else None, 'total_acres': 0})
+                    img_url = None
+                    if crop.reference_image and str(crop.reference_image).startswith('data:image'):
+                        img_url = f"/api/crops/{crop.id}/image/"
+                    portfolio_crops.append({'crop_id': str(crop.id), 'crop_name': crop.crop_name, 'reference_image': img_url, 'total_acres': 0})
                     seen_crop_ids.add(crop.id)
                     
         search_query = request.query_params.get('search', '').lower()

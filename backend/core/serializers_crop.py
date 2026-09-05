@@ -23,6 +23,12 @@ class CropMasterSerializer(serializers.ModelSerializer):
         model = CropMaster
         fields = '__all__'
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get('reference_image') and str(data['reference_image']).startswith('data:image'):
+            data['reference_image'] = f"/api/crops/{instance.id}/image/"
+        return data
+
     def to_internal_value(self, data):
         # Handle file uploads and convert to base64
         request = self.context.get('request')

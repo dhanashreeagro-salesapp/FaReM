@@ -201,7 +201,7 @@ export default function MarketIntelligence() {
               
               <div className="overflow-x-auto">
                   <div className="min-w-[600px]">
-                      <div className="grid grid-cols-13 gap-1 mb-2">
+                      <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
                           <div className="col-span-1"></div>
                           {months.map(m => (
                               <div key={m} className="col-span-1 text-center text-[10px] font-bold text-text-muted">{m}</div>
@@ -209,11 +209,11 @@ export default function MarketIntelligence() {
                       </div>
                       
                       {years.map(yr => (
-                          <div key={yr.label} className="grid grid-cols-13 gap-1 mb-1 items-center">
+                          <div key={yr.label} className="grid gap-1 mb-1 items-center" style={{ gridTemplateColumns: 'repeat(13, minmax(0, 1fr))' }}>
                               <div className="col-span-1 text-[10px] font-bold text-text text-right pr-2">{yr.label}</div>
                               {yr.data.map((val, idx) => (
                                   <div key={idx} className="col-span-1 h-8 rounded text-[10px] font-bold text-text/80 flex items-center justify-center" style={{backgroundColor: getColor(val)}}>
-                                      {val ? val.toLocaleString() : '-'}
+                                      {val ? val.toLocaleString() : 'NA'}
                                   </div>
                               ))}
                           </div>
@@ -552,14 +552,8 @@ export default function MarketIntelligence() {
         {renderStatsGrid()}
         {renderContextCards()}
         {renderApproachingFestivals()}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mb-6">
             {renderSeasonalPricePattern()}
-            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-border mb-6">
-                 <h3 className="text-sm font-bold text-text uppercase mb-4">Supply Snapshot <span className="text-xs font-normal text-text-muted normal-case">(This Week)</span></h3>
-                 <div className="flex items-center justify-center h-48 text-sm text-text-muted bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                     Supply data metrics unavailable
-                 </div>
-            </div>
         </div>
       </div>
     </div>
