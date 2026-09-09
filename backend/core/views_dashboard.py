@@ -105,7 +105,7 @@ class DashboardAPIView(APIView):
 
         data['total_farmers'] = len(farmer_ids)
 
-        data['total_visits'] = FieldVisit.objects.filter(farmer_id__in=farmer_ids).count()
+        # We will retrieve total_visits later
         data['total_calls'] = CallLog.objects.filter(farmer_id__in=farmer_ids).count()
         
         # Monthly / YTD farmer counts with robust fallback
@@ -139,11 +139,12 @@ class DashboardAPIView(APIView):
             threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
             cutoff_date = today_date - datetime.timedelta(days=threshold_days)
 
-            recent_visited_farmer_ids = set(FieldVisit.objects.filter(
-                farmer_id__in=farmer_ids, created_at__gte=cutoff_date
-            ).values_list('farmer_id', flat=True))
-
-            overdue_count = len(set(farmer_ids) - recent_visited_farmer_ids)
+            visit_agg = FieldVisit.objects.filter(farmer_id__in=farmer_ids).aggregate(
+                total_visits=Count('id'),
+                recent_farmers=Count('farmer_id', distinct=True, filter=Q(created_at__gte=cutoff_date))
+            )
+            data['total_visits'] = visit_agg['total_visits'] or 0
+            overdue_count = max(0, len(farmer_ids) - (visit_agg['recent_farmers'] or 0))
         except Exception:
             overdue_count = len(farmer_ids)
 
@@ -154,11 +155,12 @@ class DashboardAPIView(APIView):
 
         data['total_plots'] = Plot.objects.filter(farmer_id__in=farmer_ids, is_active=True).count()
         
+        # Select only required fields to avoid downloading massive image payloads from CropMaster
         active_seasons = list(
             CropSeason.objects.filter(plot__farmer_id__in=farmer_ids, plot__is_active=True, status='Active')
-            .select_related('crop', 'current_stage')
+            .values('crop_id', 'crop__crop_name', 'current_stage__stage_name', 'sowing_date')
         )
-        data['active_crop_seasons'] = len(set(s.crop_id for s in active_seasons if s.crop_id))
+        data['active_crop_seasons'] = len(set(s['crop_id'] for s in active_seasons if s.get('crop_id')))
 
         # Pre-fetch all crop stages in 1 single query to eliminate N+1 loop queries
         all_crop_stages = CropStage.objects.all().order_by('crop_id', 'sequence_number')
@@ -171,20 +173,20 @@ class DashboardAPIView(APIView):
 
         for season in active_seasons:
             try:
-                if not season.crop:
+                if not season.get('crop_id'):
                     continue
-                crop_name = season.crop.crop_name
-                active_crop_ids.add(season.crop_id)
+                crop_name = season['crop__crop_name']
+                active_crop_ids.add(season['crop_id'])
                 
                 # Use already-assigned current_stage if available, else infer from in-memory stages
-                if season.current_stage:
-                    stage_name = season.current_stage.stage_name
-                elif season.sowing_date:
-                    days_since_sowing = (today_date - season.sowing_date).days
+                if season.get('current_stage__stage_name'):
+                    stage_name = season['current_stage__stage_name']
+                elif season.get('sowing_date'):
+                    days_since_sowing = (today_date - season['sowing_date']).days
                     stage_name = 'Unknown'
                     if days_since_sowing >= 0:
                         accumulated_days = 0
-                        stages = crop_stages_map.get(season.crop_id, [])
+                        stages = crop_stages_map.get(season['crop_id'], [])
                         for stage in stages:
                             accumulated_days += stage.days_from_previous_stage
                             if days_since_sowing <= accumulated_days:
@@ -204,11 +206,16 @@ class DashboardAPIView(APIView):
         
         data['crop_stage_breakup'] = stage_breakup
 
-        # Market Trends logic - bulk fetch in 1 query
+        # Market Trends logic - single time-bounded bulk fetch
         market_trends = []
         if active_crop_ids:
+            thirty_days_ago = today_date - datetime.timedelta(days=30)
             rates_by_crop = defaultdict(list)
-            recent_rates = MarketRate.objects.filter(crop_id__in=active_crop_ids).select_related('crop').order_by('-date')
+            
+            recent_rates = MarketRate.objects.filter(
+                crop_id__in=active_crop_ids, date__gte=thirty_days_ago
+            ).select_related('crop').order_by('-date')
+            
             for rate in recent_rates:
                 if len(rates_by_crop[rate.crop_id]) < 3:
                     rates_by_crop[rate.crop_id].append(rate)
