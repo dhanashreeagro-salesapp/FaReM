@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, CheckCircle, AlertTriangle, Search, Filter, Phone, CheckSquare, Square, Navigation2, Layers } from 'lucide-react';
+import { MapPin, Navigation, CheckCircle, AlertTriangle, Search, Filter, Phone, CheckSquare, Square, Navigation2, Layers, X } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
