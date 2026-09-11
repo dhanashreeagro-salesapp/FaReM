@@ -64,7 +64,15 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
       if (channel === 'WhatsApp' && scheduleMode === 'Immediate' && farmerIds.length === 1) {
         try {
           const promoObj = promotions.find(p => String(p.id) === String(selectedPromo));
-          const messageContent = promoObj ? promoObj.content : "Promotion Message";
+          
+          let messageContent = "Promotion Message";
+          if (promoObj) {
+            messageContent = promoObj.whatsapp_template || promoObj.title || "Promotion Message";
+            if (promoObj.file_url) {
+              messageContent += `\n\nView attachment: ${promoObj.file_url}`;
+            }
+          }
+          
           const fRes = await api.getFarmer(farmerIds[0]);
           if (fRes && fRes.primary_mobile) {
             const normalizedPhone = String(fRes.primary_mobile).replace(/\D/g, '').replace(/^0+/, '');
