@@ -29,6 +29,7 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showWhatsAppConfirm, setShowWhatsAppConfirm] = useState(false);
 
   // Load All Master Crops & Products
   useEffect(() => {
@@ -248,6 +249,94 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
     } finally {
       setLoading(false);
     }
+  };
+
+  const normalizeIndianPhoneNumber = (phone) => {
+    if (!phone) return null;
+    let num = phone.replace(/[^0-9+]/g, '');
+    if (num.startsWith('+91')) {
+      num = '91' + num.slice(3);
+    } else if (num.startsWith('+')) {
+      num = num.slice(1);
+    } else if (num.startsWith('91') && num.length === 12) {
+      // already 91 + 10 digits
+    } else if (num.length === 10) {
+      num = '91' + num;
+    } else if (num.startsWith('0') && num.length === 11) {
+      num = '91' + num.slice(1);
+    }
+    return num;
+  };
+
+  const formatPhoneForDisplay = (phone) => {
+    const normalized = normalizeIndianPhoneNumber(phone);
+    if (!normalized) return '';
+    if (normalized.startsWith('91') && normalized.length === 12) {
+      return `+91 ${normalized.slice(2, 7)} ${normalized.slice(7)}`;
+    }
+    return `+${normalized}`;
+  };
+
+  const buildAdvisoryMessage = () => {
+    const plot = farmerPlots.find(p => p.id === selectedPlotId);
+    const plotName = plot ? plot.plot_name : '';
+    const plotArea = plot ? plot.area_acres : '';
+    const cropName = availableCrops.find(c => String(c.id) === String(selectedCrop))?.crop_name || '';
+    const stageName = stages.find(s => String(s.id) === String(selectedStage))?.stage_name || '';
+    
+    const matchingAi = suggestions.find(s => s.product_name === productName) || (suggestions.length > 0 ? suggestions[0] : null);
+    const aiText = matchingAi ? `\nAI Recommendation:\n${matchingAi.product_name}\n\nConfidence: ${matchingAi.confidence_score}%\n` : '';
+
+    return `AgriAmigo Advisory Recommendation
+
+Farmer: ${farmer?.full_name || ''}
+
+Plot: ${plotName}
+Area: ${plotArea ? `${plotArea} acres` : ''}
+Crop: ${cropName}
+Growth Stage: ${stageName}
+
+Recommended Product: ${productName}
+Dose: ${dose} ${doseUnit}
+Application Method: ${applicationMethod}
+Timing: ${timing}
+${aiText}
+Please follow the recommended application instructions.
+
+Regards,
+AgriAmigo Advisory`;
+  };
+
+  const validateWhatsAppRecipient = () => {
+    if (!farmer?.id) {
+      alert("Please select a farmer first.");
+      return false;
+    }
+    if (!farmer?.primary_mobile) {
+      alert("No mobile number is available for this farmer.");
+      return false;
+    }
+    const normalized = normalizeIndianPhoneNumber(farmer?.primary_mobile);
+    if (!normalized || normalized.length < 12) {
+      alert("Please check the farmer's mobile number before sending the advisory.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSendWhatsAppClick = () => {
+    if (validateWhatsAppRecipient()) {
+      setShowWhatsAppConfirm(true);
+    }
+  };
+
+  const handleConfirmSendWhatsApp = () => {
+    const normalizedPhone = normalizeIndianPhoneNumber(farmer?.primary_mobile);
+    const message = buildAdvisoryMessage();
+    const whatsappUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
+    setShowWhatsAppConfirm(false);
+    alert(`WhatsApp opened for ${farmer?.full_name}.`);
   };
 
   return (
@@ -486,13 +575,39 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
           <button
             type="button"
             disabled={loading}
-            onClick={() => handleSaveRecommendation('WhatsApp')}
+            onClick={handleSendWhatsAppClick}
             className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-md"
           >
             <MessageSquare size={14} />
-            <span>Send WhatsApp</span>
+            <span>Send on WhatsApp</span>
           </button>
         </div>
+
+        {showWhatsAppConfirm && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <h3 className="text-lg font-bold text-text mb-4">Confirm WhatsApp Advisory</h3>
+              <p className="text-sm text-text-muted mb-6">
+                Send advisory to {farmer?.full_name}<br/>
+                <span className="font-bold text-text">{formatPhoneForDisplay(farmer?.primary_mobile)}</span>?
+              </p>
+              <div className="flex justify-end gap-3 text-xs">
+                <button
+                  onClick={() => setShowWhatsAppConfirm(false)}
+                  className="px-4 py-2 border border-border text-text hover:bg-bg rounded-xl font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSendWhatsApp}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700"
+                >
+                  Open WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
