@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import Sidebar from './components/Sidebar';
@@ -20,10 +20,11 @@ import DataDebug from './pages/DataDebug';
 import FrontendDataDiagnostic from './pages/FrontendDataDiagnostic';
 
 
-import { MapPin } from 'lucide-react';
+import { MapPin, Menu } from 'lucide-react';
 
 function ProtectedLayout() {
   const { isAuthenticated, loading, user } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (loading) {
     return (
@@ -38,18 +39,26 @@ function ProtectedLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-surface border-b border-border z-10 py-3 px-6">
+    <div className="flex h-screen bg-bg overflow-hidden relative">
+      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="bg-surface border-b border-border z-10 py-3 px-4 md:px-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-heading font-bold text-text">{user?.full_name || 'FaReM App'}</h2>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-1.5 -ml-1.5 text-text-muted hover:bg-bg rounded-lg"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-heading font-bold text-text truncate max-w-[120px] md:max-w-xs">{user?.full_name || 'FaReM App'}</h2>
               {user?.territory_name && (
                 <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <MapPin size={11} /> {user.territory_name}
                 </span>
               )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-heading font-bold">

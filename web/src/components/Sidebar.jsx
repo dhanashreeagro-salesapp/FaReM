@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award, Database } from 'lucide-react';
+import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award, Database, X } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard & Reports', icon: BarChart3, roles: ['Admin', 'ZonalManager', 'TerritoryManager', 'FieldStaff'] },
@@ -20,7 +20,7 @@ const navItems = [
 ];
 
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const { user, logout } = useAuth();
 
@@ -29,16 +29,29 @@ export default function Sidebar() {
   );
 
   return (
-    <div className="w-64 bg-surface border-r border-border flex flex-col h-full">
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity" 
+          onClick={onClose}
+        />
+      )}
+      <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 w-64 bg-surface border-r border-border flex flex-col h-full ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Brand Header */}
-      <div className="flex items-center gap-3 h-16 px-4 border-b border-border bg-emerald-50/70">
-        <img src="/agriamigo-logo.png" alt="Agri Amigo Logo" className="w-10 h-10 object-contain shrink-0 rounded-lg shadow-sm" />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-heading font-bold text-emerald-900 leading-tight tracking-tight">
-            Agri Amigo
-          </h1>
-          <p className="text-[10px] font-semibold text-emerald-800 truncate">Together for Better Farms</p>
+      <div className="flex items-center justify-between gap-3 h-16 px-4 border-b border-border bg-emerald-50/70">
+        <div className="flex items-center gap-3 min-w-0">
+          <img src="/agriamigo-logo.png" alt="Agri Amigo Logo" className="w-10 h-10 object-contain shrink-0 rounded-lg shadow-sm" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base font-heading font-bold text-emerald-900 leading-tight tracking-tight">
+              Agri Amigo
+            </h1>
+            <p className="text-[10px] font-semibold text-emerald-800 truncate">Together for Better Farms</p>
+          </div>
         </div>
+        <button onClick={onClose} className="md:hidden p-1.5 text-emerald-900 hover:bg-emerald-100 rounded-lg shrink-0">
+          <X size={20} />
+        </button>
       </div>
 
       {/* User Info Card */}
@@ -66,9 +79,10 @@ export default function Sidebar() {
           {visibleItems.map(({ path, label, icon: Icon }) => {
             const active = location.pathname === path;
             return (
-              <li key={path}>
+              <li>
                 <Link
                   to={path}
+                  onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     active
                       ? 'bg-primary text-white shadow-sm'
@@ -96,5 +110,6 @@ export default function Sidebar() {
         </button>
       </div>
     </div>
+    </>
   );
 }

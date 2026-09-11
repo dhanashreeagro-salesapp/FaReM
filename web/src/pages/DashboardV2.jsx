@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import api from '../services/api';
+import { normalizeDashboardMetrics, normalizeHierarchyResponse } from '../services/dataAdapter';
 import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PlotsModal, CropsModal, VisitsModal, CallsModal, OverdueModal } from '../components/DashboardModals';
@@ -33,9 +34,19 @@ export default function DashboardV2() {
 
   // AbortController ref for race condition & unmount protection
   const abortControllerRef = useRef(null);
+  const dashboardRequestIdRef = useRef(0);
+  const hierarchyRequestIdRef = useRef(0);
 
   const fetchDashboard = async () => {
     if (!user || !user.email) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    const currentRequestId = ++dashboardRequestIdRef.current;
 
     setLoading(true);
     setError(null);
@@ -45,18 +56,23 @@ export default function DashboardV2() {
       setRequestCount(prev => prev + 1);
 
       const [json, snapshotJson] = await Promise.all([
-        api.getDashboard({ refresh: 'true', _t: Date.now() }),
-        api.request('/market/snapshot/').catch(() => [])
+        api.getDashboard({ refresh: 'true', _t: Date.now() }, { signal }),
+        api.request('/market/snapshot/', { signal }).catch(() => [])
       ]);
+
+      if (currentRequestId !== dashboardRequestIdRef.current) return;
 
       const endTime = performance.now();
       setResponseTimeMs(Math.round(endTime - startTime));
       setHttpStatus(200);
 
-      setData(json);
+      setData(normalizeDashboardMetrics(json));
       setMarketSnapshot(snapshotJson);
       setLoading(false);
     } catch (err) {
+      if (err.name === 'AbortError') return;
+      if (currentRequestId !== dashboardRequestIdRef.current) return;
+
       console.error("[DashboardV2] Fetch error:", err);
       const endTime = performance.now();
       setResponseTimeMs(Math.round(endTime - startTime));
@@ -72,20 +88,27 @@ export default function DashboardV2() {
   const fetchHierarchy = async () => {
     if (!user || !user.email) return;
 
+    const currentRequestId = ++hierarchyRequestIdRef.current;
+
     setHierarchyLoading(true);
     setHierarchyError(null);
 
     try {
       const json = await api.getHierarchy();
+      if (currentRequestId !== hierarchyRequestIdRef.current) return;
+
       if (json) {
-        setHierarchyData(json);
+        setHierarchyData(normalizeHierarchyResponse(json));
       } else {
         setHierarchyError("Empty response");
       }
     } catch (err) {
+      if (currentRequestId !== hierarchyRequestIdRef.current) return;
       setHierarchyError(err.message || 'Failed to load hierarchy');
     } finally {
-      setHierarchyLoading(false);
+      if (currentRequestId === hierarchyRequestIdRef.current) {
+        setHierarchyLoading(false);
+      }
     }
   };
 
@@ -232,7 +255,7 @@ export default function DashboardV2() {
                   id="stat-farmers"
                   icon={Users}
                   label="Total Active Farmers"
-                  value={data.total_farmers ?? 0}
+                  value={data.totalFarmers}
                   color="bg-emerald-50 text-emerald-700 border-emerald-200"
                   onClick={() => navigate('/farmers')}
                 />
@@ -240,7 +263,7 @@ export default function DashboardV2() {
                   id="stat-plots"
                   icon={MapPin}
                   label="Total Plots"
-                  value={data.total_plots ?? 0}
+                  value={data.totalPlots}
                   color="bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-500 cursor-pointer"
                   onClick={() => handleOpenModal('plots')}
                 />
@@ -248,7 +271,7 @@ export default function DashboardV2() {
                   id="stat-crops"
                   icon={Sprout}
                   label="Active Crops"
-                  value={data.active_crop_seasons ?? 0}
+                  value={data.activeCrops}
                   color="bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-500 cursor-pointer"
                   onClick={() => handleOpenModal('crops')}
                 />
@@ -256,7 +279,7 @@ export default function DashboardV2() {
                   id="stat-visits"
                   icon={Calendar}
                   label="Total Visits"
-                  value={data.total_visits ?? 0}
+                  value={data.totalVisits}
                   color="bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-500 cursor-pointer"
                   onClick={() => handleOpenModal('visits')}
                 />
@@ -264,7 +287,7 @@ export default function DashboardV2() {
                   id="stat-calls"
                   icon={Calendar}
                   label="Total Calls"
-                  value={data.total_calls ?? 0}
+                  value={data.totalCalls}
                   color="bg-teal-50 text-teal-700 border-teal-200 hover:border-teal-500 cursor-pointer"
                   onClick={() => handleOpenModal('calls')}
                 />
@@ -272,7 +295,7 @@ export default function DashboardV2() {
                   id="stat-overdue"
                   icon={AlertTriangle}
                   label="Overdue Visits"
-                  value={data.overdue_visits ?? 0}
+                  value={data.overdueVisits}
                   color="bg-red-50 text-red-700 border-red-200 hover:border-red-500 cursor-pointer"
                   onClick={() => handleOpenModal('overdue')}
                 />
@@ -286,9 +309,9 @@ export default function DashboardV2() {
                   <h3 className="text-sm font-heading font-bold text-text flex items-center gap-2">
                     <MapPin size={16} className="text-primary" /> Top Villages Breakdown
                   </h3>
-                  {data.top_villages && data.top_villages.length > 0 ? (
+                  {data.topVillages && data.topVillages.length > 0 ? (
                     <div className="space-y-2.5">
-                      {data.top_villages.map((v, i) => (
+                      {data.topVillages.map((v, i) => (
                         <div 
                           key={i} 
                           onClick={() => navigate(`/farmers?village=${encodeURIComponent(v.village)}`)}
@@ -314,15 +337,15 @@ export default function DashboardV2() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-bg/60 rounded-xl text-center">
                       <p className="text-[10px] text-text-muted uppercase font-semibold">This Month</p>
-                      <p className="text-lg font-bold text-text mt-1">{data.this_month_farmers ?? 0}</p>
+                      <p className="text-lg font-bold text-text mt-1">{data.thisMonthFarmers ?? '-'}</p>
                     </div>
                     <div className="p-3 bg-bg/60 rounded-xl text-center">
                       <p className="text-[10px] text-text-muted uppercase font-semibold">Last Month</p>
-                      <p className="text-lg font-bold text-text mt-1">{data.last_month_farmers ?? 0}</p>
+                      <p className="text-lg font-bold text-text mt-1">{data.lastMonthFarmers ?? '-'}</p>
                     </div>
                     <div className="p-3 bg-bg/60 rounded-xl text-center">
                       <p className="text-[10px] text-text-muted uppercase font-semibold">Year To Date</p>
-                      <p className="text-lg font-bold text-primary mt-1">{data.ytd_farmers ?? 0}</p>
+                      <p className="text-lg font-bold text-primary mt-1">{data.ytdFarmers ?? '-'}</p>
                     </div>
                   </div>
                 </div>
@@ -426,7 +449,7 @@ function StatCard({ id, icon: Icon, label, value, color, onClick }) {
         </div>
       </div>
       <div className="text-2xl font-heading font-bold tracking-tight">
-        {typeof value === 'number' ? value.toLocaleString() : value}
+        {value === null || value === undefined ? '-' : (typeof value === 'number' ? value.toLocaleString() : value)}
       </div>
     </div>
   );
@@ -436,7 +459,7 @@ function HierarchyNode({ node, isRoot = false }) {
   const [expanded, setExpanded] = useState(true);
   if (!node) return null;
 
-  const childrenNodes = node.children || node.subordinates || [];
+  const childrenNodes = node.children || [];
   const hasChildren = childrenNodes.length > 0;
 
   return (
@@ -454,7 +477,7 @@ function HierarchyNode({ node, isRoot = false }) {
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-xs text-text truncate">{node.name || node.full_name || 'Unnamed'}</span>
+            <span className="font-bold text-xs text-text truncate">{node.name || 'Unnamed'}</span>
             <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
               {node.role || 'Staff'}
             </span>
@@ -463,7 +486,7 @@ function HierarchyNode({ node, isRoot = false }) {
         </div>
         <div className="text-right">
           <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            {node.farmer_count ?? node.farmers_count ?? 0} Farmers
+            {node.farmerCount === null || node.farmerCount === undefined ? '-' : node.farmerCount} Farmers
           </span>
         </div>
       </div>

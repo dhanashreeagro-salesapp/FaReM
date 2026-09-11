@@ -45,36 +45,38 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username', 'mobile_number']
 
     def get_all_subordinates(self):
-        """Recursively retrieve all subordinates using 60s cached in-memory tree traversal."""
-        import time
-        if '_USER_REPORTS_CACHE' not in globals():
-            globals()['_USER_REPORTS_CACHE'] = {'ts': 0, 'map': {}}
-        _urc = globals()['_USER_REPORTS_CACHE']
-        now = time.time()
-        if now - _urc['ts'] > 60 or not _urc['map']:
-            all_users = list(User.objects.exclude(status__iexact='Inactive'))
+        """Recursively retrieve all subordinates using lightweight id traversal."""
+        from django.core.cache import cache
+        cache_key = 'user_reporting_map'
+        reports_map = cache.get(cache_key)
+        
+        if reports_map is None:
+            # Fetch only lightweight IDs instead of full ORM objects
+            all_users = User.objects.exclude(status__iexact='Inactive').values_list('id', 'reporting_manager_id')
             reports_map = {}
-            for u in all_users:
-                mgr_id = u.reporting_manager_id
+            for u_id, mgr_id in all_users:
                 if mgr_id not in reports_map:
                     reports_map[mgr_id] = []
-                reports_map[mgr_id].append(u)
-            _urc['ts'] = now
-            _urc['map'] = reports_map
-        else:
-            reports_map = _urc['map']
+                reports_map[mgr_id].append(u_id)
+            # Cache for 60 seconds
+            cache.set(cache_key, reports_map, 60)
 
         visited = {self.id}
-        all_subs = []
+        all_sub_ids = []
         queue = list(reports_map.get(self.id, []))
         while queue:
-            curr = queue.pop(0)
-            if curr.id in visited:
+            curr_id = queue.pop(0)
+            if curr_id in visited:
                 continue
-            visited.add(curr.id)
-            all_subs.append(curr)
-            queue.extend(reports_map.get(curr.id, []))
-        return all_subs
+            visited.add(curr_id)
+            all_sub_ids.append(curr_id)
+            queue.extend(reports_map.get(curr_id, []))
+            
+        if not all_sub_ids:
+            return []
+            
+        # Fetch actual objects in one query
+        return list(User.objects.filter(id__in=all_sub_ids))
 
     def get_team_users(self):
         """Get self plus all direct and indirect subordinates."""
@@ -93,26 +95,37 @@ class Territory(models.Model):
         return self.name
 
     def get_all_sub_territories(self):
-        """Recursively get all sub-territories using 1 bulk query and in-memory tree traversal."""
-        all_territories = list(Territory.objects.filter(status='Active'))
-        children_map = {}
-        for t in all_territories:
-            p_id = t.parent_territory_id
-            if p_id not in children_map:
-                children_map[p_id] = []
-            children_map[p_id].append(t)
+        """Recursively get all sub-territories using lightweight tree traversal."""
+        from django.core.cache import cache
+        cache_key = 'territory_children_map'
+        children_map = cache.get(cache_key)
+        
+        if children_map is None:
+            all_territories = Territory.objects.filter(status='Active').values_list('id', 'parent_territory_id')
+            children_map = {}
+            for t_id, p_id in all_territories:
+                if p_id not in children_map:
+                    children_map[p_id] = []
+                children_map[p_id].append(t_id)
+            cache.set(cache_key, children_map, 60)
 
         visited = set()
-        result = []
-        queue = [self]
+        result_ids = []
+        queue = [self.id]
         while queue:
-            curr = queue.pop(0)
-            if curr.id in visited:
+            curr_id = queue.pop(0)
+            if curr_id in visited:
                 continue
-            visited.add(curr.id)
-            result.append(curr)
-            queue.extend(children_map.get(curr.id, []))
-        return result
+            visited.add(curr_id)
+            if curr_id != self.id:
+                result_ids.append(curr_id)
+            queue.extend(children_map.get(curr_id, []))
+            
+        if not result_ids:
+            return [self]
+            
+        subs = list(Territory.objects.filter(id__in=result_ids))
+        return [self] + subs
 
 class Farmer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

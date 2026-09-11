@@ -22,6 +22,7 @@ const API_BASE = getApiBase();
 class ApiClient {
   constructor() {
     this.baseUrl = API_BASE;
+    this.refreshTokenPromise = null;
   }
 
   getToken() {
@@ -159,21 +160,31 @@ class ApiClient {
 
 
   async refreshAccessToken() {
-    try {
-      const res = await fetch(`${this.baseUrl}/auth/refresh/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh: this.getRefreshToken() }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        this.setTokens(data.access, data.refresh || this.getRefreshToken());
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
+    if (this.refreshTokenPromise) {
+      return await this.refreshTokenPromise;
     }
+
+    this.refreshTokenPromise = (async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/auth/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: this.getRefreshToken() }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          this.setTokens(data.access, data.refresh || this.getRefreshToken());
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        this.refreshTokenPromise = null;
+      }
+    })();
+
+    return await this.refreshTokenPromise;
   }
 
   // Auth
@@ -473,9 +484,9 @@ class ApiClient {
   approveBulkSend(id) { return this.request(`/bulk-sends/${id}/approve/`, { method: 'POST' }); }
   rejectBulkSend(id) { return this.request(`/bulk-sends/${id}/reject/`, { method: 'POST' }); }
 
-  async getDashboard(params = {}) {
+  async getDashboard(params = {}, options = {}) {
     const qs = new URLSearchParams(params).toString();
-    const res = await this.request(`/dashboard/${qs ? `?${qs}` : ''}`);
+    const res = await this.request(`/dashboard/${qs ? `?${qs}` : ''}`, options);
     if (typeof window !== 'undefined') {
       console.log('🔍 [DIAGNOSTIC TRACE] API getDashboard Response:', {
         url: `/dashboard/${qs ? `?${qs}` : ''}`,
@@ -498,8 +509,8 @@ class ApiClient {
   getOverdueVisits() {
     return this.request('/dashboard/overdue_visits/');
   }
-  getHierarchy() {
-    return this.request('/hierarchy/').catch(() => this.request('/dashboard/hierarchy/')).catch(() => this.request('/hierarchy'));
+  getHierarchy(options = {}) {
+    return this.request('/hierarchy/', options).catch(() => this.request('/dashboard/hierarchy/', options)).catch(() => this.request('/hierarchy', options));
   }
   exportReport(type = 'excel') { return this.request(`/export-report/?type=${type}`); }
 

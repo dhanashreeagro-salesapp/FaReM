@@ -31,24 +31,18 @@ class FarmerViewSet(viewsets.ModelViewSet):
             team_users = user.get_team_users()
             team_user_ids = [u.id for u in team_users]
 
-            import time
-            if '_TERRITORY_CACHE' not in globals():
-                globals()['_TERRITORY_CACHE'] = {'ts': 0, 'map': {}}
-            _tc = globals()['_TERRITORY_CACHE']
-            now_ts = time.time()
-            if now_ts - _tc['ts'] > 60 or not _tc['map']:
+            from django.core.cache import cache
+            cache_key = 'territory_children_map'
+            children_map = cache.get(cache_key)
+            if children_map is None:
                 from .models import Territory
-                all_territories = list(Territory.objects.exclude(status__iexact='Inactive'))
+                all_territories = Territory.objects.exclude(status__iexact='Inactive').values_list('id', 'parent_territory_id')
                 children_map = {}
-                for t in all_territories:
-                    p_id = t.parent_territory_id
+                for t_id, p_id in all_territories:
                     if p_id not in children_map:
                         children_map[p_id] = []
-                    children_map[p_id].append(t)
-                _tc['ts'] = now_ts
-                _tc['map'] = children_map
-            else:
-                children_map = _tc['map']
+                    children_map[p_id].append(t_id)
+                cache.set(cache_key, children_map, 60)
 
             root_t_ids = []
             if user.territory_id:
@@ -62,9 +56,8 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 if curr_t_id in visited_t:
                     continue
                 visited_t.add(curr_t_id)
-                children = children_map.get(curr_t_id, [])
-                for c in children:
-                    t_queue.append(c.id)
+                children_ids = children_map.get(curr_t_id, [])
+                t_queue.extend(children_ids)
 
             q_filter = Q(assigned_staff_id__in=team_user_ids)
             if visited_t:

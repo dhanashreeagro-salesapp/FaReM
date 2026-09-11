@@ -958,19 +958,19 @@ export default function FarmerManagement() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                  <button onClick={() => setSelectedFarmerForCall(farmer)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <button onClick={() => setSelectedFarmerForCall(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-blue-50 text-blue-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <PhoneCall size={14} /> Call
                   </button>
-                  <a href={`https://wa.me/91${farmer.primary_mobile}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <a href={`https://wa.me/91${farmer.primary_mobile}`} target="_blank" rel="noreferrer" className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <MessageSquare size={14} /> WhatsApp
                   </a>
-                  <button onClick={() => setSelectedFarmerForVisit(farmer)} className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <button onClick={() => setSelectedFarmerForVisit(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-purple-50 text-purple-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <MapPin size={14} /> Visit
                   </button>
-                  <button onClick={() => setSelectedFarmerForRecommend(farmer)} className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <button onClick={() => setSelectedFarmerForRecommend(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-amber-50 text-amber-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <Award size={14} /> Advisor
                   </button>
-                  <button onClick={() => handleEdit(farmer)} className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold min-h-[44px]">
+                  <button onClick={() => handleEdit(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-gray-100 text-gray-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
