@@ -362,6 +362,30 @@ class FarmerViewSet(viewsets.ModelViewSet):
         return Response([{'village': v} for v in sorted(normalized)])
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def districts(self, request):
+        queryset = self.get_queryset()
+        districts = queryset.exclude(district='').exclude(district__isnull=True)\
+            .values_list('district', flat=True).distinct()
+        
+        normalized = set()
+        for d in districts:
+            normalized.add(d.strip().title())
+            
+        return Response([{'district': d} for d in sorted(normalized)])
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def talukas(self, request):
+        queryset = self.get_queryset()
+        talukas = queryset.exclude(taluka='').exclude(taluka__isnull=True)\
+            .values_list('taluka', flat=True).distinct()
+        
+        normalized = set()
+        for t in talukas:
+            normalized.add(t.strip().title())
+            
+        return Response([{'taluka': t} for t in sorted(normalized)])
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def all_ids(self, request):
         queryset = self.get_queryset()
         ids = list(queryset.values_list('id', flat=True))

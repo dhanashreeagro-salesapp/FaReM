@@ -60,9 +60,32 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
       } else {
         await api.createBulkSend(payload);
       }
+
+      if (channel === 'WhatsApp' && scheduleMode === 'Immediate' && farmerIds.length === 1) {
+        try {
+          const promoObj = promotions.find(p => String(p.id) === String(selectedPromo));
+          const messageContent = promoObj ? promoObj.content : "Promotion Message";
+          const fRes = await api.getFarmer(farmerIds[0]);
+          if (fRes && fRes.primary_mobile) {
+            const normalizedPhone = String(fRes.primary_mobile).replace(/\D/g, '').replace(/^0+/, '');
+            const finalPhone = normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
+            const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(messageContent)}`;
+            window.open(whatsappUrl, '_blank');
+          }
+        } catch (err) {
+          console.error("Failed to open WhatsApp:", err);
+        }
+      }
+
       onSuccess();
     } catch (e) {
-      alert(`Failed to ${mode === 'edit' ? 'update' : 'schedule'} messages.`);
+      let errMsg = 'Unknown error';
+      if (typeof e === 'object' && e !== null) {
+        errMsg = e.detail || e.error || e.message || JSON.stringify(e);
+      } else {
+        errMsg = String(e);
+      }
+      alert(`Failed to ${mode === 'edit' ? 'update' : 'schedule'} messages. Error: ${errMsg}`);
       console.error(e);
     } finally {
       setLoading(false);

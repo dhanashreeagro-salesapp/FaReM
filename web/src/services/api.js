@@ -369,6 +369,8 @@ class ApiClient {
   }
 
   getVillages() { return this.request('/farmers/villages/'); }
+  getDistricts() { return this.request('/farmers/districts/'); }
+  getTalukas() { return this.request('/farmers/talukas/'); }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
   getFarmerIds(params = {}) {
     const qs = new URLSearchParams(params).toString();

@@ -73,11 +73,21 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
             send_status='Pending'
         )
         
+        # If it's a 1-farmer immediate WhatsApp send, it's handled by frontend wa.me
+        if channel == 'WhatsApp' and len(farmer_ids) == 1 and not batch.scheduled_start_date:
+            batch.send_status = 'Completed'
+            batch.sent_count = 1
+            batch.save(update_fields=['send_status', 'sent_count'])
+            return
+
         from django.utils import timezone
         today = timezone.now().date()
         exec_date = batch.scheduled_start_date or today
         if exec_date <= today:
-            execute_bulk_send_batch.delay(str(batch.id))
+            try:
+                execute_bulk_send_batch.delay(str(batch.id))
+            except Exception as e:
+                print(f"Failed to queue celery task: {e}")
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancel(self, request, pk=None):

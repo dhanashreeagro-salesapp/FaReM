@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Users } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from './AuthProvider';
 
 export default function AudienceTargetingModal({ onClose, onAudienceSelected }) {
+  const { user } = useAuth();
   const [territories, setTerritories] = useState([]);
   const [crops, setCrops] = useState([]);
+  
+  const [availableVillages, setAvailableVillages] = useState([]);
+  const [availableDistricts, setAvailableDistricts] = useState([]);
+  const [availableTalukas, setAvailableTalukas] = useState([]);
   
   const [selectedTerritory, setSelectedTerritory] = useState('');
   const [selectedCrop, setSelectedCrop] = useState('');
@@ -22,18 +28,30 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        const [terrData, cropData] = await Promise.all([
+        const [terrData, cropData, villData, distData, talData] = await Promise.all([
           api.getTerritories(),
-          api.getCrops()
+          api.getCrops(),
+          api.getVillages().catch(() => []),
+          api.getDistricts().catch(() => []),
+          api.getTalukas().catch(() => [])
         ]);
-        setTerritories(terrData.results || terrData);
-        setCrops(cropData.results || cropData);
+        const tList = terrData?.results || terrData || [];
+        setTerritories(tList);
+        setCrops(cropData?.results || cropData || []);
+        setAvailableVillages(villData || []);
+        setAvailableDistricts(distData || []);
+        setAvailableTalukas(talData || []);
+
+        if (user?.role === 'FieldStaff' && (user?.territory_name || user?.territory_id)) {
+          const tMatch = tList.find(t => t.name === user.territory_name || String(t.id) === String(user.territory_id));
+          if (tMatch) setSelectedTerritory(tMatch.id);
+        }
       } catch (e) {
         console.error(e);
       }
     };
     loadFilters();
-  }, []);
+  }, [user]);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -87,7 +105,8 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
               <select 
                 value={selectedTerritory}
                 onChange={e => { setSelectedTerritory(e.target.value); setMatchedCount(null); }}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                disabled={user?.role === 'FieldStaff'}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
               >
                 <option value="">Any Region</option>
                 {territories.map(t => (
@@ -134,33 +153,45 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
               <label className="block text-sm font-semibold text-text mb-1">District</label>
               <input 
                 type="text" 
+                list="districts-list"
                 value={district}
                 onChange={e => { setDistrict(e.target.value); setMatchedCount(null); }}
                 placeholder="e.g. Nashik"
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
               />
+              <datalist id="districts-list">
+                {availableDistricts.map((d, idx) => <option key={idx} value={d.district} />)}
+              </datalist>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-text mb-1">Taluka</label>
               <input 
                 type="text" 
+                list="talukas-list"
                 value={taluka}
                 onChange={e => { setTaluka(e.target.value); setMatchedCount(null); }}
                 placeholder="e.g. Sinnar"
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
               />
+              <datalist id="talukas-list">
+                {availableTalukas.map((t, idx) => <option key={idx} value={t.taluka} />)}
+              </datalist>
             </div>
 
             <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-semibold text-text mb-1">Village</label>
               <input 
                 type="text" 
+                list="villages-list"
                 value={village}
                 onChange={e => { setVillage(e.target.value); setMatchedCount(null); }}
                 placeholder="e.g. Dongargaon"
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
               />
+              <datalist id="villages-list">
+                {availableVillages.map((v, idx) => <option key={idx} value={v.village} />)}
+              </datalist>
             </div>
 
             <div className="col-span-1 md:col-span-2">

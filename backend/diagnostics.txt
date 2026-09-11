@@ -1,0 +1,22 @@
+=== Diagnostic Report ===
+
+--- Promotions ---
+Total promotions in DB: 8
+ID: fa88c23d-03bb-4f02-9243-4fa022770d14, Title: pikachya basal dose sathi, Status: Active
+ID: 159d85ae-b0ff-4dfe-9241-224e5fde5711, Title: Arohan Website, Status: Active
+ID: 40f9b23f-c57e-4d39-941c-ca8d136d7f2b, Title: Calendar of activities in Grapes, Status: Active
+ID: 7266e6c3-b7d9-4344-9d46-14f223dc4ebc, Title: Arohan Website, Status: Active
+ID: 3e4ef4b3-433e-49e8-bd97-070827673e6f, Title: कलिंगड, Status: Active
+
+--- Vishnu Bhagre Dashboard Data ---
+Found user: Vishnu Bhagare (Role: FieldStaff)
+Farmers managed: 425
+Total plots: 13
+Total Active Seasons: 17
+Unique Active Crops count: 8
+Unique Crops list: ['Banana', 'Brinjal', 'Cabbage', 'Grapes', 'Guava', 'Onion', 'Sweet orange', 'Tomato']
+Raw Active Crops (incl duplicates): ['Grapes', 'Tomato', 'Tomato', 'Grapes', 'Grapes', 'Sweet orange', 'Tomato', 'Grapes', 'Guava', 'Banana', 'Grapes', 'Sweet orange', 'Tomato', 'Cabbage', 'Tomato', 'Brinjal', 'Onion']
+
+--- Village Variations ---
+Ahergaon variants: ['Ahergaon', 'Ahergon']
+Niphad variants: ['niphad', 'Niphad', 'NIPHAD']
