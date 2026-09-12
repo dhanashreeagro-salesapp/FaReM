@@ -85,7 +85,7 @@ export default function MarketIntelligence() {
           setMarketDetails(response);
           const availableMarkets = Object.keys(response.markets_data || {});
           if (availableMarkets.length > 0) {
-              setSelectedMarkets(availableMarkets.slice(0, 3)); // select top 3 by default
+              setSelectedMarkets(availableMarkets); // select all by default
           } else {
               setSelectedMarkets([]);
           }
@@ -357,31 +357,27 @@ export default function MarketIntelligence() {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                   <h3 className="text-sm font-bold text-text uppercase">Price Trend – {marketDetails.crop_name}</h3>
                   <div className="flex items-center gap-3">
-                      <div className="relative group">
-                          <button className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-lg text-sm bg-white font-medium hover:bg-gray-50">
-                              <MapPin size={14} className="text-primary"/> Markets ({selectedMarkets.length}) <ChevronDown size={14}/>
-                          </button>
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-border shadow-lg rounded-xl overflow-hidden hidden group-hover:block z-10">
-                              {allMarkets.map(m => (
-                                  <div key={m} className="px-4 py-2 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2" onClick={() => toggleMarket(m)}>
-                                      <input type="checkbox" checked={selectedMarkets.includes(m)} readOnly className="rounded border-gray-300 text-primary focus:ring-primary" />
-                                      {m}
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
                       <Maximize size={18} className="text-gray-400 cursor-pointer hover:text-gray-700" />
                   </div>
               </div>
               
               <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                   <div className="flex flex-wrap gap-4">
-                      {selectedMarkets.map((m, i) => (
-                          <div key={m} className="flex items-center gap-2 text-xs font-bold text-text">
-                              <span className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></span>
-                              {m}
-                          </div>
-                      ))}
+                      {allMarkets.map((m, i) => {
+                          const isSelected = selectedMarkets.includes(m);
+                          return (
+                              <label key={m} className="flex items-center gap-2 text-xs font-bold text-text cursor-pointer hover:bg-gray-50 px-2 py-1 rounded-md border border-transparent hover:border-gray-200">
+                                  <input 
+                                      type="checkbox" 
+                                      checked={isSelected}
+                                      onChange={() => toggleMarket(m)}
+                                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                                  />
+                                  <span className="w-3 h-3 rounded-full" style={{backgroundColor: isSelected ? COLORS[i % COLORS.length] : '#d1d5db'}}></span>
+                                  <span className={isSelected ? 'text-text' : 'text-text-muted'}>{m}</span>
+                              </label>
+                          );
+                      })}
                   </div>
                   <div className="flex bg-surface rounded-lg p-1 border border-border">
                       {['2Y', '1Y', 'YTD'].map(ts => (
@@ -394,10 +390,10 @@ export default function MarketIntelligence() {
               
               <div className="h-[250px] w-full mt-8">
                   <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#9ca3af'}} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} dx={-10} tickFormatter={(v) => v.toLocaleString()} />
+                          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} width={80} tickFormatter={(v) => v.toLocaleString()} />
                           <Tooltip content={<CustomTooltip />} />
                           {selectedMarkets.map((m, i) => (
                               <React.Fragment key={m}>
