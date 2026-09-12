@@ -131,7 +131,6 @@ export default function MarketIntelligence() {
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-border mb-6">
               <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-bold text-text uppercase">Approaching Festivals</h3>
-                  <button className="text-xs font-bold text-primary flex items-center hover:underline">View All</button>
               </div>
               <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
                   {marketDetails.festival_intelligence.map((fest, idx) => {
@@ -259,9 +258,6 @@ export default function MarketIntelligence() {
                   <h3 className="text-sm font-bold text-text flex items-center gap-1.5 uppercase">
                       My Crops <span className="text-text-muted lowercase text-xs font-normal">(By Acreage)</span> <Info size={14} className="text-gray-300"/>
                   </h3>
-                  <button className="text-xs font-bold text-primary flex items-center hover:underline">
-                      View All <ChevronRight size={14} />
-                  </button>
               </div>
               <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
                   {myCrops.map((crop, idx) => {
@@ -271,7 +267,7 @@ export default function MarketIntelligence() {
                               <span className="absolute top-2 left-2 w-5 h-5 flex items-center justify-center bg-gray-200 rounded-full text-[10px] font-bold text-text-muted">
                                   {idx + 1}
                               </span>
-                              <div className="w-12 h-12 mb-2 rounded-full overflow-hidden bg-white border border-border shadow-sm flex items-center justify-center p-1">
+                              <div className="w-12 h-12 mb-2 rounded-xl overflow-hidden bg-white border border-border shadow-sm flex items-center justify-center p-1">
                                   {crop.reference_image ? (
                                       <img src={getImageUrl(crop.reference_image)} alt={crop.crop_name} className="w-full h-full object-contain" />
                                   ) : (
@@ -299,16 +295,13 @@ export default function MarketIntelligence() {
                   <h3 className="text-sm font-bold text-text flex items-center gap-1.5 uppercase">
                       Market Intelligence <Info size={14} className="text-gray-300"/>
                   </h3>
-                  <button className="text-xs font-bold text-primary flex items-center hover:underline">
-                      How it works? <ChevronRight size={14} />
-                  </button>
               </div>
               <div className="flex gap-6 overflow-x-auto hide-scrollbar pb-2 relative">
                   {snapshotData.map(crop => {
                       const isSelected = selectedCropId === crop.crop_id;
                       return (
                           <div key={crop.crop_id} onClick={() => handleCropSelect(crop.crop_id)} className="flex flex-col items-center gap-2 cursor-pointer group shrink-0">
-                              <div className={`w-16 h-16 rounded-full overflow-hidden border-2 flex items-center justify-center p-1 transition-all ${isSelected ? 'border-primary shadow-md bg-green-50' : 'border-gray-200 bg-white group-hover:border-gray-300'}`}>
+                              <div className={`w-16 h-16 rounded-xl overflow-hidden border-2 flex items-center justify-center p-1 transition-all ${isSelected ? 'border-primary shadow-md bg-green-50' : 'border-gray-200 bg-white group-hover:border-gray-300'}`}>
                                   {crop.reference_image ? (
                                       <img src={getImageUrl(crop.reference_image)} alt={crop.crop_name} className="w-full h-full object-contain" />
                                   ) : (
