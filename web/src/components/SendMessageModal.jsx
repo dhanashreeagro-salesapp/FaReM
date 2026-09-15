@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Calendar, Clock, RefreshCw } from 'lucide-react';
+import { X, Send, Calendar, Clock, RefreshCw, Search, ChevronDown, Sparkles } from 'lucide-react';
 import api from '../services/api';
 
 export default function SendMessageModal({ farmerIds, onClose, onSuccess, initialData, mode = 'create' }) {
@@ -11,6 +11,11 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
   const [endDate, setEndDate] = useState(initialData?.endDate || '');
   const [frequency, setFrequency] = useState(initialData?.frequency || 'Daily');
   const [loading, setLoading] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const filters = initialData?.filters || {};
+  const { crop: filterCrop, stage: filterStage } = filters;
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -109,19 +114,98 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
         </div>
         
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-semibold text-text mb-1">Select Message Template *</label>
-            <select 
-              required
-              value={selectedPromo}
-              onChange={e => setSelectedPromo(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+            <div 
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface cursor-pointer flex justify-between items-center"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <option value="">-- Choose Template --</option>
-              {promotions.map(p => (
-                <option key={p.id} value={p.id}>{p.title}</option>
-              ))}
-            </select>
+              <span className="truncate">
+                {selectedPromo ? promotions.find(p => String(p.id) === String(selectedPromo))?.title || 'Selected' : '-- Choose Template --'}
+              </span>
+              <ChevronDown size={16} className="text-text-muted shrink-0" />
+            </div>
+
+            {dropdownOpen && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-60 flex flex-col">
+                <div className="p-2 border-b border-border sticky top-0 bg-white">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-2.5 top-2.5 text-text-muted" />
+                    <input 
+                      type="text"
+                      placeholder="Search templates..."
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full pl-8 pr-2 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-y-auto flex-1 p-1">
+                  {(() => {
+                    let suggested = [];
+                    let others = [];
+                    const query = templateSearch.toLowerCase();
+                    
+                    promotions.forEach(p => {
+                      const matchSearch = p.title?.toLowerCase().includes(query) || p.whatsapp_template?.toLowerCase().includes(query) || p.sms_template?.toLowerCase().includes(query);
+                      if (!matchSearch) return;
+
+                      let isSuggested = false;
+                      if (filterCrop) {
+                        if (filterStage) {
+                          if (p.crop_name === filterCrop && p.stage_name === filterStage) isSuggested = true;
+                        } else {
+                          if (p.crop_name === filterCrop) isSuggested = true;
+                        }
+                      }
+                      
+                      if (isSuggested) suggested.push(p);
+                      else others.push(p);
+                    });
+
+                    if (suggested.length === 0 && others.length === 0) {
+                      return <div className="p-3 text-center text-xs text-text-muted">No templates found.</div>;
+                    }
+
+                    return (
+                      <>
+                        {suggested.length > 0 && (
+                          <div className="mb-2">
+                            <div className="px-2 py-1 text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1 bg-amber-50 rounded mb-1">
+                              <Sparkles size={12} /> Suggested by AI
+                            </div>
+                            {suggested.map(p => (
+                              <div 
+                                key={p.id}
+                                className={`px-2 py-1.5 text-sm cursor-pointer rounded hover:bg-gray-100 ${String(selectedPromo) === String(p.id) ? 'bg-primary/10 text-primary font-bold' : 'text-text'}`}
+                                onClick={() => { setSelectedPromo(p.id); setDropdownOpen(false); }}
+                              >
+                                {p.title}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {others.length > 0 && (
+                          <div>
+                            {suggested.length > 0 && <div className="px-2 py-1 text-[10px] font-bold text-text-muted uppercase border-t border-border mt-1 pt-2 mb-1">Other Templates</div>}
+                            {others.map(p => (
+                              <div 
+                                key={p.id}
+                                className={`px-2 py-1.5 text-sm cursor-pointer rounded hover:bg-gray-100 ${String(selectedPromo) === String(p.id) ? 'bg-primary/10 text-primary font-bold' : 'text-text'}`}
+                                onClick={() => { setSelectedPromo(p.id); setDropdownOpen(false); }}
+                              >
+                                {p.title}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

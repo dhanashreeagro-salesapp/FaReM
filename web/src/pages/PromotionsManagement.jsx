@@ -161,10 +161,10 @@ export default function PromotionsManagement() {
       {modalConfig && modalConfig.mode === 'create_audience' ? (
         <AudienceTargetingModal
           onClose={() => setModalConfig(null)}
-          onAudienceSelected={(farmerIds) => {
+          onAudienceSelected={(farmerIds, filters) => {
             setModalConfig({
               mode: 'create',
-              initialData: { farmer_ids: farmerIds, content: '', channel: 'WhatsApp', scheduleMode: 'Immediate', startDate: '', endDate: '', frequency: 'Once' }
+              initialData: { farmer_ids: farmerIds, filters: filters, content: '', channel: 'WhatsApp', scheduleMode: 'Immediate', startDate: '', endDate: '', frequency: 'Once' }
             });
           }}
         />

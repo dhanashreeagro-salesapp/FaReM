@@ -81,7 +81,8 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
     if (matchedIds.length === 0) {
       return alert('No farmers matched this criteria. Please widen your search.');
     }
-    onAudienceSelected(matchedIds);
+    const filters = { crop: selectedCrop, stage: selectedStage, territory: selectedTerritory, weather: selectedWeather };
+    onAudienceSelected(matchedIds, filters);
   };
 
   // Find the selected crop object to get its stages
