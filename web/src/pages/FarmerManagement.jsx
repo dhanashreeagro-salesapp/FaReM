@@ -970,6 +970,9 @@ export default function FarmerManagement() {
                   <button onClick={() => setSelectedFarmerForRecommend(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-amber-50 text-amber-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <Award size={14} /> Advisor
                   </button>
+                  <button onClick={() => setSelectedFarmerForPlots(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-green-50 text-green-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
+                    <Map size={14} /> Plots
+                  </button>
                   <button onClick={() => handleEdit(farmer)} className="flex flex-1 justify-center items-center gap-1.5 px-2 py-2 bg-gray-100 text-gray-700 rounded-xl text-[11px] sm:text-xs font-semibold min-h-[44px]">
                     <Edit2 size={14} /> Edit
                   </button>
