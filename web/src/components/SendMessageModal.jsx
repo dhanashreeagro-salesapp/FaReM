@@ -13,12 +13,13 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sentFarmers, setSentFarmers] = useState({});
   const [campaignLogged, setCampaignLogged] = useState(false);
+  const [robustFarmers, setRobustFarmers] = useState(farmerIds);
 
   const filters = initialData?.filters || {};
   const { crop: filterCrop, stage: filterStage } = filters;
   
-  const justIds = farmerIds.map(f => typeof f === 'object' ? f.id : f);
-  const isManualWhatsApp = channel === 'WhatsApp' && scheduleMode === 'Immediate' && justIds.length <= 5 && typeof farmerIds[0] === 'object';
+  const justIds = robustFarmers.map(f => typeof f === 'object' ? f.id : f);
+  const isManualWhatsApp = channel === 'WhatsApp' && scheduleMode === 'Immediate' && justIds.length <= 5 && typeof robustFarmers[0] === 'object';
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -31,6 +32,27 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
     };
     fetchPromos();
   }, []);
+
+  useEffect(() => {
+    const upgradeFarmers = async () => {
+      if (farmerIds.length > 0 && typeof farmerIds[0] === 'string' && farmerIds.length <= 5) {
+        setLoading(true);
+        try {
+          const detailed = await Promise.all(
+            farmerIds.map(id => api.request(`/farmers/${id}/`))
+          );
+          setRobustFarmers(detailed);
+        } catch (err) {
+          console.error("Failed to upgrade farmer IDs", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setRobustFarmers(farmerIds);
+      }
+    };
+    upgradeFarmers();
+  }, [farmerIds]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -260,7 +282,7 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
                 Manual Sending List
               </div>
               <div className="divide-y divide-border">
-                {farmerIds.map(farmer => (
+                {robustFarmers.map(farmer => (
                   <div key={farmer.id} className="p-3 flex justify-between items-center bg-white">
                     <div>
                       <div className="font-semibold text-text text-sm">{farmer.full_name}</div>
