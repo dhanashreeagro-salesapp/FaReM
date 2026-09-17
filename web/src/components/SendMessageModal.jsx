@@ -8,14 +8,17 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
   const [channel, setChannel] = useState(initialData?.channel || 'WhatsApp');
   const [scheduleMode, setScheduleMode] = useState(initialData?.scheduleMode || 'Immediate');
   const [startDate, setStartDate] = useState(initialData?.startDate || '');
-  const [endDate, setEndDate] = useState(initialData?.endDate || '');
-  const [frequency, setFrequency] = useState(initialData?.frequency || 'Daily');
   const [loading, setLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [sentFarmers, setSentFarmers] = useState({});
+  const [campaignLogged, setCampaignLogged] = useState(false);
 
   const filters = initialData?.filters || {};
   const { crop: filterCrop, stage: filterStage } = filters;
+  
+  const justIds = farmerIds.map(f => typeof f === 'object' ? f.id : f);
+  const isManualWhatsApp = channel === 'WhatsApp' && scheduleMode === 'Immediate' && justIds.length <= 5 && typeof farmerIds[0] === 'object';
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -63,30 +66,12 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
       if (mode === 'edit') {
         await api.updateBulkSend(initialData.id, payload);
       } else {
-        await api.createBulkSend(payload);
-      }
-
-      if (channel === 'WhatsApp' && scheduleMode === 'Immediate' && farmerIds.length === 1) {
-        try {
-          const promoObj = promotions.find(p => String(p.id) === String(selectedPromo));
-          
-          let messageContent = "Promotion Message";
-          if (promoObj) {
-            messageContent = promoObj.whatsapp_template || promoObj.title || "Promotion Message";
-            if (promoObj.file_url) {
-              messageContent += `\n\nView attachment: ${promoObj.file_url}`;
-            }
-          }
-          
-          const fRes = await api.getFarmer(farmerIds[0]);
-          if (fRes && fRes.primary_mobile) {
-            const normalizedPhone = String(fRes.primary_mobile).replace(/\D/g, '').replace(/^0+/, '');
-            const finalPhone = normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
-            const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(messageContent)}`;
-            window.open(whatsappUrl, '_blank');
-          }
-        } catch (err) {
-          console.error("Failed to open WhatsApp:", err);
+        // If it's a manual WhatsApp and it hasn't been logged yet, log it now
+        if (isManualWhatsApp && !campaignLogged) {
+          await api.createBulkSend(payload);
+          setCampaignLogged(true);
+        } else if (!isManualWhatsApp) {
+          await api.createBulkSend(payload);
         }
       }
 
@@ -265,12 +250,69 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
             )}
           </div>
 
+          {isManualWhatsApp && selectedPromo && (
+            <div className="mt-4 border border-border rounded-lg overflow-hidden">
+              <div className="bg-surface px-3 py-2 text-xs font-bold text-text-muted uppercase border-b border-border">
+                Manual Sending List
+              </div>
+              <div className="divide-y divide-border">
+                {farmerIds.map(farmer => (
+                  <div key={farmer.id} className="p-3 flex justify-between items-center bg-white">
+                    <div>
+                      <div className="font-semibold text-text text-sm">{farmer.full_name}</div>
+                      <div className="text-xs text-text-muted font-mono">{farmer.primary_mobile}</div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={sentFarmers[farmer.id]}
+                      onClick={async () => {
+                        const promoObj = promotions.find(p => String(p.id) === String(selectedPromo));
+                        let messageContent = "Promotion Message";
+                        if (promoObj) {
+                          messageContent = promoObj.whatsapp_template || promoObj.title || "Promotion Message";
+                          if (promoObj.file_url) messageContent += `\n\nView attachment: ${promoObj.file_url}`;
+                        }
+                        const normalizedPhone = String(farmer.primary_mobile).replace(/\D/g, '').replace(/^0+/, '');
+                        const finalPhone = normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
+                        const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(messageContent)}`;
+                        window.open(whatsappUrl, '_blank');
+                        
+                        setSentFarmers(prev => ({ ...prev, [farmer.id]: true }));
+                        
+                        // Log activity
+                        try {
+                          await api.createActivityLog({
+                            farmer: farmer.id,
+                            activity_type: 'WhatsApp',
+                            notes: `Sent promotion: ${promoObj?.title || 'Message'} via manual link`
+                          });
+                        } catch (err) { console.error(err); }
+
+                        // Log campaign if not logged
+                        if (!campaignLogged && mode === 'create') {
+                          try {
+                            const payload = { content: selectedPromo, channel: 'WhatsApp', farmer_ids: justIds, frequency: 'Once' };
+                            await api.createBulkSend(payload);
+                            setCampaignLogged(true);
+                          } catch (err) { console.error(err); }
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${sentFarmers[farmer.id] ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                    >
+                      {sentFarmers[farmer.id] ? 'Sent' : 'Send WhatsApp'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end pt-4 border-t border-border gap-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text transition-colors">
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 btn-press">
-              {loading ? 'Processing...' : 'Send Message'}
+              {isManualWhatsApp ? 'Done' : (loading ? 'Processing...' : 'Send Message')}
             </button>
           </div>
         </form>

@@ -81,6 +81,9 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
     if (matchedIds.length === 0) {
       return alert('No farmers matched this criteria. Please widen your search.');
     }
+    if (matchedIds.length > 5) {
+      return alert('Please narrow down your audience to 5 or fewer farmers for manual messaging.');
+    }
     const filters = { crop: selectedCrop, stage: selectedStage, territory: selectedTerritory, weather: selectedWeather };
     onAudienceSelected(matchedIds, filters);
   };

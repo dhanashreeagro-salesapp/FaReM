@@ -388,8 +388,8 @@ class FarmerViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def all_ids(self, request):
         queryset = self.get_queryset()
-        ids = list(queryset.values_list('id', flat=True))
-        return Response(ids)
+        data = list(queryset.values('id', 'full_name', 'primary_mobile'))
+        return Response(data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
     def bulk_assign(self, request):

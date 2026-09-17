@@ -73,10 +73,10 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
             send_status='Pending'
         )
         
-        # If it's a 1-farmer immediate WhatsApp send, it's handled by frontend wa.me
-        if channel == 'WhatsApp' and len(farmer_ids) == 1 and not batch.scheduled_start_date:
+        # If it's a small manual WhatsApp send (<= 5), it's handled by frontend wa.me
+        if channel == 'WhatsApp' and len(farmer_ids) <= 5 and not batch.scheduled_start_date:
             batch.send_status = 'Completed'
-            batch.sent_count = 1
+            batch.sent_count = len(farmer_ids)
             batch.save(update_fields=['send_status', 'sent_count'])
             return
 
