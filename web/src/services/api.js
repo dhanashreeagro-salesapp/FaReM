@@ -600,6 +600,7 @@ class ApiClient {
 
   // Audience Targeting
   getFarmerIds(params = {}) {
+    params._t = Date.now();
     const qs = new URLSearchParams(params).toString();
     return this.request(`/farmers/all_ids/${qs ? `?${qs}` : ''}`);
   }
