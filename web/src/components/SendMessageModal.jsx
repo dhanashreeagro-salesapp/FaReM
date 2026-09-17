@@ -36,6 +36,10 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
     e.preventDefault();
     if (!selectedPromo) return alert('Please select a promotion message.');
     
+    if (isManualWhatsApp && Object.keys(sentFarmers).length === 0) {
+      return alert('Please click the "Send WhatsApp" button for at least one farmer before finishing.');
+    }
+    
     setLoading(true);
     try {
       const payload = {
