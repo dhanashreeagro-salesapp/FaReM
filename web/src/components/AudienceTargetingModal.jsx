@@ -36,14 +36,22 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
           api.getTalukas().catch(() => [])
         ]);
         const tList = terrData?.results || terrData || [];
-        setTerritories(tList);
+        
+        let filteredTerritories = tList;
+        if (user?.role === 'FieldStaff') {
+          filteredTerritories = tList.filter(t => t.name === user.territory_name || String(t.id) === String(user.territory_id));
+        } else if (user?.role !== 'Admin' && user?.managed_territory_ids?.length > 0) {
+          filteredTerritories = tList.filter(t => user.managed_territory_ids.includes(String(t.id)));
+        }
+        setTerritories(filteredTerritories);
+
         setCrops(cropData?.results || cropData || []);
         setAvailableVillages(villData || []);
         setAvailableDistricts(distData || []);
         setAvailableTalukas(talData || []);
 
         if (user?.role === 'FieldStaff' && (user?.territory_name || user?.territory_id)) {
-          const tMatch = tList.find(t => t.name === user.territory_name || String(t.id) === String(user.territory_id));
+          const tMatch = filteredTerritories[0];
           if (tMatch) setSelectedTerritory(tMatch.id);
         }
       } catch (e) {
@@ -81,11 +89,15 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
     if (matchedIds.length === 0) {
       return alert('No farmers matched this criteria. Please widen your search.');
     }
+    
+    let finalIds = matchedIds;
     if (matchedIds.length > 5) {
-      return alert('Please narrow down your audience to 5 or fewer farmers for manual messaging.');
+      alert(`Your search matched ${matchedIds.length} farmers. We will only select the first 5 farmers for manual messaging.`);
+      finalIds = matchedIds.slice(0, 5);
     }
+    
     const filters = { crop: selectedCrop, stage: selectedStage, territory: selectedTerritory, weather: selectedWeather };
-    onAudienceSelected(matchedIds, filters);
+    onAudienceSelected(finalIds, filters);
   };
 
   // Find the selected crop object to get its stages
@@ -94,56 +106,47 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-bg rounded-xl shadow-xl w-full max-w-2xl overflow-hidden animate-stagger-in">
-        <div className="flex justify-between items-center p-4 border-b border-border bg-surface">
+        <div className="flex justify-between items-center p-3 border-b border-border bg-surface">
           <h3 className="font-heading font-semibold text-text flex items-center gap-2"><Users size={18}/> Target Audience</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text"><X size={18} /></button>
         </div>
         
-        <div className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
-          <p className="text-sm text-text-muted">Select filters to build an audience for your campaign.</p>
+        <div className="p-4 space-y-3">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Primary Demographics */}
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-semibold text-text mb-1">Region / Territory</label>
-              <select 
-                value={selectedTerritory}
-                onChange={e => { setSelectedTerritory(e.target.value); setMatchedCount(null); }}
-                disabled={user?.role === 'FieldStaff'}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
-              >
-                <option value="">Any Region</option>
-                {territories.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+          {user?.role !== 'FieldStaff' && (
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <select 
+                  value={selectedTerritory} 
+                  onChange={(e) => setSelectedTerritory(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
+                >
+                  <option value="">Any Region</option>
+                  {territories.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
             </div>
+          )}
 
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-semibold text-text mb-1">Crop</label>
+              <label className="block text-xs font-semibold text-text mb-1">Crop</label>
               <select 
-                value={selectedCrop}
-                onChange={e => { 
-                  setSelectedCrop(e.target.value); 
-                  setSelectedStage(''); 
-                  setMatchedCount(null); 
-                }}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                value={selectedCrop} 
+                onChange={(e) => { setSelectedCrop(e.target.value); setSelectedStage(''); }}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
               >
                 <option value="">Any Crop</option>
-                {crops.map(c => (
-                  <option key={c.id} value={c.crop_name}>{c.crop_name}</option>
-                ))}
+                {crops.map(c => <option key={c.id} value={c.crop_name}>{c.crop_name}</option>)}
               </select>
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-text mb-1">Crop Stage (Optional)</label>
+              <label className="block text-xs font-semibold text-text mb-1">Crop Stage (Optional)</label>
               <select 
-                value={selectedStage}
-                onChange={e => { setSelectedStage(e.target.value); setMatchedCount(null); }}
-                disabled={!selectedCrop}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
+                value={selectedStage} 
+                onChange={(e) => setSelectedStage(e.target.value)}
+                disabled={!selectedCrop || !activeCropObj?.stages?.length}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary disabled:opacity-50"
               >
                 <option value="">Any Stage</option>
                 {activeCropObj?.stages?.map(s => (
@@ -151,59 +154,63 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
                 ))}
               </select>
             </div>
+          </div>
 
-            {/* Geographical Granularity */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-semibold text-text mb-1">District</label>
+              <label className="block text-xs font-semibold text-text mb-1">District</label>
               <input 
                 type="text" 
                 list="districts-list"
+                placeholder="e.g. Nashik" 
                 value={district}
-                onChange={e => { setDistrict(e.target.value); setMatchedCount(null); }}
-                placeholder="e.g. Nashik"
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                onChange={(e) => setDistrict(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
               />
               <datalist id="districts-list">
-                {availableDistricts.map((d, idx) => <option key={idx} value={d.district} />)}
+                {availableDistricts.map(d => <option key={d.district} value={d.district} />)}
               </datalist>
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-text mb-1">Taluka</label>
+              <label className="block text-xs font-semibold text-text mb-1">Taluka</label>
               <input 
                 type="text" 
                 list="talukas-list"
+                placeholder="e.g. Sinnar" 
                 value={taluka}
-                onChange={e => { setTaluka(e.target.value); setMatchedCount(null); }}
-                placeholder="e.g. Sinnar"
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                onChange={(e) => setTaluka(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
               />
               <datalist id="talukas-list">
-                {availableTalukas.map((t, idx) => <option key={idx} value={t.taluka} />)}
+                {availableTalukas.map(t => <option key={t.taluka} value={t.taluka} />)}
               </datalist>
             </div>
+          </div>
 
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-semibold text-text mb-1">Village</label>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Village</label>
               <input 
                 type="text" 
                 list="villages-list"
+                placeholder="e.g. Dongargaon" 
                 value={village}
-                onChange={e => { setVillage(e.target.value); setMatchedCount(null); }}
-                placeholder="e.g. Dongargaon"
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                onChange={(e) => setVillage(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
               />
               <datalist id="villages-list">
-                {availableVillages.map((v, idx) => <option key={idx} value={v.village} />)}
+                {availableVillages.map(v => <option key={v.village} value={v.village} />)}
               </datalist>
             </div>
+          </div>
 
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-semibold text-text mb-1">Weather Condition (Forecast)</label>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Weather Condition (Forecast)</label>
               <select 
                 value={selectedWeather}
-                onChange={e => { setSelectedWeather(e.target.value); setMatchedCount(null); }}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none"
+                onChange={(e) => setSelectedWeather(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg bg-surface text-text text-sm focus:outline-none focus:border-primary"
               >
                 <option value="">Any Weather</option>
                 <option value="rain">Rain Risk / Showers Expected</option>
@@ -214,38 +221,39 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
             </div>
           </div>
           
-          <div className="flex gap-2 justify-center mt-6">
+          <div className="flex justify-center mt-3">
             <button 
-              type="button" 
-              onClick={handleSearch} 
+              onClick={handleSearch}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary hover:bg-primary/5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              className="px-4 py-1.5 border border-primary text-primary hover:bg-primary/5 font-semibold rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 text-sm"
             >
-              <Search size={16} />
-              {loading ? 'Calculating...' : 'Calculate Audience Size'}
+              {loading ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /> : <Search size={16} />}
+              Calculate Audience Size
             </button>
           </div>
 
           {matchedCount !== null && (
-            <div className={`p-4 mt-4 rounded-lg text-center ${matchedCount > 0 ? 'bg-success/10 text-success-dark border border-success/20' : 'bg-danger/10 text-danger-dark border border-danger/20'}`}>
-              <div className="text-3xl font-bold font-heading">{matchedCount}</div>
-              <div className="text-sm font-medium">Farmers matched criteria</div>
+            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
+              <div className="text-2xl font-heading font-bold text-emerald-800">{matchedCount}</div>
+              <div className="text-xs text-emerald-600 font-medium">Farmers matched criteria</div>
             </div>
           )}
+        </div>
 
-          <div className="flex justify-end pt-4 border-t border-border gap-2 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text transition-colors cursor-pointer">
-              Cancel
-            </button>
-            <button 
-              type="button" 
-              onClick={handleContinue}
-              disabled={matchedCount === null || matchedCount === 0} 
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 cursor-pointer"
-            >
-              Continue to Message
-            </button>
-          </div>
+        <div className="p-3 border-t border-border bg-surface flex justify-end gap-3">
+          <button 
+            onClick={onClose}
+            className="px-3 py-1.5 text-text-muted hover:text-text font-medium text-sm"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleContinue}
+            disabled={matchedCount === null || matchedCount === 0}
+            className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 cursor-pointer"
+          >
+            Continue to Message
+          </button>
         </div>
       </div>
     </div>

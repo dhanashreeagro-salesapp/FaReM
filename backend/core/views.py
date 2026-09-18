@@ -51,6 +51,8 @@ def login_view(request):
             last_name = user.last_name or ''
             full_name = f"{first_name} {last_name}".strip() if (first_name or last_name) else user.email
             territory_name = user.territory.name if user.territory else None
+            territory_id = str(user.territory.id) if user.territory else None
+            managed_territory_ids = [str(tid) for tid in user.managed_territories.values_list('id', flat=True)] if hasattr(user, 'managed_territories') else []
 
             return Response({
                 'refresh': str(refresh),
@@ -58,7 +60,9 @@ def login_view(request):
                 'role': user.role,
                 'full_name': full_name,
                 'email': user.email,
-                'territory_name': territory_name
+                'territory_name': territory_name,
+                'territory_id': territory_id,
+                'managed_territory_ids': managed_territory_ids
             })
 
         else:
@@ -106,12 +110,16 @@ def me_view(request):
     last_name = user.last_name or ''
     full_name = f"{first_name} {last_name}".strip() if (first_name or last_name) else user.email
     territory_name = user.territory.name if user.territory else None
+    territory_id = str(user.territory.id) if user.territory else None
+    managed_territory_ids = [str(tid) for tid in user.managed_territories.values_list('id', flat=True)] if hasattr(user, 'managed_territories') else []
 
     return Response({
         'id': str(user.id),
         'email': user.email,
         'full_name': full_name,
         'role': user.role,
-        'territory_name': territory_name
+        'territory_name': territory_name,
+        'territory_id': territory_id,
+        'managed_territory_ids': managed_territory_ids
     })
 

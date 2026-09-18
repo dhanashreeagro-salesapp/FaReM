@@ -368,9 +368,9 @@ class ApiClient {
     return this.request(`/farmers/${qs ? `?${qs}` : ''}`);
   }
 
-  getVillages() { return this.request('/farmers/villages/'); }
-  getDistricts() { return this.request('/farmers/districts/'); }
-  getTalukas() { return this.request('/farmers/talukas/'); }
+  getVillages() { return this.requestWithCache('/farmers/villages/', {}, 'cache_villages'); }
+  getDistricts() { return this.requestWithCache('/farmers/districts/', {}, 'cache_districts'); }
+  getTalukas() { return this.requestWithCache('/farmers/talukas/', {}, 'cache_talukas'); }
   getFarmer(id) { return this.request(`/farmers/${id}/`); }
   getFarmerIds(params = {}) {
     const qs = new URLSearchParams(params).toString();
@@ -534,6 +534,7 @@ class ApiClient {
 
   // Audit Logs
   getAuditLogs() { return this.request('/audit-logs/'); }
+
 
   // Config
   getConfig() { return this.request('/config/'); }

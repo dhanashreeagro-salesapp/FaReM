@@ -219,62 +219,7 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-text mb-1">Channel *</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
-                <input type="radio" name="channel" value="WhatsApp" checked={channel === 'WhatsApp'} onChange={() => setChannel('WhatsApp')} className="text-primary" />
-                WhatsApp
-              </label>
-              <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
-                <input type="radio" name="channel" value="SMS" checked={channel === 'SMS'} onChange={() => setChannel('SMS')} className="text-primary" />
-                SMS
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-text mb-2">Schedule</label>
-            <div className="flex gap-4 mb-3">
-              <label className="flex items-center gap-2 text-sm text-text cursor-pointer p-2 border border-border rounded-lg flex-1 justify-center bg-surface hover:bg-bg transition-colors" style={{borderColor: scheduleMode === 'Immediate' ? 'var(--color-primary)' : ''}}>
-                <input type="radio" name="scheduleMode" className="hidden" checked={scheduleMode === 'Immediate'} onChange={() => setScheduleMode('Immediate')} />
-                <Send size={14} className={scheduleMode === 'Immediate' ? 'text-primary' : 'text-text-muted'} /> Immediate
-              </label>
-              <label className="flex items-center gap-2 text-sm text-text cursor-pointer p-2 border border-border rounded-lg flex-1 justify-center bg-surface hover:bg-bg transition-colors" style={{borderColor: scheduleMode === 'Scheduled' ? 'var(--color-primary)' : ''}}>
-                <input type="radio" name="scheduleMode" className="hidden" checked={scheduleMode === 'Scheduled'} onChange={() => setScheduleMode('Scheduled')} />
-                <Clock size={14} className={scheduleMode === 'Scheduled' ? 'text-primary' : 'text-text-muted'} /> Schedule
-              </label>
-              <label className="flex items-center gap-2 text-sm text-text cursor-pointer p-2 border border-border rounded-lg flex-1 justify-center bg-surface hover:bg-bg transition-colors" style={{borderColor: scheduleMode === 'Recurring' ? 'var(--color-primary)' : ''}}>
-                <input type="radio" name="scheduleMode" className="hidden" checked={scheduleMode === 'Recurring'} onChange={() => setScheduleMode('Recurring')} />
-                <RefreshCw size={14} className={scheduleMode === 'Recurring' ? 'text-primary' : 'text-text-muted'} /> Recurring
-              </label>
-            </div>
-
-            {scheduleMode !== 'Immediate' && (
-              <div className="grid grid-cols-2 gap-4 bg-surface p-3 rounded-lg border border-border">
-                <div>
-                  <label className="block text-xs font-semibold text-text-muted mb-1">Start Date *</label>
-                  <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-2 py-1.5 border border-border rounded text-sm bg-bg focus:ring-1 focus:ring-primary focus:outline-none" />
-                </div>
-                
-                {scheduleMode === 'Recurring' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-semibold text-text-muted mb-1">Frequency *</label>
-                      <select value={frequency} onChange={e => setFrequency(e.target.value)} className="w-full px-2 py-1.5 border border-border rounded text-sm bg-bg focus:ring-1 focus:ring-primary focus:outline-none">
-                        <option value="Daily">Daily</option>
-                        <option value="Weekly">Weekly</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-text-muted mb-1">End Date *</label>
-                      <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-2 py-1.5 border border-border rounded text-sm bg-bg focus:ring-1 focus:ring-primary focus:outline-none" />
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Channel and Schedule options are hidden as we default to WhatsApp and Immediate */}
 
           {isManualWhatsApp && selectedPromo && (
             <div className="mt-4 border border-border rounded-lg overflow-hidden">
