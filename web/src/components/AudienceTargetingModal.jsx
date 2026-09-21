@@ -29,8 +29,8 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
     const loadFilters = async () => {
       try {
         const [terrData, cropData, villData, distData, talData] = await Promise.all([
-          api.getTerritories(),
-          api.getCrops(),
+          api.getTerritories().catch(() => []),
+          api.getCrops().catch(() => []),
           api.getVillages().catch(() => []),
           api.getDistricts().catch(() => []),
           api.getTalukas().catch(() => [])
