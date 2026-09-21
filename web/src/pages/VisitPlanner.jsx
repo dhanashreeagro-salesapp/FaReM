@@ -1,29 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, CheckCircle, AlertTriangle, Search, Filter, Phone, CheckSquare, Square, Navigation2, Layers, X } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { Navigation, Search, Filter, Phone, CheckSquare, Square, Navigation2, X, MapPin } from 'lucide-react';
 import api from '../services/api';
-import LogVisitModal from '../components/LogVisitModal';
-import FarmerProfileModal from '../components/FarmerProfileModal';
-
-// Fix for default Leaflet markers in React
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Custom icons
-const customIcon = (color) => new L.Icon({
-  iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
 
 const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labelKey = 'name' }) => {
   const [open, setOpen] = useState(false);
@@ -97,32 +74,6 @@ const MultiSelect = ({ label, options, selected, onChange, valueKey = 'id', labe
   );
 };
 
-// Map Bounds Updater component
-const MapUpdater = ({ farmers, startCoords, endCoords }) => {
-  const map = useMap();
-  useEffect(() => {
-    const bounds = L.latLngBounds([]);
-    if (startCoords) bounds.extend([startCoords.lat, startCoords.lng]);
-    if (endCoords) bounds.extend([endCoords.lat, endCoords.lng]);
-    
-    farmers.forEach(f => {
-      const plots = f.farmer.plots || [];
-      plots.forEach(p => {
-        if (p.location && p.location.coordinates) {
-          // GeoJSON Point is [lng, lat]
-          const coord = p.location.coordinates;
-          bounds.extend([coord[1], coord[0]]);
-        }
-      });
-    });
-
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-    }
-  }, [farmers, startCoords, endCoords, map]);
-  return null;
-};
-
 export default function VisitPlanner() {
   const [farmers, setFarmers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -143,10 +94,7 @@ export default function VisitPlanner() {
   
   const [selectedFarmers, setSelectedFarmers] = useState([]);
   
-  const [viewMode, setViewMode] = useState('List'); // List, Village, Crop, CropStage
-  
-  const [selectedFarmer, setSelectedFarmer] = useState(null);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [viewMode, setViewMode] = useState('List'); // List, By Village, By Crop, By Crop + Stage
 
   useEffect(() => {
     fetchFilters();
@@ -202,7 +150,6 @@ export default function VisitPlanner() {
       
       const data = await api.getDailyPlan(params);
       
-      // Prevent crash if API returns HTML or error object instead of array
       if (Array.isArray(data)) {
         setFarmers(data);
       } else {
@@ -253,53 +200,102 @@ export default function VisitPlanner() {
 
   const groupedFarmers = () => {
     if (viewMode === 'List') return { 'All': farmers };
-    const groups = {};
-    farmers.forEach(item => {
-      let key = 'Unknown';
-      if (viewMode === 'By Village') key = item.farmer.village;
-      if (viewMode === 'By Crop' || viewMode === 'By Crop + Stage') {
-        const cropsList = [];
-        item.farmer.plots?.forEach(p => {
-            p.seasons?.forEach(s => {
-                if (s.status === 'Active' && s.crop) {
-                    let k = s.crop.crop_name;
-                    if (viewMode === 'By Crop + Stage' && s.current_stage) k += ` - ${s.current_stage.stage_name}`;
-                    cropsList.push(k);
-                }
-            })
+    if (viewMode === 'By Village') {
+        const groups = {};
+        farmers.forEach(item => {
+            const key = item.farmer.village || 'Unknown';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(item);
         });
-        if (cropsList.length > 0) key = cropsList.join(', ');
-      }
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-    });
-    return groups;
+        return groups;
+    }
+    if (viewMode === 'By Crop') {
+        const groups = {};
+        farmers.forEach(item => {
+            const cropsSet = new Set();
+            item.farmer.plots?.forEach(p => {
+                p.seasons?.forEach(s => {
+                    if (s.status === 'Active' && s.crop_name) cropsSet.add(s.crop_name);
+                });
+            });
+            if (cropsSet.size === 0) {
+                if (!groups['Unknown']) groups['Unknown'] = [];
+                groups['Unknown'].push(item);
+            } else {
+                cropsSet.forEach(crop => {
+                    if (!groups[crop]) groups[crop] = [];
+                    groups[crop].push(item);
+                });
+            }
+        });
+        return groups;
+    }
+    if (viewMode === 'By Crop + Stage') {
+        const nested = {};
+        farmers.forEach(item => {
+            const cropStageSet = new Set();
+            item.farmer.plots?.forEach(p => {
+                p.seasons?.forEach(s => {
+                    if (s.status === 'Active' && s.crop_name) {
+                        const crop = s.crop_name;
+                        const stage = s.stage_name || 'Unknown';
+                        cropStageSet.add(`${crop}::${stage}`);
+                    }
+                });
+            });
+            if (cropStageSet.size === 0) {
+                if (!nested['Unknown']) nested['Unknown'] = {};
+                if (!nested['Unknown']['Unknown']) nested['Unknown']['Unknown'] = [];
+                nested['Unknown']['Unknown'].push(item);
+            } else {
+                cropStageSet.forEach(cs => {
+                    const [crop, stage] = cs.split('::');
+                    if (!nested[crop]) nested[crop] = {};
+                    if (!nested[crop][stage]) nested[crop][stage] = [];
+                    nested[crop][stage].push(item);
+                });
+            }
+        });
+        return nested;
+    }
+    return {};
   };
 
-  const renderTags = (tags) => tags.map((tag, idx) => (
+  const renderTags = (tags) => tags?.map((tag, idx) => (
     <span key={idx} className="text-[10px] px-2 py-1 rounded-md border bg-surface text-text-muted font-medium">{tag}</span>
   ));
 
-  const mapCenter = startCoords ? [startCoords.lat, startCoords.lng] : [19.0760, 72.8777]; // Default to Mumbai roughly
+  const renderFarmerItem = (item) => {
+    const isSel = selectedFarmers.includes(item.farmer.id);
+    return (
+        <div key={item.farmer.id} className={`p-3 rounded-xl border cursor-pointer transition-colors flex items-start gap-3 ${isSel ? 'border-primary bg-primary/5' : 'border-border bg-surface hover:bg-bg'}`} onClick={() => toggleFarmerSelection(item.farmer.id)}>
+            <div className="pt-0.5">
+                {isSel ? <CheckSquare size={18} className="text-primary"/> : <Square size={18} className="text-text-muted/50"/>}
+            </div>
+            <div className="flex-1">
+                <div className="font-semibold text-text text-sm">{item.farmer.full_name}</div>
+                <div className="text-xs text-text-muted flex justify-between items-center mt-0.5">
+                    <span>{item.farmer.village}</span>
+                    <a href={`tel:${item.farmer.primary_mobile}`} onClick={(e) => e.stopPropagation()} className="text-primary flex items-center gap-1 hover:underline">
+                        <Phone size={12}/> Call
+                    </a>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                    {renderTags(item.tags)}
+                </div>
+            </div>
+        </div>
+    );
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-2xl border border-border">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-text">Smart Route Planner</h1>
-          <p className="text-text-muted text-sm mt-1">Plan your day based on location, crop stages, and market trends.</p>
-        </div>
-        <div className="flex gap-2">
-            <button onClick={clearSelections} className="flex items-center gap-2 px-6 py-2 bg-surface text-text border border-border rounded-xl text-sm font-medium hover:bg-bg transition-colors">
-                <X size={16} /> Clear Selections
-            </button>
-            <button onClick={executeSearch} className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
-                <Search size={16} /> Find Farmers
-            </button>
-        </div>
+      <div className="bg-surface p-6 rounded-2xl border border-border">
+        <h1 className="text-2xl font-heading font-bold text-text">Smart Route Planner</h1>
+        <p className="text-text-muted text-sm mt-1">Plan your day based on location, crop stages, and market trends.</p>
       </div>
 
-      <div className="bg-surface p-4 rounded-2xl border border-border space-y-4">
+      <div className="bg-surface p-5 rounded-2xl border border-border space-y-4 shadow-sm">
           <datalist id="villages-list">
               {availableVillages.map((v, i) => <option key={i} value={v.name} />)}
           </datalist>
@@ -315,103 +311,99 @@ export default function VisitPlanner() {
               </div>
               <div className="space-y-1">
                   <label className="text-xs font-semibold text-text-muted uppercase">End Point</label>
-                  <input type="text" value={endQuery} onChange={e => setEndQuery(e.target.value)} list="villages-list" placeholder="e.g. Nashik (Optional)" className="w-full bg-bg border border-border rounded-xl px-4 py-2 text-sm focus:border-primary focus:outline-none" />
+                  <input type="text" value={endQuery} onChange={e => setEndQuery(e.target.value)} list="villages-list" placeholder="e.g. Nashik (Defaults to Start Point if empty)" className="w-full bg-bg border border-border rounded-xl px-4 py-2 text-sm focus:border-primary focus:outline-none" />
               </div>
           </div>
-          <div className="flex flex-wrap gap-3 pt-2 border-t border-border">
-              <MultiSelect label="Villages" options={availableVillages} selected={villages} onChange={setVillages} />
-              <MultiSelect label="Crops" options={availableCrops} selected={crops} onChange={setCrops} />
-              <MultiSelect label="Stages" options={availableStages} selected={stages} onChange={setStages} />
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 border-t border-border">
+              <div className="flex flex-wrap gap-3">
+                  <MultiSelect label="Villages" options={availableVillages} selected={villages} onChange={setVillages} />
+                  <MultiSelect label="Crops" options={availableCrops} selected={crops} onChange={setCrops} />
+                  <MultiSelect label="Stages" options={availableStages} selected={stages} onChange={setStages} />
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                  <button onClick={clearSelections} className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-6 py-2 bg-bg text-text border border-border rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors">
+                      <X size={16} /> Clear
+                  </button>
+                  <button onClick={executeSearch} className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
+                      <Search size={16} /> Find Farmers
+                  </button>
+              </div>
           </div>
       </div>
 
       {loading && <div className="py-12 text-center text-text-muted animate-pulse">Calculating optimal routes and filtering portfolio...</div>}
 
       {!loading && farmers.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 h-[500px] bg-surface rounded-2xl border border-border overflow-hidden relative z-0">
-                  <MapContainer center={mapCenter} zoom={7} style={{ height: '100%', width: '100%' }}>
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      <MapUpdater farmers={farmers} startCoords={startCoords} endCoords={endCoords} />
-                      
-                      {startCoords && (
-                          <Marker position={[startCoords.lat, startCoords.lng]} icon={customIcon('green')}>
-                              <Popup>Start Point: {startQuery}</Popup>
-                          </Marker>
-                      )}
-                      
-                      {endCoords && (
-                          <Marker position={[endCoords.lat, endCoords.lng]} icon={customIcon('red')}>
-                              <Popup>End Point: {endQuery}</Popup>
-                          </Marker>
-                      )}
-
-                      {startCoords && endCoords && (
-                          <Polyline positions={[[startCoords.lat, startCoords.lng], [endCoords.lat, endCoords.lng]]} color="blue" weight={3} opacity={0.5} dashArray="10, 10" />
-                      )}
-
-                      {farmers.map(f => {
-                          const isSel = selectedFarmers.includes(f.farmer.id);
-                          return f.farmer.plots?.filter(p => p.location?.coordinates).map((p, idx) => (
-                              <Marker key={`${f.farmer.id}-${idx}`} position={[p.location.coordinates[1], p.location.coordinates[0]]} icon={customIcon(isSel ? 'gold' : 'blue')}>
-                                  <Popup>
-                                      <div className="font-bold">{f.farmer.full_name}</div>
-                                      <div className="text-sm">{f.farmer.village}</div>
-                                      <a href={`tel:${f.farmer.primary_mobile}`} className="text-primary flex items-center gap-1 mt-1 text-sm"><Phone size={12}/> Call {f.farmer.primary_mobile}</a>
-                                  </Popup>
-                              </Marker>
-                          ));
-                      })}
-                  </MapContainer>
-              </div>
-
-              <div className="flex flex-col h-[500px] bg-surface rounded-2xl border border-border overflow-hidden">
-                  <div className="p-4 border-b border-border bg-bg/50 space-y-3">
-                      <div className="flex justify-between items-center">
-                          <h2 className="font-bold text-text">Tour Selection</h2>
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-semibold">{selectedFarmers.length} / {farmers.length} Selected</span>
+          <div className="max-w-4xl mx-auto">
+              <div className="flex flex-col bg-surface rounded-2xl border border-border shadow-sm overflow-hidden min-h-[600px]">
+                  <div className="p-5 border-b border-border bg-bg/50 space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                          <h2 className="font-bold text-text text-lg">Tour Selection</h2>
+                          <div className="flex items-center gap-4 text-sm">
+                              <span className="bg-primary/10 text-primary px-3 py-1 rounded-full font-semibold">{selectedFarmers.length} / {farmers.length} Selected</span>
+                              <div className="flex gap-2 font-medium">
+                                  <button onClick={selectAll} className="text-primary hover:underline">Select All</button>
+                                  <span className="text-border">|</span>
+                                  <button onClick={deselectAll} className="text-text-muted hover:underline">Clear</button>
+                              </div>
+                          </div>
                       </div>
-                      <div className="flex gap-2 text-sm">
-                          <button onClick={selectAll} className="text-primary hover:underline">Select All</button>
-                          <span className="text-border">|</span>
-                          <button onClick={deselectAll} className="text-text-muted hover:underline">Clear</button>
-                      </div>
+                      
                       <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                           {['List', 'By Village', 'By Crop', 'By Crop + Stage'].map(mode => (
-                              <button key={mode} onClick={() => setViewMode(mode)} className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === mode ? 'bg-primary text-white' : 'bg-surface border border-border text-text-muted hover:bg-bg'}`}>{mode}</button>
+                              <button key={mode} onClick={() => setViewMode(mode)} className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${viewMode === mode ? 'bg-primary text-white shadow-md' : 'bg-surface border border-border text-text hover:bg-bg'}`}>{mode}</button>
                           ))}
                       </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-4">
-                      {Object.entries(groupedFarmers()).map(([groupName, items]) => (
-                          <div key={groupName} className="space-y-2">
-                              {viewMode !== 'List' && <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider px-2 pt-2">{groupName}</h3>}
-                              {items.map(item => {
-                                  const isSel = selectedFarmers.includes(item.farmer.id);
-                                  return (
-                                      <div key={item.farmer.id} className={`p-3 rounded-xl border cursor-pointer transition-colors flex items-start gap-3 ${isSel ? 'border-primary bg-primary/5' : 'border-border bg-surface hover:bg-bg'}`} onClick={() => toggleFarmerSelection(item.farmer.id)}>
-                                          <div className="pt-0.5">
-                                              {isSel ? <CheckSquare size={18} className="text-primary"/> : <Square size={18} className="text-text-muted/50"/>}
-                                          </div>
-                                          <div className="flex-1">
-                                              <div className="font-semibold text-text text-sm">{item.farmer.full_name}</div>
-                                              <div className="text-xs text-text-muted flex gap-2 mt-0.5">
-                                                  <span>{item.farmer.village}</span>
-                                                  {item.distance && <span className="text-primary font-medium">{item.distance}km</span>}
-                                              </div>
-                                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                                  {renderTags(item.tags)}
-                                              </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                      {viewMode === 'By Crop + Stage' ? (
+                          Object.entries(groupedFarmers()).map(([cropName, stagesObj]) => (
+                              <div key={cropName} className="space-y-4 bg-bg/30 p-4 rounded-xl border border-border/50">
+                                  <h3 className="text-base font-heading font-bold text-text border-b border-border/60 pb-2">{cropName}</h3>
+                                  {Object.entries(stagesObj).map(([stageName, items]) => (
+                                      <div key={stageName} className="space-y-3 pl-4 border-l-2 border-primary/20 ml-2">
+                                          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider">{stageName}</h4>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                              {items.map(renderFarmerItem)}
                                           </div>
                                       </div>
-                                  )
-                              })}
-                          </div>
-                      ))}
+                                  ))}
+                              </div>
+                          ))
+                      ) : (
+                          Object.entries(groupedFarmers()).map(([groupName, items]) => (
+                              <div key={groupName} className="space-y-3">
+                                  {viewMode !== 'List' && (
+                                      <div className="flex items-center gap-2 px-1 pt-2">
+                                          {viewMode === 'By Village' && (
+                                              <button onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const allSelected = items.every(i => selectedFarmers.includes(i.farmer.id));
+                                                  if (allSelected) {
+                                                      setSelectedFarmers(prev => prev.filter(id => !items.find(i => i.farmer.id === id)));
+                                                  } else {
+                                                      const newIds = items.map(i => i.farmer.id).filter(id => !selectedFarmers.includes(id));
+                                                      setSelectedFarmers(prev => [...prev, ...newIds]);
+                                                  }
+                                              }} className="text-primary focus:outline-none hover:opacity-80 transition-opacity">
+                                                  {items.every(i => selectedFarmers.includes(i.farmer.id)) ? <CheckSquare size={18} /> : <Square size={18} className="text-text-muted/50" />}
+                                              </button>
+                                          )}
+                                          <h3 className="text-sm font-heading font-bold text-text uppercase tracking-wide">{groupName} <span className="text-text-muted text-xs font-normal lowercase ml-1">({items.length} farmers)</span></h3>
+                                      </div>
+                                  )}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      {items.map(renderFarmerItem)}
+                                  </div>
+                              </div>
+                          ))
+                      )}
                   </div>
-                  <div className="p-4 border-t border-border bg-bg/50">
-                      <button onClick={generateRoute} disabled={selectedFarmers.length === 0} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent/90 transition-colors disabled:opacity-50">
-                          <Navigation size={18} /> Generate Tour Route
+                  
+                  <div className="p-5 border-t border-border bg-surface">
+                      <button onClick={generateRoute} disabled={selectedFarmers.length === 0} className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-accent text-white rounded-xl text-base font-bold hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-md">
+                          <Navigation size={20} /> Generate Tour Route
                       </button>
                   </div>
               </div>
@@ -419,7 +411,7 @@ export default function VisitPlanner() {
       )}
       
       {!loading && farmers.length === 0 && (
-          <div className="text-center py-16 bg-surface rounded-2xl border border-border">
+          <div className="text-center py-16 bg-surface rounded-2xl border border-border shadow-sm">
             <MapPin size={48} className="mx-auto text-text-muted/30 mb-4" />
             <h3 className="text-lg font-heading font-semibold text-text mb-2">Ready to Plan</h3>
             <p className="text-text-muted max-w-sm mx-auto">Enter start/end points or filter by crop/village to find farmers for your tour.</p>
