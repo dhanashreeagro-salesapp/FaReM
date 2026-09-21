@@ -620,7 +620,21 @@ def check_overdue_visits_and_stage_transitions():
             
         if selected_stage and season.current_stage != selected_stage:
             season.current_stage = selected_stage
-            season.save(update_fields=['current_stage'])
+            update_fields = ['current_stage']
+            
+            next_stage = None
+            for s in stages:
+                if s.sequence_number > selected_stage.sequence_number:
+                    next_stage = s
+                    break
+            
+            if next_stage:
+                from datetime import timedelta
+                total_days = sum(s.days_from_previous_stage for s in stages if s.sequence_number <= next_stage.sequence_number)
+                season.expected_next_stage_date = season.sowing_date + timedelta(days=total_days)
+                update_fields.append('expected_next_stage_date')
+                
+            season.save(update_fields=update_fields)
             stages_updated_count += 1
 
     seasons = CropSeason.objects.filter(expected_next_stage_date=today, status='Active').select_related('plot__farmer__assigned_staff')

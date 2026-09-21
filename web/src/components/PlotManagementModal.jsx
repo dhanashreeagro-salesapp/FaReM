@@ -423,7 +423,7 @@ export default function PlotManagementModal({ farmer, onClose }) {
                               <div><span className="block text-xs text-text-muted mb-1">Variety</span><span className="font-medium">{activeSeason.variety_name || '—'}</span></div>
                               <div><span className="block text-xs text-text-muted mb-1">Area</span><span className="font-medium">{activeSeason.area_acres || selectedPlot.area_acres} Acres</span></div>
                               <div><span className="block text-xs text-text-muted mb-1">Sowing Date</span><span className="font-medium">{activeSeason.sowing_date}</span></div>
-                              <div><span className="block text-xs text-text-muted mb-1">Stage</span><span className="font-medium">{activeSeason.current_stage?.stage_name || 'Unknown'}</span></div>
+                              <div><span className="block text-xs text-text-muted mb-1">Stage</span><span className="font-medium">{activeSeason.stage_name || 'Unknown'}</span></div>
                             </div>
                             
                             {showEndForm !== activeSeason.id ? (
