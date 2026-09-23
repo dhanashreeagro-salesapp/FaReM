@@ -20,7 +20,7 @@ import DataDebug from './pages/DataDebug';
 import FrontendDataDiagnostic from './pages/FrontendDataDiagnostic';
 
 
-import { MapPin, Menu } from 'lucide-react';
+import { MapPin, Menu, HelpCircle } from 'lucide-react';
 
 function ProtectedLayout() {
   const { isAuthenticated, loading, user } = useAuth();
@@ -61,6 +61,24 @@ function ProtectedLayout() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={() => {
+                  const path = window.location.pathname;
+                  let section = '';
+                  if (path.includes('/dashboard')) section = '#sec5';
+                  else if (path.includes('/farmers')) section = '#sec6';
+                  else if (path.includes('/planner')) section = '#sec7';
+                  else if (path.includes('/recommendations')) section = '#sec8';
+                  else if (path.includes('/promotions')) section = '#sec9';
+                  else if (path.includes('/market-intelligence')) section = '#sec10';
+                  window.open('/user-manual.html' + section, '_blank');
+                }}
+                className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors flex items-center gap-1.5"
+                title="Help / User Manual"
+              >
+                <HelpCircle size={20} />
+                <span className="hidden sm:inline text-xs font-semibold">Help</span>
+              </button>
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-heading font-bold">
                 {user?.full_name?.[0]?.toUpperCase() || 'U'}
               </div>

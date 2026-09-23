@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agri Amigo — User Manual / वापरकर्ता मार्गदर्शिका</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1E6B3C;
+      --primary-light: #D4EDE1;
+      --primary-dark: #144928;
+      --text-main: #2D3748;
+      --text-muted: #64748B;
+      --bg-page: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --border-color: #E2E8F0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans', 'Noto Sans Devanagari', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--primary);
+      color: #fff;
+      padding: 0.8rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .brand-box { display: flex; align-items: center; gap: 0.8rem; }
+    .brand-box h1 { font-size: 1.25rem; font-weight: 700; }
+    .brand-box span { font-size: 0.85rem; opacity: 0.9; }
+
+    .header-actions { display: flex; align-items: center; gap: 1rem; }
+    .lang-toggle {
+      display: flex;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .lang-toggle button {
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .lang-toggle button.active {
+      background: #fff;
+      color: var(--primary);
+    }
+
+    /* Main Container with Sidebar + Content */
+    .container {
+      display: flex;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: 320px;
+      height: calc(100vh - 60px);
+      position: sticky;
+      top: 60px;
+      overflow-y: auto;
+      background: #fff;
+      border-right: 1px solid var(--border-color);
+      padding: 1.2rem 1rem;
+    }
+    aside .search-box {
+      width: 100%;
+      padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    aside ul { list-style: none; }
+    aside li { margin-bottom: 0.4rem; }
+    aside a {
+      display: block;
+      padding: 0.5rem 0.7rem;
+      border-radius: 6px;
+      color: var(--text-main);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    aside a:hover, aside a.active {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    /* Content Area */
+    main {
+      flex: 1;
+      padding: 2rem 2.5rem;
+      max-width: 1080px;
+    }
+
+    .section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      scroll-margin-top: 80px;
+    }
+
+    .section-header {
+      border-bottom: 2px solid var(--primary-light);
+      padding-bottom: 0.8rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .section-header h2 {
+      font-size: 1.4rem;
+      color: var(--primary);
+    }
+    .section-header h3 {
+      font-size: 1.2rem;
+      color: var(--primary-dark);
+      font-weight: 600;
+    }
+    .back-to-top {
+      font-size: 0.82rem;
+      color: var(--primary);
+      text-decoration: none;
+      padding: 0.3rem 0.6rem;
+      background: var(--primary-light);
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* Bilingual Columns */
+    .bilingual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      position: relative;
+    }
+    .bilingual-grid::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      background: var(--border-color);
+    }
+
+    .col h4 {
+      font-size: 1rem;
+      color: var(--primary);
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .col ul, .col ol { padding-left: 1.2rem; margin-bottom: 1rem; }
+    .col li { margin-bottom: 0.4rem; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    table th, table td {
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+    }
+    table th {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+
+    /* Tip Box */
+    .tip-box {
+      background: var(--primary-light);
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.2rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.2rem 0;
+      font-size: 0.92rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .container { flex-direction: column; }
+      aside { width: 100%; height: auto; position: static; }
+      .bilingual-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+      .bilingual-grid::after { display: none; }
+    }
+
+    /* Filter modes */
+    body.show-en .col-mr { display: none; }
+    body.show-en .bilingual-grid { grid-template-columns: 1fr; }
+    body.show-en .bilingual-grid::after { display: none; }
+    body.show-mr .col-en { display: none; }
+    body.show-mr .bilingual-grid { grid-template-columns: 1fr; }
+    body.show-mr .bilingual-grid::after { display: none; }
+  </style>
+</head>
+<body class="show-both">
+
+  <header>
+    <div class="brand-box">
+      <div>
+        <h1>Agri Amigo User Manual</h1>
+        <span>चांगल्या शेतीसाठी एकत्र | Dhanashree Crop Solutions</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="lang-toggle">
+        <button id="btn-both" class="active" onclick="setLang('both')">Both (दोन्ही)</button>
+        <button id="btn-en" onclick="setLang('en')">English</button>
+        <button id="btn-mr" onclick="setLang('mr')">मराठी</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Sidebar Navigation -->
+    <aside>
+      <input type="text" id="manualSearch" class="search-box" placeholder="Search manual / शोधा..." onkeyup="filterMenu()">
+      <ul id="menuList">
+        <li><a href="#sec1">1. About This Manual / याबद्दल</a></li>
+        <li><a href="#sec2">2. What is Agri Amigo? / काय आहे?</a></li>
+        <li><a href="#sec3">3. How to Log In / लॉगिन</a></li>
+        <li><a href="#sec4">4. Menu Navigation / मेनू</a></li>
+        <li><a href="#sec5">5. Dashboard & Reports / डॅशबोर्ड</a></li>
+        <li><a href="#sec6">6. Farmer Management / शेतकरी</a></li>
+        <li><a href="#sec7">7. Smart Planner / मार्ग नियोजन</a></li>
+        <li><a href="#sec8">8. Recommendation Engine / सल्ला</a></li>
+        <li><a href="#sec9">9. Promotions Management / जाहिरात</a></li>
+        <li><a href="#sec10">10. Market Intelligence / बाजारभाव</a></li>
+        <li><a href="#sec11">11. Sign Out / बाहेर पडा</a></li>
+        <li><a href="#sec12">12. Field Tips / शेतातील टिप्स</a></li>
+        <li><a href="#sec13">13. FAQ / प्रश्नोत्तरे</a></li>
+        <li><a href="#sec14">14. Support / मदत कक्ष</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main>
+
+      <!-- Section 1 -->
+      <section id="sec1" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 1: About This Manual</h2>
+            <h3>विभाग १: या मार्गदर्शिकेबद्दल</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <p>This manual is for Field Executives using the Agri Amigo app on mobile phones. It helps you learn all six parts of the app step by step. Follow the numbered steps carefully. Look at the screenshots and practise directly on your app.</p>
+</div>
+<div class="col col-mr">
+<p>ही मार्गदर्शिका फोनवर अ‍ॅग्री अमिगो अ‍ॅप वापरणाऱ्या फील्ड एक्झिक्युटिव्हसाठी आहे. हे तुम्हाला अ‍ॅपचे सर्व ६ भाग टप्प्याटप्प्याने शिकण्यास मदत करते. दिलेल्या क्रमांकांनुसार पायऱ्यांचे पालन करा. स्क्रीनशॉट पहा आणि थेट तुमच्या अ‍ॅपवर सराव करा.</p>
+</div>
+</div>
+</section>
+
+      <!-- Section 2 -->
+      <section id="sec2" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 2: What is Agri Amigo?</h2>
+            <h3>विभाग २: अ‍ॅग्री अमिगो काय आहे?</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <p>Agri Amigo is a mobile app for managing farmer relationships easily in the field.</p>
+            <ul>
+              <li>Store details of all your farmers in one place.</li>
+              <li>Record farm visits and calls so you never forget.</li>
+              <li>Plan the best route for your field visits.</li>
+              <li>Send crop advice and promotions by WhatsApp or SMS.</li>
+              <li>See live mandi prices for tomato, grapes, onion, and more.</li>
+              <li>Help your manager see your work through a live dashboard.</li>
+            </ul>
+          </div>
+          <div class="col col-mr">
+            <p>अ‍ॅग्री अमिगो हे शेतामध्ये शेतकऱ्यांशी जोडलेले राहण्यासाठी आणि व्यवस्थापनासाठी बनवलेले मोबाईल अ‍ॅप आहे.</p>
+            <ul>
+              <li>तुमच्या सर्व शेतकऱ्यांची माहिती एकाच ठिकाणी साठवा.</li>
+              <li>शेतातील भेटी आणि फोन कॉल्सची नोंद ठेवा.</li>
+              <li>तुमच्या शेती भेटींसाठी सर्वोत्तम मार्गाचे नियोजन करा.</li>
+              <li>शेतकऱ्यांना व्हॉट्सअ‍ॅप किंवा एसएमएसद्वारे पीक सल्ला आणि माहिती पाठवा.</li>
+              <li>टोमॅटो, द्राक्षे, कांदा आणि इतर पिकांचे थेट बाजारभाव पहा.</li>
+              <li>थेट डॅशबोर्डद्वारे तुमच्या व्यवस्थापकाला तुमचे दैनंदिन काम पाहण्यास मदत करा.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3 -->
+      <section id="sec3" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 3: Getting Started: How to Log In</h2>
+            <h3>विभाग ३: सुरुवात कशी करावी: लॉगिन कसे करावे</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li>Open the Agri Amigo app on your phone.</li>
+<li>You will see the login screen.</li>
+<li>Type your registered email in the box.</li>
+<li>Enter your password, Click on the "Sign In" Button</li>
+<li>The app will open and show your Dashboard.</li>
+</ol>
+<div class="tip-box"><strong>Tip:</strong> You can contact your administrator for reseting your password</div>
+</div>
+<div class="col col-mr">
+<ol>
+<li>तुमच्या फोनवर अ‍ॅग्री अमिगो अ‍ॅप उघडा.</li>
+<li>तुम्हाला लॉगिन स्क्रीन दिसेल.</li>
+<li>बॉक्समध्ये तुमचा नोंदणीकृत ईमेल टाका]</li>
+<li>तुमचा पासवर्ड टाका, "Sign In"बटण वर क्लिक करा</li>
+<li>अ‍ॅप उघडेल आणि तुमचा डॅशबोर्ड दिसेल.</li>
+</ol>
+<div class="tip-box"><strong>टिप:</strong> तुमचा पासवर्ड बदलण्यासाठी अॅडमिनिस्ट्रेटरशी संपर्क साधा</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4 -->
+      <section id="sec4" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 4: App Navigation (The Menu)</h2>
+            <h3>विभाग ४: अ‍ॅप कसे वापरावे (मेनू)</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <p>Tap <strong>≡</strong> at top left to open menu.</p>
+            <table>
+              <tr><th>Menu Item</th><th>What it does</th></tr>
+              <tr><td><strong>Dashboard & Reports</strong></td><td>Shows your summary numbers</td></tr>
+              <tr><td><strong>Farmer Management</strong></td><td>Add, search, and manage farmers</td></tr>
+              <tr><td><strong>Smart Planner</strong></td><td>Plan best route for field visits</td></tr>
+              <tr><td><strong>Recommendation Engine</strong></td><td>Send crop advice to farmers</td></tr>
+              <tr><td><strong>Promotions Management</strong></td><td>Send messages to groups</td></tr>
+              <tr><td><strong>Market Intelligence</strong></td><td>See live mandi prices</td></tr>
+              <tr><td><strong>Sign Out</strong></td><td>Safely log out of the app</td></tr>
+            </table>
+          </div>
+          <div class="col col-mr">
+            <p>मेनू उघडण्यासाठी वर डाव्या बाजूला <strong>≡</strong> दाबा.</p>
+            <table>
+              <tr><th>मेनू पर्याय</th><th>त्याचे कार्य</th></tr>
+              <tr><td><strong>Dashboard & Reports</strong></td><td>एकूण शेतकरी व कामाचा सारांश</td></tr>
+              <tr><td><strong>Farmer Management</strong></td><td>शेतकरी जोडा, शोधा व व्यवस्थापित करा</td></tr>
+              <tr><td><strong>Smart Planner</strong></td><td>भेटींसाठी सर्वोत्तम मार्ग नियोजन</td></tr>
+              <tr><td><strong>Recommendation Engine</strong></td><td>शेतकऱ्यांना पीक सल्ला पाठवा</td></tr>
+              <tr><td><strong>Promotions Management</strong></td><td>शेतकरी समूहाला संदेश पाठवा</td></tr>
+              <tr><td><strong>Market Intelligence</strong></td><td>थेट बाजारभाव तपासा</td></tr>
+              <tr><td><strong>Sign Out</strong></td><td>अ‍ॅपमधून सुरक्षितपणे बाहेर पडा</td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5 -->
+      <section id="sec5" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 5: Dashboard & Reports</h2>
+            <h3>विभाग ५: डॅशबोर्ड आणि अहवाल</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ul>
+              <li><strong>Total Active Farmers:</strong> Total farmers added by you.</li>
+              <li><strong>Total Plots:</strong> Total farm plots mapped.</li>
+              <li><strong>Active Crops:</strong> Active crop seasons across plots.</li>
+              <li><strong>Total Visits:</strong> Total visits logged.</li>
+              <li><strong>Total Calls:</strong> Total phone calls logged.</li>
+              <li><strong>Overdue Visits:</strong> Unvisited farmers due for follow-up. Act first.</li>
+            </ul>
+            <p><em>Tap <strong>Refresh Data</strong> to update numbers instantly.</em></p>
+          </div>
+          <div class="col col-mr">
+            <ul>
+              <li><strong>Total Active Farmers:</strong> तुम्ही जोडलेले एकूण सक्रिय शेतकरी.</li>
+              <li><strong>Total Plots:</strong> नोंदणी केलेले एकूण शेतजमीन प्लॉट्स.</li>
+              <li><strong>Active Crops:</strong> शेतात सध्या चालू असलेली पिके.</li>
+              <li><strong>Total Visits:</strong> तुम्ही घेतलेल्या एकूण प्रत्यक्ष भेटी.</li>
+              <li><strong>Total Calls:</strong> तुम्ही केलेले एकूण फोन कॉल्स.</li>
+              <li><strong>Overdue Visits:</strong> बाकी राहिलेल्या भेटी. यांना प्रथम भेट द्या.</li>
+            </ul>
+            <p><em>माहिती अपडेट करण्यासाठी <strong>Refresh Data</strong> वर टॅप करा.</em></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 6 -->
+      <section id="sec6" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 6: Farmer Management</h2>
+            <h3>विभाग ६: शेतकरी व्यवस्थापन</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <h4>How to Add a Farmer</h4>
+            <ol>
+              <li>Tap <strong>+ Add Farmer</strong>.</li>
+              <li>Type farmer name (required).</li>
+              <li>Type mobile number (required).</li>
+              <li>Select village from dropdown.</li>
+              <li>Fill land size and tap <strong>Save</strong>.</li>
+            </ol>
+            <p><strong>Note:</strong> Farmer records cannot be deleted. Contact your manager for fixes.</p>
+          </div>
+          <div class="col col-mr">
+            <h4>नवीन शेतकरी कसा जोडावा</h4>
+            <ol>
+              <li><strong>+ Add Farmer</strong> वर टॅप करा.</li>
+              <li>शेतकऱ्याचे नाव भरा (बंधनकारक).</li>
+              <li>मोबाईल नंबर टाका (बंधनकारक).</li>
+              <li>यादीतून गाव निवडा.</li>
+              <li>जमीन तपशील भरून <strong>Save</strong> दाबा.</li>
+            </ol>
+            <p><strong>टीप:</strong> शेतकरी रेकॉर्ड डिलीट करता येत नाही. दुरुस्तीसाठी व्यवस्थापकांना सांगा.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 7 -->
+      <section id="sec7" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 7: Smart Planner</h2>
+            <h3>विभाग ७: स्मार्ट प्लॅनर</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li>Tap <strong>Smart Planner</strong> in menu.</li>
+              <li>Enter <strong>START POINT</strong> or use GPS.</li>
+              <li>Enter optional <strong>END POINT</strong>.</li>
+              <li>Filter by village, crop, or growth stage.</li>
+              <li>Tap <strong>Find Farmers</strong> to see route.</li>
+              <li>Tap any farmer to start visit.</li>
+            </ol>
+            <div class="tip-box">
+              <strong>Tip:</strong> Use Smart Planner every morning. This saves fuel and time.
+            </div>
+          </div>
+          <div class="col col-mr">
+            <ol>
+              <li>मेनूमध्ये <strong>Smart Planner</strong> उघडा.</li>
+              <li><strong>START POINT</strong> टाका किंवा GPS वापरा.</li>
+              <li>इच्छित असल्यास <strong>END POINT</strong> टाका.</li>
+              <li>गाव, पीक किंवा अवस्थेनुसार फिल्टर करा.</li>
+              <li><strong>Find Farmers</strong> दाबा आणि मार्ग पहा.</li>
+              <li>भेट देण्यासाठी शेतकऱ्याच्या नावावर टॅप करा.</li>
+            </ol>
+            <div class="tip-box">
+              <strong>टिप:</strong> दररोज सकाळी Smart Planner वापरा. पेट्रोल व वेळ दोन्ही वाचतील.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 8 -->
+      <section id="sec8" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 8: Recommendation Engine</h2>
+            <h3>विभाग ८: शिफारस इंजिन</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li>Find farmer in Farmer Management.</li>
+              <li>Tap <strong>Advisor</strong> on card.</li>
+              <li>Review stage-based advisory templates.</li>
+              <li>Pick template or write custom advice.</li>
+              <li>Choose <strong>WhatsApp</strong> or <strong>SMS</strong>.</li>
+              <li>Tap <strong>Send</strong>. Log saves automatically.</li>
+            </ol>
+          </div>
+          <div class="col col-mr">
+            <ol>
+              <li>Farmer Management मध्ये शेतकरी शोधा.</li>
+              <li>कार्डवरील <strong>Advisor</strong> दाबा.</li>
+              <li>पिकाच्या वाढीनुसार तयार सल्ला निवडा.</li>
+              <li>टेम्पलेट निवडा किंवा स्वतः लिहा.</li>
+              <li><strong>WhatsApp</strong> किंवा <strong>SMS</strong> निवडा.</li>
+              <li><strong>Send</strong> दाबा. सल्ला आपोआप सेव्ह होईल.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 9 -->
+      <section id="sec9" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 9: Promotions Management</h2>
+            <h3>विभाग ९: जाहिरात व्यवस्थापन</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li>Tap <strong>Promotions Management</strong> in menu.</li>
+              <li>Tap <strong>New Promotion</strong>.</li>
+              <li>Set filters: Crop, Stage, District, Taluka, Weather.</li>
+              <li>Tap <strong>Calculate Audience Size</strong>.</li>
+              <li>Tap <strong>Continue to Message</strong>.</li>
+              <li>Send message by WhatsApp or SMS.</li>
+            </ol>
+          </div>
+          <div class="col col-mr">
+            <ol>
+              <li>मेनूमध्ये <strong>Promotions Management</strong> उघडा.</li>
+              <li><strong>New Promotion</strong> बटण दाबा.</li>
+              <li>फिल्टर निवडा: पीक, अवस्था, जिल्हा, तालुका, हवामान.</li>
+              <li><strong>Calculate Audience Size</strong> वर टॅप करा.</li>
+              <li><strong>Continue to Message</strong> दाबा.</li>
+              <li>WhatsApp किंवा SMS द्वारे संदेश पाठवा.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 10 -->
+      <section id="sec10" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 10: Market Intelligence</h2>
+            <h3>विभाग १०: बाजार माहिती</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <p>Check live mandi rates for crops like Tomato, Grapes, and Onion.</p>
+            <ul>
+              <li><strong>High price:</strong> Maximum price at mandi.</li>
+              <li><strong>Modal price:</strong> Most common price. Most useful number.</li>
+              <li><strong>Low price:</strong> Minimum mandi price.</li>
+              <li><strong>Approaching Festivals:</strong> Festivals impacting prices.</li>
+            </ul>
+            <div class="tip-box">
+              <strong>Tip:</strong> Check Modal price and Approaching Festivals before harvest advice.
+            </div>
+          </div>
+          <div class="col col-mr">
+            <p>टोमॅटो, द्राक्षे आणि कांदा यांसारख्या पिकांचे थेट बाजारभाव तपासा.</p>
+            <ul>
+              <li><strong>High price:</strong> बाजारातील सर्वोच्च दर.</li>
+              <li><strong>Modal price:</strong> सरासरी सर्वात सामान्य दर. सर्वात महत्त्वाचा.</li>
+              <li><strong>Low price:</strong> बाजारातील सर्वात कमी दर.</li>
+              <li><strong>Approaching Festivals:</strong> भावावर परिणाम करणारे सण.</li>
+            </ul>
+            <div class="tip-box">
+              <strong>टिप:</strong> काढणीचा सल्ला देण्यापूर्वी Modal price व सण तपासा.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 11 -->
+      <section id="sec11" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 11: How to Sign Out</h2>
+            <h3>विभाग ११: बाहेर कसे पडावे</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li>Tap <strong>≡</strong> icon at top left.</li>
+              <li>Scroll to bottom of menu.</li>
+              <li>Tap <strong>Sign Out</strong>.</li>
+            </ol>
+            <p><em>Your data is saved safely on the server. Nothing is lost.</em></p>
+          </div>
+          <div class="col col-mr">
+            <ol>
+              <li>वर डाव्या बाजूला <strong>≡</strong> वर टॅप करा.</li>
+              <li>मेनूच्या शेवटी खाली स्क्रोल करा.</li>
+              <li><strong>Sign Out</strong> वर टॅप करा.</li>
+            </ol>
+            <p><em>तुमची माहिती सुरक्षितपणे सेव्ह आहे. काहीही नष्ट होत नाही.</em></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 12 -->
+      <section id="sec12" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 12: Field Usage Tips</h2>
+            <h3>विभाग १२: शेतातील महत्त्वाच्या टिप्स</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <ol>
+              <li><strong>Works Offline:</strong> Logs save without internet and sync later.</li>
+              <li><strong>Log Immediately:</strong> Record visits on the farm immediately.</li>
+              <li><strong>Add Photos:</strong> Capture crop health and pest damage photos.</li>
+              <li><strong>Prioritize Overdue:</strong> Check Overdue Visits card first every day.</li>
+              <li><strong>WhatsApp First:</strong> Advisories on WhatsApp get read faster.</li>
+              <li><strong>Keep Updated:</strong> Update app promptly for new features.</li>
+            </ol>
+          </div>
+          <div class="col col-mr">
+            <ol>
+              <li><strong>ऑफलाइन काम:</strong> इंटरनेट नसताना माहिती सेव्ह राहते व नंतर सिंक होते.</li>
+              <li><strong>लगेच नोंद:</strong> शेतात असतानाच भेट त्वरित नोंदवा.</li>
+              <li><strong>फोटो जोडा:</strong> पिके आणि किडींचे फोटो भेटीसोबत अपलोड करा.</li>
+              <li><strong>बाकी भेटी आधी:</strong> सकाळी Overdue Visits कार्ड आधी तपासा.</li>
+              <li><strong>व्हॉट्सअ‍ॅप वापरा:</strong> व्हॉट्सअ‍ॅप सल्ला लवकर वाचला जातो.</li>
+              <li><strong>अ‍ॅप अपडेट:</strong> सुरळीत चालण्यासाठी अ‍ॅप नेहमी अपडेट ठेवा.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 13 -->
+      <section id="sec13" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 13: Frequently Asked Questions (FAQ)</h2>
+            <h3>विभाग १३: वारंवार विचारले जाणारे प्रश्न</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <p><strong>Q1: Can I delete a farmer?</strong><br>A: No. Contact manager to mark inactive.</p>
+            <p><strong>Q2: Can officers see other farmers?</strong><br>A: No. Only assigned farmers are visible.</p>
+            <p><strong>Q3: Slow or not loading?</strong><br>A: Check internet, tap Refresh Data, restart app.</p>
+          </div>
+          <div class="col col-mr">
+            <p><strong>प्रश्न 1: शेतकरी डिलीट करता येतो का?</strong><br>उत्तर: नाही. निष्क्रिय करण्यासाठी मॅनेजरशी संपर्क करा.</p>
+            <p><strong>प्रश्न 2: इतर अधिकाऱ्यांचे शेतकरी दिसतात?</strong><br>उत्तर: नाही. फक्त स्वतःचे शेतकरी दिसतात.</p>
+            <p><strong>प्रश्न 3: अ‍ॅप संथ चालत आहे?</strong><br>उत्तर: इंटरनेट तपासा, Refresh Data दाबा किंवा रीस्टार्ट करा.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 14 -->
+      <section id="sec14" class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>Section 14: Contact & Support</h2>
+            <h3>विभाग १४: संपर्क आणि मदत कक्ष</h3>
+          </div>
+          <a href="#" class="back-to-top">↑ Top</a>
+        </div>
+        <div class="bilingual-grid">
+          <div class="col col-en">
+            <table>
+              <tr><th>Support Type</th><th>Contact</th></tr>
+              <tr><td>Helpdesk</td><td><code>8956084307</code></td></tr>
+              <tr><td>Email</td><td><code>skhokrale@plantnutrition.in</code></td></tr>
+            </table>
+          </div>
+          <div class="col col-mr">
+            <table>
+              <tr><th>मदतीचा प्रकार</th><th>संपर्क तपशील</th></tr>
+              <tr><td>आयटी हेल्पडेस्क</td><td><code>8956084307</code></td></tr>
+              <tr><td>ईमेल</td><td><code>skhokrale@plantnutrition.in</code></td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    function setLang(mode) {
+      document.body.className = '';
+      document.getElementById('btn-both').classList.remove('active');
+      document.getElementById('btn-en').classList.remove('active');
+      document.getElementById('btn-mr').classList.remove('active');
+
+      if (mode === 'en') {
+        document.body.classList.add('show-en');
+        document.getElementById('btn-en').classList.add('active');
+      } else if (mode === 'mr') {
+        document.body.classList.add('show-mr');
+        document.getElementById('btn-mr').classList.add('active');
+      } else {
+        document.body.classList.add('show-both');
+        document.getElementById('btn-both').classList.add('active');
+      }
+    }
+
+    function filterMenu() {
+      const q = document.getElementById('manualSearch').value.toLowerCase();
+      const items = document.querySelectorAll('#menuList li');
+      items.forEach(li => {
+        const text = li.innerText.toLowerCase();
+        li.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
