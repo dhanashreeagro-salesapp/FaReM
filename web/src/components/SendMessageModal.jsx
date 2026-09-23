@@ -118,8 +118,8 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-bg rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-stagger-in">
-        <div className="flex justify-between items-center p-4 border-b border-border bg-surface">
+      <div className="bg-bg rounded-xl shadow-xl w-full max-w-lg overflow-visible animate-stagger-in">
+        <div className="flex justify-between items-center p-4 border-b border-border bg-surface rounded-t-xl">
           <h3 className="font-heading font-semibold text-text">Send Message ({farmerIds.length} farmers)</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text"><X size={18} /></button>
         </div>

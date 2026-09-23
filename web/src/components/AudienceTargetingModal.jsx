@@ -28,12 +28,13 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        const [terrData, cropData, villData, distData, talData] = await Promise.all([
+        const [terrData, cropData, villData, distData, talData, dashData] = await Promise.all([
           api.getTerritories().catch(() => []),
           api.getCrops().catch(() => []),
           api.getVillages().catch(() => []),
           api.getDistricts().catch(() => []),
-          api.getTalukas().catch(() => [])
+          api.getTalukas().catch(() => []),
+          api.getDashboard().catch(() => null)
         ]);
         const tList = terrData?.results || terrData || [];
         
@@ -45,7 +46,13 @@ export default function AudienceTargetingModal({ onClose, onAudienceSelected }) 
         }
         setTerritories(filteredTerritories);
 
-        setCrops(cropData?.results || cropData || []);
+        let allCrops = cropData?.results || cropData || [];
+        if (dashData && dashData.crop_stage_breakup) {
+          const activeCropNames = Object.keys(dashData.crop_stage_breakup);
+          allCrops = allCrops.filter(c => activeCropNames.includes(c.crop_name));
+        }
+        allCrops.sort((a,b) => a.crop_name.localeCompare(b.crop_name));
+        setCrops(allCrops);
         setAvailableVillages(villData || []);
         setAvailableDistricts(distData || []);
         setAvailableTalukas(talData || []);

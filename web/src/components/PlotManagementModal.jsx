@@ -65,7 +65,11 @@ export default function PlotManagementModal({ farmer, onClose }) {
 
   useEffect(() => {
     fetchPlots();
-    api.getCrops().then(d => setCrops(Array.isArray(d) ? d : d.results || [])).catch(() => {});
+    api.getCrops().then(d => {
+      const arr = Array.isArray(d) ? d : d.results || [];
+      arr.sort((a, b) => a.crop_name.localeCompare(b.crop_name));
+      setCrops(arr);
+    }).catch(() => {});
   }, [farmer.id]);
 
   useEffect(() => {
@@ -104,6 +108,7 @@ export default function PlotManagementModal({ farmer, onClose }) {
 
   const handleSavePlot = async (e) => {
     e.preventDefault();
+    if (loading) return;
     if (polygonPoints.length < 3) {
       alert("Please select at least 3 points on the map to define the plot area.");
       return;
@@ -113,6 +118,7 @@ export default function PlotManagementModal({ farmer, onClose }) {
     coords.push(`${polygonPoints[0][1]} ${polygonPoints[0][0]}`);
     const wkt = `POLYGON((${coords.join(', ')}))`;
 
+    setLoading(true);
     try {
       await api.createPlot({
         farmer: farmer.id,
@@ -129,6 +135,8 @@ export default function PlotManagementModal({ farmer, onClose }) {
       fetchPlots();
     } catch (e) {
       alert(e.error || 'Failed to save plot');
+    } finally {
+      setLoading(false);
     }
   };
 
