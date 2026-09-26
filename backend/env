@@ -1,6 +1,6 @@
 DEBUG=True
 SECRET_KEY=your-secure-django-secret-key
-DATABASE_URL=postgresql://postgres.gfsladmfnhnglbftabkh:FuAkZCd5Jl4WQe4e@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres:FuAkZCd5Jl4WQe4e@db.uchvfrueeifbbdnzakpb.supabase.co:5432/postgres
 REDIS_URL=memory://
 MSG91_AUTH_KEY=your-msg91-key
 INTERAKT_API_KEY=your-interakt-key
