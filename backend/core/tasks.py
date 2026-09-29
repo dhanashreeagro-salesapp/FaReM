@@ -384,6 +384,10 @@ def commit_user_import(import_job_id):
     expected_columns = ['Employee ID', 'FullName', 'PrimaryMobile', 'Designation', 'Territory', 'Email']
     df = normalize_dataframe_headers(df, expected_columns)
     
+    # Drop in-file duplicates, keeping the last occurrence
+    if 'PrimaryMobile' in df.columns:
+        df = df.drop_duplicates(subset=['PrimaryMobile'], keep='last')
+        
     created_count = 0
     updated_count = 0
 
@@ -469,6 +473,7 @@ def commit_user_import(import_job_id):
                     user.reporting_manager = territory.parent_territory.manager
                 
                 users_to_create.append(user)
+                existing_users[mobile] = user  # Prevent UniqueViolation if mobile is repeated in same file
                 created_count += 1
         except:
             continue
