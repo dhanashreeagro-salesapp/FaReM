@@ -34,8 +34,27 @@ class CropMasterSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.FILES and 'reference_image' in request.FILES:
             file_obj = request.FILES['reference_image']
-            encoded = base64.b64encode(file_obj.read()).decode('utf-8')
-            mime_type = getattr(file_obj, 'content_type', 'image/jpeg')
+            
+            try:
+                from PIL import Image
+                from io import BytesIO
+                
+                img = Image.open(file_obj)
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                    
+                img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                
+                buffer = BytesIO()
+                img.save(buffer, format="JPEG", quality=70, optimize=True)
+                compressed_data = buffer.getvalue()
+                
+                encoded = base64.b64encode(compressed_data).decode('utf-8')
+                mime_type = 'image/jpeg'
+            except Exception:
+                file_obj.seek(0)
+                encoded = base64.b64encode(file_obj.read()).decode('utf-8')
+                mime_type = getattr(file_obj, 'content_type', 'image/jpeg')
             
             # Avoid QueryDict.copy() deepcopy crash for TemporaryUploadedFiles (>2.5MB)
             if hasattr(data, 'dict'):
