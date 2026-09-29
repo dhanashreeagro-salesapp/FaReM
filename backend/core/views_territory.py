@@ -23,54 +23,50 @@ class TerritoryViewSet(viewsets.ModelViewSet):
         return Territory.objects.all().select_related('parent_territory', 'manager')
 
     def list(self, request, *args, **kwargs):
-        # Fetch all territories
-        queryset = self.filter_queryset(self.get_queryset())
-        territories = list(queryset)
-        
-        # Build in-memory map for sub-territories and farmer counts to avoid N+1
-        from django.db.models import Count
-        from .models import Farmer
-        
-        # 1. Base counts per territory (1 query)
-        farmer_counts_direct = dict(
-            Territory.objects.annotate(fc=Count('farmers')).values_list('id', 'fc')
-        )
-        
-        # 2. Build parent-child mapping
-        children_map = {t.id: [] for t in territories}
-        for t in territories:
-            if t.parent_territory_id:
-                if t.parent_territory_id in children_map:
-                    children_map[t.parent_territory_id].append(t)
-        
-        # 3. Calculate recursive farmer counts bottom-up or memoized
-        def get_recursive_count(tid, memo):
-            if tid in memo:
-                return memo[tid]
-            total = farmer_counts_direct.get(tid, 0)
-            for child in children_map.get(tid, []):
-                total += get_recursive_count(child.id, memo)
-            memo[tid] = total
-            return total
+        try:
+            # Fetch all territories
+            queryset = self.filter_queryset(self.get_queryset())
+            territories = list(queryset)
             
-        memoized_counts = {}
-        for t in territories:
-            get_recursive_count(t.id, memoized_counts)
+            # Build in-memory map for sub-territories and farmer counts to avoid N+1
+            from django.db.models import Count
+            from .models import Farmer
             
-        # 4. Prefetch children manually onto objects so serializer doesn't hit DB
-        for t in territories:
-            # We mock the related manager so `.all()` returns our memory list without queries
-            # A simple way is to pass the children map in the serializer context
-            pass
+            # 1. Base counts per territory (1 query)
+            farmer_counts_direct = dict(
+                Territory.objects.annotate(fc=Count('farmers')).values_list('id', 'fc')
+            )
             
-        # Instead of mocking related manager which is hard, we just pass the counts
-        # and let the serializer use context to fetch children
-        context = self.get_serializer_context()
-        context['farmer_counts'] = memoized_counts
-        context['children_map'] = children_map
-        
-        serializer = self.get_serializer(territories, many=True, context=context)
-        return Response(serializer.data)
+            # 2. Build parent-child mapping
+            children_map = {t.id: [] for t in territories}
+            for t in territories:
+                if t.parent_territory_id:
+                    if t.parent_territory_id in children_map:
+                        children_map[t.parent_territory_id].append(t)
+            
+            # 3. Calculate recursive farmer counts bottom-up or memoized
+            def get_recursive_count(tid, memo):
+                if tid in memo:
+                    return memo[tid]
+                total = farmer_counts_direct.get(tid, 0)
+                for child in children_map.get(tid, []):
+                    total += get_recursive_count(child.id, memo)
+                memo[tid] = total
+                return total
+                
+            memoized_counts = {}
+            for t in territories:
+                get_recursive_count(t.id, memoized_counts)
+                
+            context = self.get_serializer_context()
+            context['farmer_counts'] = memoized_counts
+            context['children_map'] = children_map
+            
+            serializer = self.get_serializer(territories, many=True, context=context)
+            return Response(serializer.data)
+        except Exception as e:
+            import traceback
+            return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=500)
 
     def perform_create(self, serializer):
         instance = serializer.save()
