@@ -43,7 +43,11 @@ def normalize_dataframe_headers(df, expected_columns):
                 break
 
     df = df.rename(columns=col_map)
-    df = df.dropna(how='all')
+    # Aggressively drop empty rows that excel sometimes generates
+    if 'FullName' in df.columns and 'PrimaryMobile' in df.columns:
+        df = df.dropna(subset=['FullName', 'PrimaryMobile'], how='all')
+    else:
+        df = df.dropna(how='all')
     return df
 
 
