@@ -536,20 +536,20 @@ export default function MarketIntelligence() {
       <div className="max-w-5xl mx-auto space-y-2">
         <div className="flex justify-between items-center mb-6">
             <div>
-                <h2 className="text-xl font-bold">Good Morning,</h2>
-                <h1 className="text-2xl font-bold text-text">{user?.first_name || 'User'} {user?.last_name || ''}</h1>
-                <p className="text-text-muted text-sm">{user?.role || 'Officer'}</p>
+                <h1 className="text-2xl font-bold text-text">Market Intelligence</h1>
             </div>
             <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2 text-xs text-text-muted bg-white px-3 py-1.5 rounded-full border border-border shadow-sm">
                     <Calendar size={14}/> {new Date().toLocaleString('en-GB', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-primary-hover transition-colors">
-                        <Upload size={14}/> Import Data
-                    </button>
-                    <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                </div>
+                {user?.role === 'Admin' && (
+                    <div className="flex gap-2">
+                        <button onClick={() => fileInputRef.current?.click()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-primary-hover transition-colors">
+                            <Upload size={14}/> Import Data
+                        </button>
+                        <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                    </div>
+                )}
             </div>
         </div>
         

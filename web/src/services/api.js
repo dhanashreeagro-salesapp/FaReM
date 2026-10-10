@@ -521,7 +521,7 @@ class ApiClient {
         let ytdFarmers = 0;
 
         farmers.forEach(f => {
-          const addedDate = new Date(f.date_added);
+          const addedDate = new Date(f.acquisition_date || f.date_added);
           if (addedDate >= firstDayThisMonth) thisMonthFarmers++;
           if (addedDate >= firstDayLastMonth && addedDate < firstDayThisMonth) lastMonthFarmers++;
           if (addedDate >= firstDayYTD) ytdFarmers++;

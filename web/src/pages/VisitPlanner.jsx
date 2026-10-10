@@ -102,8 +102,21 @@ export default function VisitPlanner() {
 
   const fetchFilters = async () => {
     try {
-      const [vData, cData, sData] = await Promise.all([
-        api.getVillages(),
+      const { getAll } = await import('../utils/db.js');
+      const localFarmers = await getAll('farmers');
+      
+      let vData = [];
+      if (localFarmers && localFarmers.length > 0) {
+        const vSet = new Set();
+        localFarmers.forEach(f => {
+          if (f.village) vSet.add(f.village);
+        });
+        vData = Array.from(vSet).map(v => ({ village: v })).sort((a, b) => a.village.localeCompare(b.village));
+      } else {
+        vData = await api.getVillages();
+      }
+
+      const [cData, sData] = await Promise.all([
         api.getCrops(),
         api.getCropStages()
       ]);

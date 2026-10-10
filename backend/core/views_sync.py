@@ -142,7 +142,7 @@ def downstream_sync_view(request):
         
     farmers = list(farmers_qs.values(
         'id', 'full_name', 'primary_mobile', 'village', 'taluka', 'district', 
-        'pin_code', 'state', 'assigned_staff_id', 'territory_id', 'date_added', 'status'
+        'pin_code', 'state', 'assigned_staff_id', 'territory_id', 'date_added', 'acquisition_date', 'status'
     ))
     
     farmer_ids = [f['id'] for f in farmers]

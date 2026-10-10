@@ -101,25 +101,20 @@ class DashboardAPIView(APIView):
         # We will retrieve total_visits later
         data['total_calls'] = CallLog.objects.filter(farmer_id__in=farmer_ids).count()
         
-        # Monthly / YTD farmer counts with robust fallback
+        # Monthly / YTD farmer counts using acquisition_date
         try:
-            dt_this_month = timezone.make_aware(datetime.datetime.combine(first_day_this_month, datetime.time.min))
-            dt_last_month_start = timezone.make_aware(datetime.datetime.combine(first_day_last_month, datetime.time.min))
-            dt_last_month_end = timezone.make_aware(datetime.datetime.combine(last_day_last_month, datetime.time.max))
-            dt_fy_start = timezone.make_aware(datetime.datetime.combine(fy_start, datetime.time.min))
-
             farmer_stats = Farmer.objects.filter(id__in=farmer_ids).aggregate(
-                this_month=Count('id', filter=Q(date_added__gte=dt_this_month)),
-                last_month=Count('id', filter=Q(date_added__gte=dt_last_month_start, date_added__lte=dt_last_month_end)),
-                ytd=Count('id', filter=Q(date_added__gte=dt_fy_start))
+                this_month=Count('id', filter=Q(acquisition_date__gte=first_day_this_month)),
+                last_month=Count('id', filter=Q(acquisition_date__gte=first_day_last_month, acquisition_date__lte=last_day_last_month)),
+                ytd=Count('id', filter=Q(acquisition_date__gte=fy_start))
             )
             data['this_month_farmers'] = farmer_stats['this_month'] or 0
             data['last_month_farmers'] = farmer_stats['last_month'] or 0
             data['ytd_farmers'] = farmer_stats['ytd'] or 0
         except Exception:
-            data['this_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_this_month).count()
-            data['last_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=first_day_last_month, date_added__date__lte=last_day_last_month).count()
-            data['ytd_farmers'] = Farmer.objects.filter(id__in=farmer_ids, date_added__date__gte=fy_start).count()
+            data['this_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, acquisition_date__gte=first_day_this_month).count()
+            data['last_month_farmers'] = Farmer.objects.filter(id__in=farmer_ids, acquisition_date__gte=first_day_last_month, acquisition_date__lte=last_day_last_month).count()
+            data['ytd_farmers'] = Farmer.objects.filter(id__in=farmer_ids, acquisition_date__gte=fy_start).count()
         
         # Breakdown by village
         village_data = Farmer.objects.filter(id__in=farmer_ids).exclude(village='').exclude(village__isnull=True).values('village').annotate(count=Count('id')).order_by('-count')[:5]
