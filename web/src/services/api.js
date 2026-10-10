@@ -61,24 +61,37 @@ class ApiClient {
     });
   }
 
-  async requestWithCache(endpoint, options = {}, cacheKey = null) {
+  async requestWithCache(endpoint, options = {}, cacheKey = null, ttlMs = 300000) {
     const userEmail = localStorage.getItem('ffma_email') || 'anon';
     const rawKey = cacheKey || endpoint;
     const key = `ffma_cache_${userEmail}_${rawKey}`;
+    const timeKey = `ffma_cache_time_${userEmail}_${rawKey}`;
     const cachedStr = localStorage.getItem(key);
+    const cachedTimeStr = localStorage.getItem(timeKey);
     
-    // Background fresh fetch to update cache silently
-    const networkPromise = this.request(endpoint, options).then(data => {
-      if (data) {
-        try {
-          localStorage.setItem(key, JSON.stringify(data));
-        } catch (e) { /* localstorage quota handler */ }
+    let isStale = true;
+    if (cachedStr && cachedTimeStr) {
+      const cachedTime = parseInt(cachedTimeStr, 10);
+      if (Date.now() - cachedTime < ttlMs) {
+        isStale = false; // Cache is fresh, skip background fetch
       }
-      return data;
-    }).catch(err => {
-      console.warn(`Background fetch failed for ${endpoint}:`, err);
-      return null;
-    });
+    }
+
+    let networkPromise = null;
+    if (isStale || !cachedStr) {
+      networkPromise = this.request(endpoint, options).then(data => {
+        if (data) {
+          try {
+            localStorage.setItem(key, JSON.stringify(data));
+            localStorage.setItem(timeKey, Date.now().toString());
+          } catch (e) { /* localstorage quota handler */ }
+        }
+        return data;
+      }).catch(err => {
+        console.warn(`Background fetch failed for ${endpoint}:`, err);
+        return null;
+      });
+    }
 
     if (cachedStr) {
       try {
@@ -86,10 +99,11 @@ class ApiClient {
         return cachedData;
       } catch (e) {
         localStorage.removeItem(key);
+        localStorage.removeItem(timeKey);
       }
     }
 
-    return await networkPromise;
+    return networkPromise ? await networkPromise : null;
   }
 
 
@@ -487,19 +501,66 @@ class ApiClient {
   rejectBulkSend(id) { return this.request(`/bulk-sends/${id}/reject/`, { method: 'POST' }); }
 
   async getDashboard(params = {}, options = {}) {
+    try {
+      const { getAll } = await import('../utils/db.js');
+      const farmers = await getAll('farmers');
+      
+      if (farmers && farmers.length > 0) {
+        const plots = await getAll('plots');
+        const crop_seasons = await getAll('crop_seasons');
+        const visits = await getAll('visits');
+        const calls = await getAll('calls');
+
+        const now = new Date();
+        const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const firstDayYTD = new Date(now.getFullYear(), 3, 1); // April 1st
+
+        let thisMonthFarmers = 0;
+        let lastMonthFarmers = 0;
+        let ytdFarmers = 0;
+
+        farmers.forEach(f => {
+          const addedDate = new Date(f.date_added);
+          if (addedDate >= firstDayThisMonth) thisMonthFarmers++;
+          if (addedDate >= firstDayLastMonth && addedDate < firstDayThisMonth) lastMonthFarmers++;
+          if (addedDate >= firstDayYTD) ytdFarmers++;
+        });
+
+        // Simple Top Villages
+        const villageCount = {};
+        farmers.forEach(f => {
+          if (f.village) villageCount[f.village] = (villageCount[f.village] || 0) + 1;
+        });
+        const topVillages = Object.keys(villageCount)
+          .map(v => ({ village: v, count: villageCount[v] }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        const res = {
+          total_farmers: farmers.length,
+          total_plots: plots.length,
+          active_crop_seasons: crop_seasons.length,
+          total_visits: visits.length,
+          total_calls: calls.length,
+          this_month_farmers: thisMonthFarmers,
+          last_month_farmers: lastMonthFarmers,
+          ytd_farmers: ytdFarmers,
+          top_villages: topVillages,
+          debug_trace: { source: 'local_indexeddb', db_total_farmers_all: farmers.length }
+        };
+
+        if (typeof window !== 'undefined') {
+          console.log('🔍 [DIAGNOSTIC TRACE] LOCAL getDashboard:', res);
+        }
+        return res;
+      }
+    } catch (e) {
+      console.warn('LocalDB dashboard fallback failed', e);
+    }
+
     const qs = new URLSearchParams(params).toString();
     const res = await this.request(`/dashboard/${qs ? `?${qs}` : ''}`, options);
-    if (typeof window !== 'undefined') {
-      console.log('🔍 [DIAGNOSTIC TRACE] API getDashboard Response:', {
-        url: `/dashboard/${qs ? `?${qs}` : ''}`,
-        received_total_farmers: res?.total_farmers,
-        received_total_plots: res?.total_plots,
-        received_active_crop_seasons: res?.active_crop_seasons,
-        received_total_visits: res?.total_visits,
-        received_total_calls: res?.total_calls,
-        debug_trace: res?.debug_trace
-      });
-    }
     return res;
   }
   getActiveCrops() {

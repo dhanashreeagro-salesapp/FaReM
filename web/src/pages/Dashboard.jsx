@@ -143,6 +143,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboard();
+    
+    const handleSync = () => fetchDashboard();
+    window.addEventListener('localdb-synced', handleSync);
+    return () => window.removeEventListener('localdb-synced', handleSync);
   }, [user?.email]);
 
   const handleOpenActiveCropsModal = async () => {

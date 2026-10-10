@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import FieldVisit, CallLog, Recommendation, RecommendationMessage, Farmer, Plot, User, SystemAuditLog
+from .models import FieldVisit, CallLog, Recommendation, RecommendationMessage, Farmer, Plot, User, SystemAuditLog, CropMaster, CropStage, CropSeason, MarketRate, Role
+from django.db.models import Q
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -113,3 +114,75 @@ def offline_batch_sync_view(request):
         "synced_recommendations": synced_recommendations,
         "errors": errors
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def downstream_sync_view(request):
+    """
+    Offline Delta Downstream Sync Endpoint.
+    Returns app data and user-specific data to populate the frontend IndexedDB.
+    """
+    user = request.user
+    
+    # App Data
+    crops = list(CropMaster.objects.filter(status='Active').values('id', 'crop_name', 'crop_category', 'reference_image'))
+    stages = list(CropStage.objects.values('id', 'crop_id', 'stage_name', 'sequence_number', 'days_from_previous_stage'))
+    
+    thirty_days_ago = timezone.now().date() - timezone.timedelta(days=30)
+    market_rates = list(MarketRate.objects.filter(date__gte=thirty_days_ago).values('id', 'crop_id', 'date', 'min_price', 'max_price', 'avg_price'))
+    
+    # User Data (Hierarchy-scoped)
+    farmers_qs = Farmer.objects.exclude(status__iexact='Inactive')
+    if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
+        team_users = user.get_team_users()
+        team_user_ids = [u.id for u in team_users]
+        q_filter = Q(assigned_staff_id__in=team_user_ids)
+        farmers_qs = farmers_qs.filter(q_filter)
+        
+    farmers = list(farmers_qs.values(
+        'id', 'full_name', 'primary_mobile', 'village', 'taluka', 'district', 
+        'pin_code', 'state', 'assigned_staff_id', 'territory_id', 'date_added', 'status'
+    ))
+    
+    farmer_ids = [f['id'] for f in farmers]
+    
+    plots = list(Plot.objects.filter(farmer_id__in=farmer_ids, is_active=True).values(
+        'id', 'farmer_id', 'plot_name', 'area_acres', 'soil_type', 'irrigation_source'
+    ))
+    
+    plot_ids = [p['id'] for p in plots]
+    
+    seasons = list(CropSeason.objects.filter(plot_id__in=plot_ids, status='Active').values(
+        'id', 'plot_id', 'crop_id', 'current_stage_id', 'sowing_date', 'area_acres'
+    ))
+    
+    visits = list(FieldVisit.objects.filter(farmer_id__in=farmer_ids).order_by('-created_at')[:1000].values(
+        'id', 'farmer_id', 'plot_id', 'staff_id', 'purpose', 'status', 'check_in_time'
+    ))
+    
+    calls = list(CallLog.objects.filter(farmer_id__in=farmer_ids).order_by('-call_time')[:1000].values(
+        'id', 'farmer_id', 'staff_id', 'direction', 'call_time', 'outcome', 'duration'
+    ))
+    
+    recommendations = list(Recommendation.objects.filter(farmer_id__in=farmer_ids).order_by('-timestamp')[:500].values(
+        'id', 'farmer_id', 'product_name', 'timestamp', 'priority', 'status', 'channel'
+    ))
+    
+    return Response({
+        "timestamp": timezone.now().isoformat(),
+        "app_data": {
+            "crops": crops,
+            "crop_stages": stages,
+            "market_rates": market_rates
+        },
+        "user_data": {
+            "farmers": farmers,
+            "plots": plots,
+            "crop_seasons": seasons,
+            "visits": visits,
+            "calls": calls,
+            "recommendations": recommendations
+        }
+    })
+

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import syncService from '../services/syncService';
+import { clearAllData } from '../utils/db';
 
 const AuthContext = createContext(null);
 
@@ -17,6 +19,7 @@ export function AuthProvider({ children }) {
 
       if (token && role) {
         setUser({ role, full_name: fullName || '', email: email || '', territory_name: territoryName || '' });
+        syncService.startSync(); // Start background sync if already authenticated
         try {
           const meData = await api.getMe();
           if (meData && meData.role) {
@@ -37,6 +40,8 @@ export function AuthProvider({ children }) {
             localStorage.removeItem('ffma_full_name');
             localStorage.removeItem('ffma_email');
             localStorage.removeItem('ffma_territory_name');
+            syncService.stopSync();
+            clearAllData().catch(console.error);
             setUser(null);
           }
         }
@@ -60,6 +65,8 @@ export function AuthProvider({ children }) {
       email: data.email || email,
       territory_name: data.territory_name || ''
     });
+    
+    syncService.startSync(); // Start sync on login
     return data;
   };
 
@@ -69,6 +76,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('ffma_full_name');
     localStorage.removeItem('ffma_email');
     localStorage.removeItem('ffma_territory_name');
+    syncService.stopSync();
+    clearAllData().catch(console.error); // Clear local DB on logout
     setUser(null);
   };
 

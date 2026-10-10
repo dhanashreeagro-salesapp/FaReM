@@ -69,6 +69,7 @@ urlpatterns = [
     path('config/', views_config.AppConfigurationView.as_view(), name='app_config'),
     path('farmers/<uuid:farmer_id>/timeline/', views_timeline.farmer_timeline_view, name='farmer_timeline'),
     path('sync/offline_batch/', views_sync.offline_batch_sync_view, name='offline_batch_sync'),
+    path('sync/downstream/', views_sync.downstream_sync_view, name='downstream_sync'),
     path('field-visits/', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('field-visits', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),
     path('field_visits/', views_visit.FieldVisitViewSet.as_view({'get': 'list', 'post': 'create'})),

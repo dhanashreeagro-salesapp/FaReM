@@ -90,6 +90,12 @@ def validate_farmer_import(import_job_id):
 
     df['Import Status'] = 'SUCCESS'
 
+    existing_mobiles = set(Farmer.objects.values_list('primary_mobile', flat=True))
+    all_users = User.objects.all()
+    user_mobile_map = {u.mobile_number: u for u in all_users if u.mobile_number}
+    user_email_map = {u.email.lower(): u for u in all_users if u.email}
+    user_username_map = {u.username.lower(): u for u in all_users if u.username}
+
     for index, row in df.iterrows():
         try:
             raw_mobile = str(row['PrimaryMobile']).split('.')[0].strip()
@@ -104,19 +110,18 @@ def validate_farmer_import(import_job_id):
                 raise ValueError(f"Invalid PrimaryMobile format: {raw_mobile}")
 
             # Check for duplicates in DB
-            from .models import Farmer
-            if Farmer.objects.filter(primary_mobile=primary_mobile).exists():
+            if primary_mobile in existing_mobiles:
                 duplicate_count += 1
                 if df.at[index, 'Import Status'] == 'SUCCESS':
                     df.at[index, 'Import Status'] = 'DUPLICATE (Will be updated)'
             
             # Resolve Staff (by mobile, email, or username)
             if staff_val:
-                staff_user = User.objects.filter(mobile_number=staff_val).first()
+                staff_user = user_mobile_map.get(staff_val)
                 if not staff_user:
-                    staff_user = User.objects.filter(email__iexact=staff_val).first()
+                    staff_user = user_email_map.get(staff_val.lower())
                 if not staff_user:
-                    staff_user = User.objects.filter(username__iexact=staff_val).first()
+                    staff_user = user_username_map.get(staff_val.lower())
                 if not staff_user:
                     # Fallback to job.created_by if assigned staff not found
                     pass
@@ -160,6 +165,27 @@ def commit_farmer_import(import_job_id):
     created_count = 0
     updated_count = 0
 
+    all_users = User.objects.all()
+    user_mobile_map = {u.mobile_number: u for u in all_users if u.mobile_number}
+    user_email_map = {u.email.lower(): u for u in all_users if u.email}
+    user_username_map = {u.username.lower(): u for u in all_users if u.username}
+    user_first_last_map = {}
+    user_first_map = {}
+    user_last_map = {}
+    for u in all_users:
+        if u.first_name and u.last_name:
+            user_first_last_map[(u.first_name.lower(), u.last_name.lower())] = u
+        if u.first_name:
+            user_first_map[u.first_name.lower()] = u
+        if u.last_name:
+            user_last_map[u.last_name.lower()] = u
+
+    all_territories = Territory.objects.all()
+    territory_name_map = {t.name.lower(): t for t in all_territories if t.name}
+
+    farmers_to_upsert_dict = {}
+    from django.utils import timezone
+
     for index, row in df.iterrows():
         try:
             full_name = str(row['FullName']).strip()
@@ -180,21 +206,22 @@ def commit_farmer_import(import_job_id):
             
             assigned_staff_user = None
             if staff_val:
+                staff_val_lower = staff_val.lower()
                 digits_only = re.sub(r'\D', '', staff_val)[-10:]
                 if digits_only and len(digits_only) == 10:
-                    assigned_staff_user = User.objects.filter(mobile_number=digits_only).first()
+                    assigned_staff_user = user_mobile_map.get(digits_only)
                 if not assigned_staff_user:
-                    assigned_staff_user = User.objects.filter(email__iexact=staff_val).first()
+                    assigned_staff_user = user_email_map.get(staff_val_lower)
                 if not assigned_staff_user:
-                    assigned_staff_user = User.objects.filter(username__iexact=staff_val).first()
+                    assigned_staff_user = user_username_map.get(staff_val_lower)
                 if not assigned_staff_user:
                     parts = staff_val.split()
                     if len(parts) >= 2:
-                        assigned_staff_user = User.objects.filter(first_name__iexact=parts[0], last_name__iexact=parts[-1]).first()
+                        assigned_staff_user = user_first_last_map.get((parts[0].lower(), parts[-1].lower()))
                 if not assigned_staff_user:
-                    assigned_staff_user = User.objects.filter(first_name__icontains=staff_val).first()
+                    assigned_staff_user = user_first_map.get(staff_val_lower)
                 if not assigned_staff_user:
-                    assigned_staff_user = User.objects.filter(last_name__icontains=staff_val).first()
+                    assigned_staff_user = user_last_map.get(staff_val_lower)
 
             if not assigned_staff_user:
                 assigned_staff_user = job.created_by
@@ -203,8 +230,8 @@ def commit_farmer_import(import_job_id):
             territory_obj = None
             terr_raw = row.get('Territory')
             if pd.notna(terr_raw) and str(terr_raw).strip():
-                terr_name = str(terr_raw).strip()
-                territory_obj = Territory.objects.filter(name__iexact=terr_name).first()
+                terr_name = str(terr_raw).strip().lower()
+                territory_obj = territory_name_map.get(terr_name)
 
             if not territory_obj and assigned_staff_user and assigned_staff_user.territory:
                 territory_obj = assigned_staff_user.territory
@@ -214,11 +241,10 @@ def commit_farmer_import(import_job_id):
 
             if not territory_obj:
                 if village:
-                    territory_obj = Territory.objects.filter(name__iexact=village).first()
+                    territory_obj = territory_name_map.get(village.lower())
                 if not territory_obj and district:
-                    territory_obj = Territory.objects.filter(name__iexact=district).first()
+                    territory_obj = territory_name_map.get(district.lower())
 
-            from django.utils import timezone
             source = str(row.get('Source', '')).strip() if pd.notna(row.get('Source')) else ''
             if source == 'nan' or not source:
                 source = 'BulkImport'
@@ -232,30 +258,32 @@ def commit_farmer_import(import_job_id):
                 except:
                     acquisition_date = timezone.now().date()
 
-            assigned_staff = assigned_staff_user
-            
-            farmer, created = Farmer.objects.update_or_create(
+            farmers_to_upsert_dict[primary_mobile] = Farmer(
                 primary_mobile=primary_mobile,
-                defaults={
-                    'full_name': full_name,
-                    'village': village,
-                    'taluka': taluka,
-                    'district': district,
-                    'state': state,
-                    'pin_code': pin_code,
-                    'assigned_staff': assigned_staff,
-                    'source': source,
-                    'acquisition_date': acquisition_date,
-                    'territory': territory_obj
-                }
+                full_name=full_name,
+                village=village,
+                taluka=taluka,
+                district=district,
+                state=state,
+                pin_code=pin_code,
+                assigned_staff=assigned_staff_user,
+                source=source,
+                acquisition_date=acquisition_date,
+                territory=territory_obj
             )
-
-            if created:
-                created_count += 1
-            else:
-                updated_count += 1
+            
+            created_count += 1
         except Exception as e:
             continue
+
+    if farmers_to_upsert_dict:
+        Farmer.objects.bulk_create(
+            list(farmers_to_upsert_dict.values()),
+            batch_size=1000,
+            update_conflicts=True,
+            unique_fields=['primary_mobile'],
+            update_fields=['full_name', 'village', 'taluka', 'district', 'state', 'pin_code', 'assigned_staff', 'source', 'acquisition_date', 'territory']
+        )
 
     job.status = 'Completed'
     job.save()
