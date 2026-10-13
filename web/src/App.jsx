@@ -18,6 +18,7 @@ import MarketIntelligence from './pages/MarketIntelligence';
 import CommodityMapping from './pages/CommodityMapping';
 import DataDebug from './pages/DataDebug';
 import FrontendDataDiagnostic from './pages/FrontendDataDiagnostic';
+import CropIntelligence from './pages/CropIntelligence';
 
 
 import { MapPin, Menu, HelpCircle } from 'lucide-react';
@@ -105,6 +106,7 @@ function ProtectedLayout() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/data-debug" element={<DataDebug />} />
             <Route path="/frontend-diagnostic" element={<FrontendDataDiagnostic />} />
+            <Route path="/crop-intelligence" element={<CropIntelligence />} />
           </Routes>
         </main>
       </div>

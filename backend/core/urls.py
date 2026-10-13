@@ -22,6 +22,7 @@ from . import views_timeline
 from . import views_sync
 from . import views_market
 from . import views_route
+from . import views_crop_intelligence
 
 router = DefaultRouter()
 router.register(r'route-corridors', views_route.RouteCorridorViewSet, basename='route-corridors')
@@ -79,6 +80,7 @@ urlpatterns = [
     path('market/snapshot/', views_market.MarketSnapshotView.as_view(), name='market_snapshot'),
     path('market/mappings/', views_market.CommodityMappingView.as_view(), name='market_mappings'),
     path('route/big-farmers/', views_route.BigFarmerDirectoryView.as_view(), name='big_farmers'),
+    path('crop-intelligence/', views_crop_intelligence.CropIntelligenceAPIView.as_view(), name='crop_intelligence'),
     path('', include(router.urls)),
 ]
 

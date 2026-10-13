@@ -667,6 +667,12 @@ class ApiClient {
     return this.request(`/farmers/all_ids/${qs ? `?${qs}` : ''}`);
   }
 
+  // Crop & Geography Intelligence
+  getCropIntelligence(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/crop-intelligence/${qs ? '?' + qs : ''}`);
+  }
+
   getStoredUser() {
     try {
       return JSON.parse(localStorage.getItem('user'));
