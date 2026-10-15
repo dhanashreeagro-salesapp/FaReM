@@ -80,6 +80,7 @@ class MarketDataImportView(views.APIView):
             
             records_created = 0
             failed_rows = 0
+            first_row_error = None
             
             # Map columns fuzzily to handle variable spaces/casing in headers
             header_map = {}
@@ -92,8 +93,9 @@ class MarketDataImportView(views.APIView):
                 elif 'low' in k_clean or 'min' in k_clean: header_map['low'] = k
                 elif 'high' in k_clean or 'max' in k_clean: header_map['high'] = k
 
-            first_row_error = None
-            for index, row in df.iterrows():
+            # Always persist batch progress even if an unexpected exception occurs mid-loop
+            try:
+                for index, row in df.iterrows():
                 try:
                     def get_clean_str(key):
                         val = row.get(header_map.get(key, '_miss_'))
@@ -111,10 +113,13 @@ class MarketDataImportView(views.APIView):
                         failed_rows += 1
                         continue
 
-                    # Parse Date
+                    # Parse Date — try multiple formats (dayfirst for Indian dd/mm/yyyy, fallback to ISO)
                     try:
                         if isinstance(date_val, str):
-                            parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
+                            try:
+                                parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
+                            except Exception:
+                                parsed_date = pd.to_datetime(date_val, dayfirst=False).date()
                         else:
                             parsed_date = pd.to_datetime(date_val).date()
                     except Exception as date_e:
@@ -176,28 +181,25 @@ class MarketDataImportView(views.APIView):
                     failed_rows += 1
                     continue
 
-            if records_created == 0:
-                batch.status = 'Failed'
+            finally:
+                # Always save batch progress — fixes the records_processed=0 counter bug
+                batch.records_processed = records_created
+                batch.status = 'Success' if records_created > 0 else 'Failed'
                 batch.save()
-                
+
+            if records_created == 0:
                 missing = [key for key in ['commodity', 'market', 'date', 'modal'] if key not in header_map]
                 error_msg = f"Failed to import any valid rows from a total of {len(df)} rows. "
                 if missing:
                     error_msg += f"Could not securely map required columns: {missing}. Found Excel columns: {list(df.columns)}. "
                 else:
-                    error_msg += f"Columns mapped successfully, but parsing failed natively. First internal error: [{first_row_error}]"
-                
+                    error_msg += f"Columns mapped successfully, but parsing failed. First error: [{first_row_error}]"
                 return Response({'error': error_msg}, status=400)
                 
-            batch.records_processed = records_created
-            batch.status = 'Success'
-            batch.save()
-            
-            # Explicitly return X of Y metric
             msg = f'Successfully processed {records_created} rows out of a total {len(df)} rows.'
             if failed_rows > 0:
-                msg += f' {failed_rows} rows were skipped due to errors. First error: {first_row_error}'
-            return Response({'message': msg, 'batch_id': batch.id})
+                msg += f' {failed_rows} rows were skipped. First skip reason: {first_row_error}'
+            return Response({'message': msg, 'batch_id': str(batch.id)})
             
         except Exception as e:
             import traceback

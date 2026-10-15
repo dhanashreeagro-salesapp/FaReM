@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Upload, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize, Sprout } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize, Sprout } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthProvider';
 
@@ -48,9 +48,6 @@ export default function MarketIntelligence() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedMarkets, setSelectedMarkets] = useState([]);
   const [timeScale, setTimeScale] = useState('2Y');
-  
-  const fileInputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchSnapshot();
@@ -95,20 +92,6 @@ export default function MarketIntelligence() {
       } finally {
           setDetailsLoading(false);
       }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    setUploading(true);
-    try {
-      const response = await api.importMarketData(file);
-      alert(response?.message || 'Market data imported successfully!');
-      fetchSnapshot();
-    } catch (error) {
-      alert('Failed to import market data: ' + (error.error || error.message || 'Unknown error'));
-    } finally {
-      setUploading(false); e.target.value = null;
-    }
   };
 
   const toggleMarket = (market) => {
@@ -538,21 +521,9 @@ export default function MarketIntelligence() {
             <div>
                 <h1 className="text-2xl font-bold text-text">Market Intelligence</h1>
             </div>
-            <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2 text-xs text-text-muted bg-white px-3 py-1.5 rounded-full border border-border shadow-sm">
-                    <Calendar size={14}/> {new Date().toLocaleString('en-GB', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
-                </div>
-                {user?.role === 'Admin' && (
-                    <div className="flex gap-2">
-                        <button onClick={() => fileInputRef.current?.click()} className="text-xs bg-primary text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-primary-hover transition-colors">
-                            <Upload size={14}/> Import Data
-                        </button>
-                        <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                    </div>
-                )}
-            </div>
         </div>
         
+
         {renderMyCrops()}
         {renderMarketIntelligenceSelector()}
         {renderChart()}

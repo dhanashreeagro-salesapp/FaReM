@@ -138,7 +138,7 @@ class DashboardAPIView(APIView):
 
         data['overdue_visits'] = overdue_count
         
-        from .models import Plot, CropSeason, CropStage, MarketRate
+        from .models import Plot, CropSeason, CropStage
         from collections import defaultdict
 
         data['total_plots'] = Plot.objects.filter(farmer_id__in=farmer_ids, is_active=True).count()
@@ -194,47 +194,78 @@ class DashboardAPIView(APIView):
         
         data['crop_stage_breakup'] = stage_breakup
 
-        # Market Trends logic - single time-bounded bulk fetch
+        # ------------------------------------------------------------------ #
+        # Market Trends — reads from MarketPriceRecord (populated by imports).
+        # Bug fix: previously read from the always-empty MarketRate table.
+        # Trend is anchored to each crop's own latest date (not today's date),
+        # so data always shows even when imports lag by days or weeks.
+        # ------------------------------------------------------------------ #
         market_trends = []
         if active_crop_ids:
-            thirty_days_ago = today_date - datetime.timedelta(days=30)
-            rates_by_crop = defaultdict(list)
-            
-            recent_rates = MarketRate.objects.filter(
-                crop_id__in=active_crop_ids, date__gte=thirty_days_ago
-            ).select_related('crop').order_by('-date')
-            
-            for rate in recent_rates:
-                if len(rates_by_crop[rate.crop_id]) < 3:
-                    rates_by_crop[rate.crop_id].append(rate)
+            from .models import MarketPriceRecord, CropMaster
+            from django.db.models import Max, Avg
 
-            for crop_id, rates in rates_by_crop.items():
-                if rates:
-                    latest = rates[0]
-                    trend = 'FLAT'
-                    percentage_change = 0.0
-                    
-                    prev = None
-                    if len(rates) == 3:
-                        prev = rates[2]
-                    elif len(rates) == 2:
-                        prev = rates[1]
-                        
-                    if prev and prev.avg_price and latest.avg_price and prev.avg_price > 0:
-                        if latest.avg_price > prev.avg_price:
-                            trend = 'UP'
-                            percentage_change = float(((latest.avg_price - prev.avg_price) / prev.avg_price) * 100)
-                        elif latest.avg_price < prev.avg_price:
-                            trend = 'DOWN'
-                            percentage_change = float(((prev.avg_price - latest.avg_price) / prev.avg_price) * 100)
+            # Crop name lookup — one query
+            crop_name_map = dict(
+                CropMaster.objects.filter(id__in=active_crop_ids).values_list('id', 'crop_name')
+            )
 
-                    market_trends.append({
-                        'crop_name': latest.crop.crop_name,
-                        'latest_price': float(latest.avg_price) if latest.avg_price else 0,
-                        'date': latest.date.isoformat(),
-                        'trend': trend,
-                        'percentage_change': round(percentage_change, 2)
-                    })
+            # Latest date available per crop across all markets — one query
+            latest_dates_qs = (
+                MarketPriceRecord.objects
+                .filter(crop_id__in=active_crop_ids)
+                .values('crop_id')
+                .annotate(latest_date=Max('date'))
+            )
+
+            for entry in latest_dates_qs:
+                crop_id = entry['crop_id']
+                latest_date = entry['latest_date']
+                crop_name = crop_name_map.get(crop_id)
+                if not latest_date or not crop_name:
+                    continue
+
+                # Average modal price on the latest available date across all markets
+                latest_avg = (
+                    MarketPriceRecord.objects
+                    .filter(crop_id=crop_id, date=latest_date)
+                    .aggregate(avg=Avg('modal_price'))
+                )['avg']
+                if not latest_avg:
+                    continue
+
+                # Compare to ~30 days prior (±5-day tolerance window)
+                prior_target = latest_date - datetime.timedelta(days=30)
+                prior_avg = (
+                    MarketPriceRecord.objects
+                    .filter(
+                        crop_id=crop_id,
+                        date__range=[
+                            prior_target - datetime.timedelta(days=5),
+                            prior_target + datetime.timedelta(days=5),
+                        ]
+                    )
+                    .aggregate(avg=Avg('modal_price'))
+                )['avg']
+
+                trend = 'FLAT'
+                percentage_change = 0.0
+                if prior_avg and float(prior_avg) > 0:
+                    diff = float(latest_avg) - float(prior_avg)
+                    percentage_change = round(abs((diff / float(prior_avg)) * 100), 2)
+                    if diff > 0:
+                        trend = 'UP'
+                    elif diff < 0:
+                        trend = 'DOWN'
+
+                market_trends.append({
+                    'crop_name': crop_name,
+                    'latest_price': round(float(latest_avg), 2),
+                    'date': latest_date.isoformat(),
+                    'trend': trend,
+                    'percentage_change': percentage_change,
+                })
+
         data['market_trends'] = market_trends
 
         return Response(data)
