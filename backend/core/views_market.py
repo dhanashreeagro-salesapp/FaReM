@@ -44,6 +44,8 @@ class CommodityMappingView(views.APIView):
             
             # Retroactively link historically unmapped records
             MarketPriceRecord.objects.filter(commodity_name=mapping.commodity_name, crop__isnull=True).update(crop=crop)
+            from core.market_trends import invalidate_market_cache
+            invalidate_market_cache()
             
             return Response({'message': 'Commodity successfully linked to Crop'})
         except Exception as e:
@@ -93,94 +95,121 @@ class MarketDataImportView(views.APIView):
                 elif 'low' in k_clean or 'min' in k_clean: header_map['low'] = k
                 elif 'high' in k_clean or 'max' in k_clean: header_map['high'] = k
 
+            # Perf: pre-load crop + mapping lookups once (was 1-3 queries per row)
+            crop_by_name = {}
+            for c in CropMaster.objects.only('id', 'crop_name'):
+                crop_by_name.setdefault((c.crop_name or '').strip().lower(), c)
+            mapping_by_name = {}
+            for m in CommodityMapping.objects.select_related('crop').only('id', 'commodity_name', 'crop__id', 'crop__crop_name'):
+                mapping_by_name.setdefault((m.commodity_name or '').strip().lower(), m)
+            new_mapping_names = {}
+            # Deduplicate by unique key (last row wins, matching update_or_create semantics)
+            pending = {}
+
             # Always persist batch progress even if an unexpected exception occurs mid-loop
             try:
                 for index, row in df.iterrows():
-                try:
-                    def get_clean_str(key):
-                        val = row.get(header_map.get(key, '_miss_'))
-                        return '' if pd.isna(val) else str(val).strip()
-                    
-                    commodity_name = get_clean_str('commodity')
-                    market_name = get_clean_str('market')
-                    date_val = row.get(header_map.get('date', '_miss_'))
-                    modal_price = row.get(header_map.get('modal', '_miss_'))
-
-                    # Check required fields
-                    if not commodity_name or commodity_name.lower() == 'nan' or commodity_name == 'None' or not market_name or market_name.lower() == 'nan' or market_name == 'None' or pd.isna(date_val) or pd.isna(modal_price):
-                        if not first_row_error:
-                            first_row_error = f"Row {index+1} missing required data: commodity='{commodity_name}', market='{market_name}', date='{date_val}', modal_price='{modal_price}'"
-                        failed_rows += 1
-                        continue
-
-                    # Parse Date — try multiple formats (dayfirst for Indian dd/mm/yyyy, fallback to ISO)
                     try:
-                        if isinstance(date_val, str):
-                            try:
-                                parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
-                            except Exception:
-                                parsed_date = pd.to_datetime(date_val, dayfirst=False).date()
-                        else:
-                            parsed_date = pd.to_datetime(date_val).date()
-                    except Exception as date_e:
-                        if not first_row_error: first_row_error = f"Row {index+1} invalid date format: '{date_val}' (Error: {str(date_e)})"
-                        failed_rows += 1
-                        continue
-
-                    # Parse Prices securely (handling commas and spaces)
-                    def parse_price(val):
-                        if pd.isna(val) or str(val).strip().lower() == 'nan' or str(val) == '_miss_': return None
-                        try:
-                            # Strip commas and any whitespace
-                            import re
-                            val_str = str(val).replace(',', '').strip()
-                            match = re.search(r'[-+]?\d*\.\d+|\d+', val_str)
-                            if match:
-                                return float(match.group())
-                            return None
-                        except: return None
+                        def get_clean_str(key):
+                            val = row.get(header_map.get(key, '_miss_'))
+                            return '' if pd.isna(val) else str(val).strip()
                         
-                    m_price = parse_price(modal_price)
-                    if m_price is None:
-                        if not first_row_error: first_row_error = f"Row {index+1} invalid numeric format for modal price: '{modal_price}'"
+                        commodity_name = get_clean_str('commodity')
+                        market_name = get_clean_str('market')
+                        date_val = row.get(header_map.get('date', '_miss_'))
+                        modal_price = row.get(header_map.get('modal', '_miss_'))
+
+                        # Check required fields
+                        if not commodity_name or commodity_name.lower() == 'nan' or commodity_name == 'None' or not market_name or market_name.lower() == 'nan' or market_name == 'None' or pd.isna(date_val) or pd.isna(modal_price):
+                            if not first_row_error:
+                                first_row_error = f"Row {index+1} missing required data: commodity='{commodity_name}', market='{market_name}', date='{date_val}', modal_price='{modal_price}'"
+                            failed_rows += 1
+                            continue
+
+                        # Parse Date — try multiple formats (dayfirst for Indian dd/mm/yyyy, fallback to ISO)
+                        try:
+                            if isinstance(date_val, str):
+                                try:
+                                    parsed_date = pd.to_datetime(date_val, dayfirst=True).date()
+                                except Exception:
+                                    parsed_date = pd.to_datetime(date_val, dayfirst=False).date()
+                            else:
+                                parsed_date = pd.to_datetime(date_val).date()
+                        except Exception as date_e:
+                            if not first_row_error: first_row_error = f"Row {index+1} invalid date format: '{date_val}' (Error: {str(date_e)})"
+                            failed_rows += 1
+                            continue
+
+                        # Parse Prices securely (handling commas and spaces)
+                        def parse_price(val):
+                            if pd.isna(val) or str(val).strip().lower() == 'nan' or str(val) == '_miss_': return None
+                            try:
+                                import re
+                                val_str = str(val).replace(',', '').strip()
+                                match = re.search(r'[-+]?\d*\.\d+|\d+', val_str)
+                                if match:
+                                    return float(match.group())
+                                return None
+                            except: return None
+                            
+                        m_price = parse_price(modal_price)
+                        if m_price is None:
+                            if not first_row_error: first_row_error = f"Row {index+1} invalid numeric format for modal price: '{modal_price}'"
+                            failed_rows += 1
+                            continue
+
+                        # Match crop restrictively (no auto-creation)
+                        crop_name_stripped = commodity_name.strip()
+                        name_key = crop_name_stripped.lower()
+                        crop = crop_by_name.get(name_key)
+                        
+                        if not crop:
+                            # Fallback to CommodityMapping rationalization
+                            mapping = mapping_by_name.get(name_key)
+                            if mapping and mapping.crop:
+                                crop = mapping.crop
+                            elif not mapping:
+                                # Queue unmapped placeholder for Admin rationalization screen
+                                new_mapping_names.setdefault(name_key, crop_name_stripped)
+                                
+                        pending[(parsed_date, market_name, crop_name_stripped)] = MarketPriceRecord(
+                            date=parsed_date,
+                            market_name=market_name,
+                            commodity_name=crop_name_stripped,
+                            import_batch=batch,
+                            crop=crop,
+                            modal_price=m_price,
+                            min_price=parse_price(row.get(header_map.get('low', '_miss_'))),
+                            max_price=parse_price(row.get(header_map.get('high', '_miss_'))),
+                        )
+                    except Exception as row_e:
+                        if not first_row_error: first_row_error = f"Row {index+1} database insertion failure: {str(row_e)}"
                         failed_rows += 1
                         continue
 
-                    # Match crop restrictively (no auto-creation)
-                    crop_name_stripped = commodity_name.strip()
-                    crop = CropMaster.objects.filter(crop_name__iexact=crop_name_stripped).first()
-                    
-                    if not crop:
-                        # Fallback to CommodityMapping rationalization
-                        mapping = CommodityMapping.objects.filter(commodity_name__iexact=crop_name_stripped).first()
-                        if mapping and mapping.crop:
-                            crop = mapping.crop
-                        elif not mapping:
-                            # Create unmapped placeholder for Admin rationalization screen
-                            try:
-                                CommodityMapping.objects.create(commodity_name=crop_name_stripped)
-                            except Exception: # In case of concurrent duplicates
-                                pass
-                            
-                    
-                    MarketPriceRecord.objects.update_or_create(
-                        date=parsed_date,
-                        market_name=market_name,
-                        commodity_name=crop_name_stripped,
-                        defaults={
-                            'import_batch': batch,
-                            'crop': crop,
-                            'modal_price': m_price,
-                            'min_price': parse_price(row.get(header_map.get('low', '_miss_'))),
-                            'max_price': parse_price(row.get(header_map.get('high', '_miss_'))),
-                        }
+                # Bulk write: create placeholders, then upsert all records
+                if new_mapping_names:
+                    CommodityMapping.objects.bulk_create(
+                        [CommodityMapping(commodity_name=n) for n in new_mapping_names.values()],
+                        ignore_conflicts=True,
                     )
-                    records_created += 1
-                except Exception as row_e:
-                    if not first_row_error: first_row_error = f"Row {index+1} database insertion failure: {str(row_e)}"
-                    failed_rows += 1
-                    continue
-
+                if pending:
+                    from django.db import transaction
+                    with transaction.atomic():
+                        MarketPriceRecord.objects.bulk_create(
+                            list(pending.values()),
+                            batch_size=1000,
+                            update_conflicts=True,
+                            unique_fields=['date', 'market_name', 'commodity_name'],
+                            update_fields=['import_batch', 'crop', 'modal_price', 'min_price', 'max_price'],
+                        )
+                    records_created = len(pending)
+                    from core.market_trends import invalidate_market_cache
+                    invalidate_market_cache()
+            except Exception as bulk_e:
+                if not first_row_error:
+                    first_row_error = f"Bulk database write failure: {str(bulk_e)}"
+                records_created = 0
             finally:
                 # Always save batch progress — fixes the records_processed=0 counter bug
                 batch.records_processed = records_created
@@ -199,7 +228,12 @@ class MarketDataImportView(views.APIView):
             msg = f'Successfully processed {records_created} rows out of a total {len(df)} rows.'
             if failed_rows > 0:
                 msg += f' {failed_rows} rows were skipped. First skip reason: {first_row_error}'
-            return Response({'message': msg, 'batch_id': str(batch.id)})
+            return Response({
+                'message': msg,
+                'batch_id': str(batch.id),
+                'records_imported': records_created,
+                'failed_rows': failed_rows,
+            })
             
         except Exception as e:
             import traceback
@@ -272,10 +306,12 @@ class MarketSnapshotView(views.APIView):
                 portfolio_crops.append({'crop_id': str(item['crop_id']), 'crop_name': item['crop__crop_name'], 'reference_image': img_url, 'total_acres': float(item['total_acres'])})
                 seen_crop_ids.add(item['crop_id'])
                 
-        other_mapped_ids = MarketPriceRecord.objects.exclude(crop__isnull=True).values_list('crop_id', flat=True).distinct()
+        other_mapped_ids = set(MarketPriceRecord.objects.exclude(crop__isnull=True).values_list('crop_id', flat=True).distinct()) - seen_crop_ids
+        # Perf: one query for all crops instead of one per crop
+        other_crops = {c.id: c for c in CropMaster.objects.filter(id__in=other_mapped_ids)}
         for cid in other_mapped_ids:
             if cid not in seen_crop_ids:
-                crop = CropMaster.objects.filter(id=cid).first()
+                crop = other_crops.get(cid)
                 if crop:
                     img_url = None
                     if crop.reference_image and str(crop.reference_image).startswith('data:image'):
@@ -291,20 +327,36 @@ class MarketSnapshotView(views.APIView):
             # ONLY return lightweight overview when target_crop_id is absent
             cids = [pc['crop_id'] for pc in portfolio_crops]
             latest_dates_qs = MarketPriceRecord.objects.filter(crop_id__in=cids).values('crop_id').annotate(latest_date=Max('date'))
-            latest_dates_map = {str(item['crop_id']): item['latest_date'] for item in latest_dates_qs}
-            
-            latest_records = []
-            for cid_str, ldate in latest_dates_map.items():
-                record = MarketPriceRecord.objects.filter(crop_id=cid_str, date=ldate).first()
-                if record: latest_records.append(record)
-                
-            latest_map = {str(r.crop_id): r for r in latest_records}
-            
+            latest_dates_map = {str(item['crop_id']): item['latest_date'] for item in latest_dates_qs if item['latest_date']}
+
+            # Perf: one bulk fetch covering latest date and the 7-day-prior window
+            # for every crop (was 2 queries per crop).
+            latest_map = {}
             prior_records_map = {}
-            for r in latest_records:
-                seven_days_ago = r.date - timedelta(days=7)
-                prior = MarketPriceRecord.objects.filter(crop_id=r.crop_id, market_name=r.market_name, date__range=[seven_days_ago - timedelta(days=3), seven_days_ago + timedelta(days=3)]).order_by('-date').first()
-                if prior: prior_records_map[str(r.crop_id)] = prior
+            if latest_dates_map:
+                window_q = Q()
+                for cid_str, ldate in latest_dates_map.items():
+                    window_q |= Q(crop_id=cid_str, date__gte=ldate - timedelta(days=10), date__lte=ldate)
+                recs = list(
+                    MarketPriceRecord.objects
+                    .filter(window_q)
+                    .only('crop_id', 'market_name', 'date', 'modal_price')
+                    .order_by('crop_id', '-date', 'id')
+                )
+                by_crop = {}
+                for r in recs:
+                    by_crop.setdefault(str(r.crop_id), []).append(r)
+                for cid_str, ldate in latest_dates_map.items():
+                    crop_recs = by_crop.get(cid_str, [])
+                    latest = next((r for r in crop_recs if r.date == ldate), None)
+                    if not latest:
+                        continue
+                    latest_map[cid_str] = latest
+                    target = latest.date - timedelta(days=7)
+                    lo, hi = target - timedelta(days=3), target + timedelta(days=3)
+                    prior = next((r for r in crop_recs if r.market_name == latest.market_name and lo <= r.date <= hi), None)
+                    if prior:
+                        prior_records_map[cid_str] = prior
 
             for pc in portfolio_crops:
                 cid = pc['crop_id']

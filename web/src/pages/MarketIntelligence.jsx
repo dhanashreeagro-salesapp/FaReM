@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize, Sprout } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Calendar, MapPin, AlertCircle, Info, ChevronRight, ChevronDown, Maximize, Sprout, Upload, X, CheckCircle, Download, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthProvider';
 
@@ -39,7 +40,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function MarketIntelligence() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [snapshotData, setSnapshotData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('Loading...');
@@ -48,6 +49,12 @@ export default function MarketIntelligence() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedMarkets, setSelectedMarkets] = useState([]);
   const [timeScale, setTimeScale] = useState('2Y');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importStatus, setImportStatus] = useState(null); // null | 'uploading' | 'success' | 'error'
+  const [importMessage, setImportMessage] = useState('');
+  const [importResult, setImportResult] = useState(null); // full API response on success
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchSnapshot();
@@ -514,6 +521,33 @@ export default function MarketIntelligence() {
       );
   };
 
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImportStatus('uploading');
+    setImportMessage('');
+    setImportResult(null);
+    try {
+      const result = await api.importMarketData(importFile);
+      setImportStatus('success');
+      setImportResult(result);
+      setImportMessage(result?.message || `Import successful.`);
+      setImportFile(null);
+      // Refresh snapshot data after successful import
+      setTimeout(() => { fetchSnapshot(); }, 500);
+    } catch (err) {
+      setImportStatus('error');
+      setImportMessage(err?.error || err?.detail || err?.message || 'Import failed. Please check the file format and try again.');
+    }
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setImportFile(null);
+    setImportStatus(null);
+    setImportMessage('');
+    setImportResult(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-text pb-20 p-4 md:p-6 font-sans">
       <div className="max-w-5xl mx-auto space-y-2">
@@ -521,7 +555,117 @@ export default function MarketIntelligence() {
             <div>
                 <h1 className="text-2xl font-bold text-text">Market Intelligence</h1>
             </div>
+            {isAdmin && (
+              <button
+                id="import-market-data-btn"
+                onClick={() => { setShowImportModal(true); setImportStatus(null); setImportMessage(''); setImportFile(null); }}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors btn-press shadow-sm"
+              >
+                <Upload size={16} />
+                Import Data
+              </button>
+            )}
         </div>
+
+        {/* Import Data Modal */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-text/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-stagger-in">
+              <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-bg/50">
+                <h3 className="font-heading font-bold text-text">Import Market Price Data</h3>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={async () => { try { await api.downloadMarketTemplate(); } catch { alert('Failed to download template'); } }}
+                    className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
+                    title="Download blank Excel template"
+                  >
+                    <Download size={13} /> Template
+                  </button>
+                  <button onClick={closeImportModal} className="text-text-muted hover:text-text transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                {importStatus !== 'success' && (
+                  <>
+                    <div className="text-xs bg-bg border border-border rounded-lg p-3 text-text-muted">
+                      <p className="font-bold text-text mb-1">Required Columns:</p>
+                      <p>Date &bull; Market &bull; Commodity Name &bull; Low (Rs/qt) &bull; High (Rs/q) &bull; Modal (Rs/q)</p>
+                      <p className="mt-1 italic">Tip: Dates in dd/mm/yyyy or ISO format are both accepted.</p>
+                    </div>
+                    <div className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-bg/20">
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={e => { setImportFile(e.target.files[0]); setImportStatus(null); setImportMessage(''); }}
+                        className="hidden"
+                        id="market-import-file"
+                      />
+                      <label htmlFor="market-import-file" className="cursor-pointer">
+                        <div className="text-primary font-heading font-medium mb-1">
+                          {importFile ? importFile.name : 'Click to select file'}
+                        </div>
+                        <div className="text-xs text-text-muted">Only .xlsx, .xls or .csv accepted</div>
+                      </label>
+                    </div>
+                    {importStatus === 'error' && importMessage && (
+                      <div className="bg-danger/10 border border-danger/20 text-danger rounded-lg px-4 py-3 text-sm flex items-start gap-2">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                        <span>{importMessage}</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleImport}
+                      disabled={!importFile || importStatus === 'uploading'}
+                      className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {importStatus === 'uploading' ? (
+                        <><RefreshCw size={16} className="animate-spin" /> Uploading & Processing...</>
+                      ) : (
+                        <><Upload size={16} /> Upload & Import</>
+                      )}
+                    </button>
+                  </>
+                )}
+                {importStatus === 'success' && (
+                  <div className="py-4 space-y-4">
+                    <div className="text-center">
+                      <CheckCircle size={48} className="mx-auto text-success mb-3" />
+                      <p className="font-heading font-bold text-text text-lg">Import Successful!</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-success/5 border border-success/20 rounded-lg p-3 text-center">
+                        <p className="text-xs text-success font-medium mb-1">Records Imported</p>
+                        <p className="text-2xl font-bold text-success">{importResult?.records_imported ?? '—'}</p>
+                      </div>
+                      <div className="bg-warning/5 border border-warning/20 rounded-lg p-3 text-center">
+                        <p className="text-xs text-accent font-medium mb-1">Rows Skipped</p>
+                        <p className="text-2xl font-bold text-accent">{importResult?.failed_rows ?? 0}</p>
+                      </div>
+                    </div>
+                    {(importResult?.failed_rows > 0 || importResult?.records_imported > 0) && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-3">
+                        <Info size={16} className="text-primary shrink-0 mt-0.5" />
+                        <div className="text-xs text-text-muted">
+                          <p className="font-semibold text-text mb-1">Unmapped Commodities?</p>
+                          <p>If any commodity names didn't match a Crop Master entry, they were queued for manual linking.</p>
+                          <button
+                            onClick={() => { closeImportModal(); navigate('/market-mapping'); }}
+                            className="mt-2 flex items-center gap-1 text-primary font-semibold hover:underline text-xs"
+                          >
+                            Go to Commodity Mapping <ArrowRight size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={closeImportModal} className="btn-primary w-full">Done</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         
 
         {renderMyCrops()}

@@ -145,11 +145,21 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+REDIS_URL = os.environ.get('REDIS_URL')
+if REDIS_URL and (REDIS_URL.startswith('redis://') or REDIS_URL.startswith('rediss://')):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'agriamigo-cache',
+        }
+    }
 
 # GeoDjango Windows Configuration
 if os.name == 'nt':

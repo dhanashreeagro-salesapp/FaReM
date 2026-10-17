@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
-import UserMaster from './pages/UserMaster';
-import CropMaster from './pages/CropMaster';
-import TerritoryManagement from './pages/TerritoryManagement';
-import FarmerManagement from './pages/FarmerManagement';
-import PromotionLibrary from './pages/PromotionLibrary';
-import PromotionsManagement from './pages/PromotionsManagement';
-import DashboardV2 from './pages/DashboardV2';
-import AuditLogs from './pages/AuditLogs';
-import SettingsPage from './pages/SettingsPage';
-import VisitPlanner from './pages/VisitPlanner';
-import RecommendationDashboard from './pages/RecommendationDashboard';
-import MarketIntelligence from './pages/MarketIntelligence';
-import CommodityMapping from './pages/CommodityMapping';
-import DataDebug from './pages/DataDebug';
-import FrontendDataDiagnostic from './pages/FrontendDataDiagnostic';
-import CropIntelligence from './pages/CropIntelligence';
+
+const UserMaster = lazy(() => import('./pages/UserMaster'));
+const CropMaster = lazy(() => import('./pages/CropMaster'));
+const TerritoryManagement = lazy(() => import('./pages/TerritoryManagement'));
+const FarmerManagement = lazy(() => import('./pages/FarmerManagement'));
+const PromotionLibrary = lazy(() => import('./pages/PromotionLibrary'));
+const PromotionsManagement = lazy(() => import('./pages/PromotionsManagement'));
+const DashboardV2 = lazy(() => import('./pages/DashboardV2'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const VisitPlanner = lazy(() => import('./pages/VisitPlanner'));
+const RecommendationDashboard = lazy(() => import('./pages/RecommendationDashboard'));
+const MarketIntelligence = lazy(() => import('./pages/MarketIntelligence'));
+const CommodityMapping = lazy(() => import('./pages/CommodityMapping'));
+const DataDebug = lazy(() => import('./pages/DataDebug'));
+const FrontendDataDiagnostic = lazy(() => import('./pages/FrontendDataDiagnostic'));
+const CropIntelligence = lazy(() => import('./pages/CropIntelligence'));
 
 
 import { MapPin, Menu, HelpCircle } from 'lucide-react';
@@ -88,26 +89,32 @@ function ProtectedLayout() {
         </header>
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-            <Route path="/users" element={<UserMaster />} />
-            <Route path="/crops" element={<CropMaster />} />
-            <Route path="/territories" element={<TerritoryManagement />} />
-            <Route path="/farmers" element={<FarmerManagement />} />
-            <Route path="/planner" element={<VisitPlanner />} />
-            <Route path="/promotions" element={<PromotionLibrary />} />
-            <Route path="/promotions-management" element={<PromotionsManagement />} />
-            <Route path="/recommendations-dashboard" element={<RecommendationDashboard />} />
-            <Route path="/market-intelligence" element={<MarketIntelligence />} />
-            <Route path="/market-mapping" element={<CommodityMapping />} />
-            <Route path="/dashboard" element={<DashboardV2 />} />
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/users" element={<UserMaster />} />
+              <Route path="/crops" element={<CropMaster />} />
+              <Route path="/territories" element={<TerritoryManagement />} />
+              <Route path="/farmers" element={<FarmerManagement />} />
+              <Route path="/planner" element={<VisitPlanner />} />
+              <Route path="/promotions" element={<PromotionLibrary />} />
+              <Route path="/promotions-management" element={<PromotionsManagement />} />
+              <Route path="/recommendations-dashboard" element={<RecommendationDashboard />} />
+              <Route path="/market-intelligence" element={<MarketIntelligence />} />
+              <Route path="/market-mapping" element={<CommodityMapping />} />
+              <Route path="/dashboard" element={<DashboardV2 />} />
 
-            <Route path="/audit-logs" element={<AuditLogs />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/data-debug" element={<DataDebug />} />
-            <Route path="/frontend-diagnostic" element={<FrontendDataDiagnostic />} />
-            <Route path="/crop-intelligence" element={<CropIntelligence />} />
-          </Routes>
+              <Route path="/audit-logs" element={<AuditLogs />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/data-debug" element={<DataDebug />} />
+              <Route path="/frontend-diagnostic" element={<FrontendDataDiagnostic />} />
+              <Route path="/crop-intelligence" element={<CropIntelligence />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>

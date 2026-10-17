@@ -21,7 +21,6 @@ from .models import (
     CropSeason,
     CropStage,
     CropMaster,
-    MarketRate,
     Territory,
     User,
 )
@@ -292,31 +291,14 @@ class CropIntelligenceAPIView(APIView):
         market_trend_map = {}  # crop_id -> price_trend_score (positive = rising)
 
         if active_crop_ids:
-            # Get last 2 market entries per crop to compute direction
-            recent_rates = list(
-                MarketRate.objects.filter(
-                    crop_id__in=active_crop_ids, date__gte=thirty_days_ago
-                )
-                .values("crop_id", "avg_price", "date")
-                .order_by("crop_id", "-date")
-            )
-
-            rates_by_crop = defaultdict(list)
-            for r in recent_rates:
-                if len(rates_by_crop[r["crop_id"]]) < 3:
-                    rates_by_crop[r["crop_id"]].append(r)
-
-            for crop_id, rates in rates_by_crop.items():
-                if len(rates) >= 2 and rates[-1]["avg_price"] and rates[0]["avg_price"]:
-                    latest = float(rates[0]["avg_price"])
-                    oldest = float(rates[-1]["avg_price"])
-                    if oldest > 0:
-                        pct_change = (latest - oldest) / oldest * 100
-                        market_trend_map[crop_id] = pct_change
-                    else:
-                        market_trend_map[crop_id] = 0.0
-                else:
-                    market_trend_map[crop_id] = 0.0
+            # Reads MarketPriceRecord via the shared bulk + cached helper
+            # (previously read the always-empty MarketRate table).
+            from .market_trends import get_dashboard_market_trends
+            id_key_map = {cid: str(cid) for cid in active_crop_ids}
+            for t in get_dashboard_market_trends(active_crop_ids, id_key_map):
+                sign = 1 if t["trend"] == "UP" else (-1 if t["trend"] == "DOWN" else 0)
+                market_trend_map[t["crop_name"]] = sign * t["percentage_change"]
+            market_trend_map = {cid: market_trend_map.get(str(cid), 0.0) for cid in active_crop_ids}
 
         # Score each season: score = price_trend_pct + (acres * 5) + (10 if early stage)
         # "Early stage" = sequence_number <= 2

@@ -649,6 +649,24 @@ class ApiClient {
     });
   }
 
+  downloadMarketTemplate() {
+    return fetch(`${this.baseUrl}/market/template/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'market_data_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
+  }
+
   getUnmappedCommodities() {
     return this.request('/market/mappings/');
   }

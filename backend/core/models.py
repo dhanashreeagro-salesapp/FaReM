@@ -606,5 +606,7 @@ class MarketPriceRecord(models.Model):
         unique_together = ('date', 'market_name', 'commodity_name')
         indexes = [
             models.Index(fields=['commodity_name', 'date']),
+            models.Index(fields=['crop', 'date'], name='mpr_crop_date_idx'),
+            models.Index(fields=['crop', 'market_name', 'date'], name='mpr_crop_mkt_date_idx'),
         ]
 
