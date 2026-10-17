@@ -11,7 +11,7 @@ fi
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear || true
 
-exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --worker-class gthread --threads 4 --worker-tmp-dir /dev/shm --preload --access-logfile - --log-level info --timeout 120 --keep-alive 65 --max-requests 1000 --max-requests-jitter 50 ffma.wsgi:application
+exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --keep-alive 65 --max-requests 1000 --max-requests-jitter 50 ffma.wsgi:application
 
 
 
