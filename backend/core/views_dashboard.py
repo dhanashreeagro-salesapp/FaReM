@@ -340,25 +340,85 @@ class HierarchyAPIView(APIView):
     def get(self, request):
         user = request.user
 
+        import datetime
         from collections import defaultdict
         from django.utils import timezone
-        current_year = timezone.now().year
+        from django.db.models import Count, Q
+        from .models import FieldVisit, AppConfiguration
+
+        today_date = timezone.now().date()
+        first_day_this_month = today_date.replace(day=1)
+        if today_date.month == 1:
+            first_day_last_month = today_date.replace(year=today_date.year - 1, month=12, day=1)
+        else:
+            first_day_last_month = today_date.replace(month=today_date.month - 1, day=1)
+        last_day_last_month = first_day_this_month - datetime.timedelta(days=1)
+
+        if today_date.month >= 4:
+            fy_start = today_date.replace(month=4, day=1)
+        else:
+            fy_start = today_date.replace(year=today_date.year - 1, month=4, day=1)
+
+        config = AppConfiguration.get_config()
+        threshold_days = getattr(config, 'visit_frequency_norm_days', 30) or 30
+        cutoff_date = timezone.now() - datetime.timedelta(days=threshold_days)
+
+        # 1. Farmers per staff with acquisition date
+        staff_farmer_ids = defaultdict(list)
+        for f_id, s_id, acq in Farmer.objects.exclude(status__iexact='Inactive').values_list('id', 'assigned_staff_id', 'acquisition_date'):
+            if s_id:
+                staff_farmer_ids[s_id].append((f_id, acq))
+
+        farmer_counts = {s_id: len(f_list) for s_id, f_list in staff_farmer_ids.items()}
+
+        # 2. Farmers added this month, last month, this year
+        farmers_month_counts = {}
+        farmers_last_month_counts = {}
+        farmers_year_counts = {}
+        for s_id, f_list in staff_farmer_ids.items():
+            farmers_month_counts[s_id] = sum(1 for _, acq in f_list if acq and acq >= first_day_this_month)
+            farmers_last_month_counts[s_id] = sum(1 for _, acq in f_list if acq and first_day_last_month <= acq <= last_day_last_month)
+            farmers_year_counts[s_id] = sum(1 for _, acq in f_list if acq and acq >= fy_start)
+
+        # 3. Recent visited farmer IDs for overdue calculation
+        recent_visited_farmer_ids = set(
+            FieldVisit.objects.filter(check_in_time__gte=cutoff_date).values_list('farmer_id', flat=True)
+        )
+
+        # 4. Overdue counts per staff
+        overdue_counts = {}
+        for s_id, f_list in staff_farmer_ids.items():
+            overdue_counts[s_id] = sum(1 for f_id, _ in f_list if f_id not in recent_visited_farmer_ids)
+
+        # 5. Visits counts (FieldVisit + ActivityLog)
+        fv_counts = dict(FieldVisit.objects.values('staff_id').annotate(c=Count('id')).values_list('staff_id', 'c'))
+        act_counts = dict(ActivityLog.objects.filter(activity_type='Visit').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
+        visits_counts = defaultdict(int)
+        for k, v in fv_counts.items():
+            visits_counts[k] = max(visits_counts[k], v)
+        for k, v in act_counts.items():
+            visits_counts[k] = max(visits_counts[k], v)
+
+        # 6. Crops count per staff
+        crop_counts = dict(
+            CropSeason.objects.filter(status='Active')
+            .exclude(plot__farmer__status__iexact='Inactive')
+            .values('plot__farmer__assigned_staff_id')
+            .annotate(c=Count('crop_id', distinct=True))
+            .values_list('plot__farmer__assigned_staff_id', 'c')
+        )
+
+        # 7. Other pre-aggregations
+        plot_counts = dict(Plot.objects.filter(is_active=True).exclude(farmer__status__iexact='Inactive').values('farmer__assigned_staff_id').annotate(c=Count('id')).values_list('farmer__assigned_staff_id', 'c'))
+        recs_counts = dict(Recommendation.objects.values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
+        wa_counts = dict(Recommendation.objects.filter(channel='WhatsApp').values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
+        calls_counts = dict(ActivityLog.objects.filter(activity_type='Call').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
 
         all_active_users = list(User.objects.exclude(status__iexact='Inactive').select_related('territory'))
         children_by_manager = defaultdict(list)
         for u in all_active_users:
             if u.reporting_manager_id:
                 children_by_manager[u.reporting_manager_id].append(u)
-
-        # Pre-aggregate direct stats in bulk 5 queries total
-        farmer_counts = dict(Farmer.objects.exclude(status__iexact='Inactive').values('assigned_staff_id').annotate(c=Count('id')).values_list('assigned_staff_id', 'c'))
-        plot_counts = dict(Plot.objects.filter(is_active=True).exclude(farmer__status__iexact='Inactive').values('farmer__assigned_staff_id').annotate(c=Count('id')).values_list('farmer__assigned_staff_id', 'c'))
-        crop_counts = dict(CropSeason.objects.filter(status='Active').exclude(plot__farmer__status__iexact='Inactive').values('plot__farmer__assigned_staff_id').annotate(c=Count('crop_id', distinct=True)).values_list('plot__farmer__assigned_staff_id', 'c'))
-        
-        recs_counts = dict(Recommendation.objects.values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
-        wa_counts = dict(Recommendation.objects.filter(channel='WhatsApp').values('created_by_user_id').annotate(c=Count('id')).values_list('created_by_user_id', 'c'))
-        visits_counts = dict(ActivityLog.objects.filter(activity_type='Visit').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
-        calls_counts = dict(ActivityLog.objects.filter(activity_type='Call').values('logged_by_user_id').annotate(c=Count('id')).values_list('logged_by_user_id', 'c'))
 
         def build_user_tree(u):
             subordinates = children_by_manager.get(u.id, [])
@@ -367,18 +427,25 @@ class HierarchyAPIView(APIView):
             direct_farmer_count = farmer_counts.get(u.id, 0)
             direct_plot_count = plot_counts.get(u.id, 0)
             direct_crop_count = crop_counts.get(u.id, 0)
-            direct_farmers_this_year = direct_farmer_count
+            direct_visits_count = visits_counts.get(u.id, 0)
+            direct_overdue_count = overdue_counts.get(u.id, 0)
+            direct_added_month = farmers_month_counts.get(u.id, 0)
+            direct_added_last_month = farmers_last_month_counts.get(u.id, 0)
+            direct_added_year = farmers_year_counts.get(u.id, 0)
 
             recs_count = recs_counts.get(u.id, 0)
-            visits_count = visits_counts.get(u.id, 0)
             calls_count = calls_counts.get(u.id, 0)
             whatsapp_count = wa_counts.get(u.id, 0)
 
             total_farmers = direct_farmer_count + sum(sub['farmer_count'] for sub in sub_nodes)
             total_plots = direct_plot_count + sum(sub['plot_count'] for sub in sub_nodes)
             total_crops = direct_crop_count + sum(sub['crop_count'] for sub in sub_nodes)
-            total_added_ytd = direct_farmers_this_year + sum(sub['farmers_added_this_year'] for sub in sub_nodes)
-            total_visits = visits_count + sum(sub['visits_count'] for sub in sub_nodes)
+            total_visits = direct_visits_count + sum(sub['visits_count'] for sub in sub_nodes)
+            total_overdue = direct_overdue_count + sum(sub['overdue_visits'] for sub in sub_nodes)
+            total_added_month = direct_added_month + sum(sub['farmers_added_this_month'] for sub in sub_nodes)
+            total_added_last_month = direct_added_last_month + sum(sub['farmers_added_last_month'] for sub in sub_nodes)
+            total_added_year = direct_added_year + sum(sub['farmers_added_this_year'] for sub in sub_nodes)
+
             total_calls = calls_count + sum(sub['calls_count'] for sub in sub_nodes)
             total_recs = recs_count + sum(sub['recommendations_count'] for sub in sub_nodes)
             total_wa = whatsapp_count + sum(sub['whatsapp_count'] for sub in sub_nodes)
@@ -399,13 +466,28 @@ class HierarchyAPIView(APIView):
                 'territory_name': u.territory.name if u.territory else 'General Region',
                 'farmer_count': total_farmers,
                 'farmers_count': total_farmers,
-                'plot_count': total_plots,
-                'plots_count': total_plots,
                 'crop_count': total_crops,
                 'active_crops_count': total_crops,
-                'farmers_added_this_year': total_added_ytd,
-                'recommendations_count': total_recs,
                 'visits_count': total_visits,
+                'total_visits': total_visits,
+                'overdue_visits': total_overdue,
+                'overdue_count': total_overdue,
+                'farmers_added_this_month': total_added_month,
+                'this_month_farmers': total_added_month,
+                'farmers_added_last_month': total_added_last_month,
+                'last_month_farmers': total_added_last_month,
+                'farmers_added_this_year': total_added_year,
+                'ytd_farmers': total_added_year,
+                'direct_farmer_count': direct_farmer_count,
+                'direct_crop_count': direct_crop_count,
+                'direct_visits_count': direct_visits_count,
+                'direct_overdue_visits': direct_overdue_count,
+                'direct_farmers_added_this_month': direct_added_month,
+                'direct_farmers_added_last_month': direct_added_last_month,
+                'direct_farmers_added_this_year': direct_added_year,
+                'plot_count': total_plots,
+                'plots_count': total_plots,
+                'recommendations_count': total_recs,
                 'calls_count': total_calls,
                 'whatsapp_count': total_wa,
                 'performance_pct': perf_pct,
@@ -414,9 +496,9 @@ class HierarchyAPIView(APIView):
                 'subordinates_count': len(sub_nodes)
             }
 
-        # Find top roots (Users with no reporting manager or top Admin/ZonalManager)
+        # Find top roots: for Admin, show organization roots. For others, show logged in user and subtree.
         if user.role == Role.ADMIN:
-            top_users = list(User.objects.filter(reporting_manager__isnull=True, status='Active')[:10])
+            top_users = list(User.objects.filter(reporting_manager__isnull=True, status='Active').order_by('first_name'))
             if not top_users:
                 top_users = [user]
         else:

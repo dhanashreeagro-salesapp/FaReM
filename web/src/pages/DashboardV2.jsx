@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import api from '../services/api';
 import { normalizeDashboardMetrics, normalizeHierarchyResponse } from '../services/dataAdapter';
-import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award } from 'lucide-react';
+import { Users, MapPin, Sprout, Calendar, AlertTriangle, RefreshCw, Layers, CheckCircle2, ChevronRight, Award, UserPlus, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PlotsModal, CropsModal, VisitsModal, CallsModal, OverdueModal } from '../components/DashboardModals';
 
@@ -396,26 +396,40 @@ export default function DashboardV2() {
       {/* TAB 2: ORG HIERARCHY TREE */}
       {activeTab === 'hierarchy' && (
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-5 overflow-x-auto w-full">
-          <h3 className="text-base font-heading font-bold text-text flex items-center gap-2">
-            <Layers size={18} className="text-primary" /> Organization Hierarchy Tree
-          </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-border">
+            <div>
+              <h3 className="text-base font-heading font-bold text-text flex items-center gap-2">
+                <Layers size={18} className="text-primary" /> Organization Hierarchy Tree
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Superior-subordinate reporting structure with aggregated field operations summary
+              </p>
+            </div>
+            {hierarchyData && (
+              <span className="text-xs font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">
+                Reporting structure for: {user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.email}
+              </span>
+            )}
+          </div>
 
           {hierarchyLoading && (
-            <div className="p-6 text-center text-xs text-text-muted animate-pulse">
-              Loading hierarchy tree...
+            <div className="p-8 text-center text-xs text-text-muted animate-pulse">
+              <RefreshCw size={20} className="animate-spin text-primary mx-auto mb-2" />
+              Loading organization hierarchy tree...
             </div>
           )}
 
           {hierarchyError && (
-            <div className="p-4 bg-red-50 border border-red-200 text-danger text-xs rounded-xl">
-              Failed to load hierarchy: {hierarchyError}
+            <div className="p-4 bg-red-50 border border-red-200 text-danger text-xs rounded-xl flex items-center gap-2">
+              <AlertTriangle size={16} />
+              <span>Failed to load hierarchy: {hierarchyError}</span>
             </div>
           )}
 
           {!hierarchyLoading && hierarchyData && (
             <div className="space-y-4">
               {Array.isArray(hierarchyData) ? (
-                hierarchyData.map((node, i) => <HierarchyNode key={i} node={node} isRoot={true} />)
+                hierarchyData.map((node, i) => <HierarchyNode key={node.id || i} node={node} isRoot={true} />)
               ) : (
                 <HierarchyNode node={hierarchyData} isRoot={true} />
               )}
@@ -463,38 +477,137 @@ function HierarchyNode({ node, isRoot = false }) {
   const hasChildren = childrenNodes.length > 0;
 
   return (
-    <div className={`space-y-2 ${!isRoot ? 'ml-6 pl-4 border-l-2 border-border/60' : ''}`}>
-      <div className="flex items-center gap-3 p-3 bg-bg/80 border border-border rounded-xl max-w-lg">
-        {hasChildren ? (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-1 hover:bg-surface rounded text-text-muted"
-          >
-            <ChevronRight size={16} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
-          </button>
-        ) : (
-          <div className="w-6" />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-xs text-text truncate">{node.name || 'Unnamed'}</span>
-            <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
-              {node.role || 'Staff'}
+    <div className={`space-y-3 ${!isRoot ? 'ml-4 sm:ml-8 pl-3 sm:pl-5 border-l-2 border-emerald-500/20' : ''}`}>
+      <div className="card p-4 border border-border hover:border-primary/40 bg-surface/90 shadow-sm transition-all rounded-xl">
+        {/* Header row: Expand button, Name, Role, Territory, Direct Reports */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/60">
+          <div className="flex items-center gap-3">
+            {hasChildren ? (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="p-1 hover:bg-bg rounded-lg text-text-muted hover:text-text transition-colors cursor-pointer"
+                title={expanded ? "Collapse team" : "Expand team"}
+              >
+                <ChevronRight size={18} className={`transition-transform duration-200 ${expanded ? 'rotate-90 text-primary' : ''}`} />
+              </button>
+            ) : (
+              <div className="w-6 flex justify-center text-text-muted/40">•</div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-heading font-bold text-sm text-text">{node.name || 'Unnamed'}</span>
+                <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                  node.role === 'ZonalManager' ? 'bg-purple-100 text-purple-800' :
+                  node.role === 'TerritoryManager' ? 'bg-emerald-100 text-emerald-800' :
+                  node.role === 'Admin' ? 'bg-blue-100 text-blue-800' :
+                  'bg-surface border border-border text-text-muted'
+                }`}>
+                  {node.role}
+                </span>
+                {hasChildren && (
+                  <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    {childrenNodes.length} direct report{childrenNodes.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-text-muted mt-0.5 flex-wrap">
+                <span>{node.email}</span>
+                {node.territoryName && (
+                  <span className="flex items-center gap-1 text-[11px] text-text-muted">
+                    <MapPin size={11} className="text-text-muted" /> {node.territoryName}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
+              👥 {node.farmerCount.toLocaleString()} Farmers
             </span>
           </div>
-          <p className="text-[11px] text-text-muted">{node.email}</p>
         </div>
-        <div className="text-right">
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            {node.farmerCount === null || node.farmerCount === undefined ? '-' : node.farmerCount} Farmers
-          </span>
+
+        {/* Operational Summary Grid: Farmers, Crops, Visits, Overdue, New This Mo, Last Mo, This Year */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-3 text-xs">
+          {/* 1. Total Farmers */}
+          <div className="bg-bg/60 p-2 rounded-lg border border-border/50">
+            <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+              <Users size={11} className="text-emerald-600" /> Total Farmers
+            </div>
+            <div className="font-bold text-text text-sm mt-0.5">
+              {node.farmerCount.toLocaleString()}
+            </div>
+            {hasChildren && node.directFarmerCount > 0 && (
+              <div className="text-[10px] text-text-muted">{node.directFarmerCount} direct</div>
+            )}
+          </div>
+
+          {/* 2. Number of Crops */}
+          <div className="bg-bg/60 p-2 rounded-lg border border-border/50">
+            <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+              <Sprout size={11} className="text-amber-600" /> Active Crops
+            </div>
+            <div className="font-bold text-text text-sm mt-0.5">
+              {node.cropCount}
+            </div>
+            <div className="text-[10px] text-text-muted">Mapped crops</div>
+          </div>
+
+          {/* 3. Total Visits Done */}
+          <div className="bg-bg/60 p-2 rounded-lg border border-border/50">
+            <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+              <CheckCircle2 size={11} className="text-purple-600" /> Total Visits
+            </div>
+            <div className="font-bold text-text text-sm mt-0.5">
+              {node.visitsCount}
+            </div>
+            <div className="text-[10px] text-text-muted">Completed visits</div>
+          </div>
+
+          {/* 4. Overdue Visits */}
+          <div className={`p-2 rounded-lg border ${
+            node.overdueVisits > 0 
+              ? 'bg-red-50/70 border-red-200 text-red-900' 
+              : 'bg-bg/60 border-border/50 text-text'
+          }`}>
+            <div className="text-[10px] font-medium uppercase tracking-wider flex items-center gap-1 text-red-600">
+              <AlertTriangle size={11} /> Overdue Visits
+            </div>
+            <div className="font-bold text-sm mt-0.5 text-danger">
+              {node.overdueVisits}
+            </div>
+            <div className="text-[10px] text-text-muted">&gt; 30 days gap</div>
+          </div>
+
+          {/* 5. New Farmers (This Month / Last Month) */}
+          <div className="bg-bg/60 p-2 rounded-lg border border-border/50">
+            <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+              <UserPlus size={11} className="text-blue-600" /> This / Last Mo.
+            </div>
+            <div className="font-bold text-text text-sm mt-0.5">
+              +{node.farmersAddedThisMonth} <span className="text-text-muted font-normal text-xs">/ {node.farmersAddedLastMonth}</span>
+            </div>
+            <div className="text-[10px] text-text-muted">Monthly added</div>
+          </div>
+
+          {/* 6. New Farmers (This Year) */}
+          <div className="bg-bg/60 p-2 rounded-lg border border-border/50">
+            <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+              <TrendingUp size={11} className="text-teal-600" /> This Year
+            </div>
+            <div className="font-bold text-text text-sm mt-0.5">
+              +{node.farmersAddedThisYear}
+            </div>
+            <div className="text-[10px] text-text-muted">YTD additions</div>
+          </div>
         </div>
       </div>
 
       {expanded && hasChildren && (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-3 pt-1">
           {childrenNodes.map((child, idx) => (
-            <HierarchyNode key={idx} node={child} />
+            <HierarchyNode key={child.id || idx} node={child} />
           ))}
         </div>
       )}

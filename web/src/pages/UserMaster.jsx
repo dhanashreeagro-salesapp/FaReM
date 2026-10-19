@@ -125,7 +125,8 @@ export default function UserMaster() {
       user.mobile_number?.includes(searchTerm) ||
       user.email?.toLowerCase().includes(searchLow) ||
       user.employee_id?.toLowerCase().includes(searchLow) ||
-      user.territory_name?.toLowerCase().includes(searchLow)
+      user.territory_name?.toLowerCase().includes(searchLow) ||
+      user.reporting_manager_name?.toLowerCase().includes(searchLow)
     );
   });
 
@@ -243,6 +244,18 @@ export default function UserMaster() {
                 {territories.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">Reporting Manager</label>
+              <select value={form.reporting_manager} onChange={e => setForm({...form, reporting_manager: e.target.value})}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface focus:ring-2 focus:ring-primary focus:outline-none">
+                <option value="">-- None (Top Level) --</option>
+                {users.filter(u => !editingUser || u.id !== editingUser.id).map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.first_name} {u.last_name || ''} ({u.role} - {u.email})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="col-span-2 flex justify-end gap-3 mt-2">
               <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 rounded-lg font-medium text-sm text-text-muted hover:text-text transition-colors">
                 Cancel
@@ -260,7 +273,7 @@ export default function UserMaster() {
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input 
           type="text" 
-          placeholder="Search by name, mobile, email, employee ID or territory..." 
+          placeholder="Search by name, mobile, email, employee ID, territory or manager..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-3 border border-border rounded-xl text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all"
@@ -277,15 +290,16 @@ export default function UserMaster() {
               <th>Email</th>
               <th>Role</th>
               <th>Territory</th>
+              <th>Reports To</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8" className="text-center py-8 text-text-muted">Loading...</td></tr>
+              <tr><td colSpan="9" className="text-center py-8 text-text-muted">Loading...</td></tr>
             ) : filteredUsers.length === 0 ? (
-              <tr><td colSpan="8" className="text-center py-8 text-text-muted">No users found. Try a different search or add a user.</td></tr>
+              <tr><td colSpan="9" className="text-center py-8 text-text-muted">No users found. Try a different search or add a user.</td></tr>
             ) : filteredUsers.map((user, i) => (
               <tr key={user.id} className="animate-stagger-in hover:bg-surface/50" style={{ animationDelay: `${i * 40}ms` }}>
                 <td className="font-mono text-xs text-text-muted">{user.employee_id || '—'}</td>
@@ -302,6 +316,7 @@ export default function UserMaster() {
                 <td className="text-xs text-text-muted">{user.email || '—'}</td>
                 <td><span className={`badge ${roleColors[user.role] || ''}`}>{user.role}</span></td>
                 <td className="text-sm">{user.territory_name || '—'}</td>
+                <td className="text-xs text-text-muted font-medium">{user.reporting_manager_name || '—'}</td>
                 <td><span className={`badge ${user.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>{user.status}</span></td>
                 <td className="text-right">
                   {isAdmin ? (
