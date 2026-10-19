@@ -802,6 +802,29 @@ def execute_bulk_send_batch(batch_id):
     except BulkSendBatch.DoesNotExist:
         return {"status": "failed", "error": "Batch not found"}
 
+PROMO_HEADER_ALIASES = {
+    'Title': ['title', 'content title', 'promotion title', 'name', 'template name'],
+    'ContentType': ['contenttype', 'content type', 'type', 'format', 'media type'],
+    'FileURL': ['fileurl', 'file url', 'url', 'link', 'content url', 'file link'],
+    'Category': ['category', 'promo category', 'tag'],
+    'Crop': ['crop', 'crops', 'crop name', 'crop names', 'target crops'],
+    'Stage': ['stage', 'stages', 'growth stage', 'growth stages', 'target stages', 'crop stage', 'crop stages'],
+    'Product': ['product', 'products', 'related product', 'related products'],
+    'ExpiryDate': ['expirydate', 'expiry date', 'expiry', 'valid till', 'end date'],
+    'WhatsAppTemplate': ['whatsapp_template', 'whatsapp template', 'whatsapp template name', 'wa template'],
+    'SMSTemplate': ['sms_template', 'sms template', 'sms template name'],
+}
+
+def normalize_promotion_headers(df):
+    mapping = {}
+    for raw_col in df.columns:
+        cl = str(raw_col).replace('\xa0', ' ').lower().strip()
+        for std_name, aliases in PROMO_HEADER_ALIASES.items():
+            if cl in aliases or cl == std_name.lower():
+                mapping[raw_col] = std_name
+                break
+    return df.rename(columns=mapping)
+
 @shared_task
 def validate_promotion_import(import_job_id):
     from .models import ImportJob, PromotionLibrary, CropMaster, CropStage, ProductMaster
@@ -824,10 +847,8 @@ def validate_promotion_import(import_job_id):
     error_count = 0
     error_report = []
 
+    df = normalize_promotion_headers(df)
     required_columns = ['Title', 'ContentType', 'FileURL']
-    expected_columns = required_columns + ['Crop', 'Stage', 'Product']
-    
-    df = normalize_dataframe_headers(df, expected_columns)
     
     if not all(col in df.columns for col in required_columns):
         job.status = 'Failed'
@@ -835,14 +856,20 @@ def validate_promotion_import(import_job_id):
         job.save()
         return {"status": "failed", "error": "Missing required columns"}
 
+    valid_types = {'video': 'Video', 'image': 'Image', 'pdf': 'PDF', 'link': 'Link'}
+
     for index, row in df.iterrows():
         try:
             title = str(row['Title']).strip()
-            ctype = str(row['ContentType']).strip()
+            raw_ctype = str(row['ContentType']).strip().lower()
             url = str(row['FileURL']).strip()
             
-            if ctype not in ['Video', 'Image', 'PDF', 'Link']:
-                raise ValueError(f"Invalid ContentType: {ctype}")
+            if not title or title.lower() == 'nan':
+                raise ValueError("Title cannot be empty")
+            if raw_ctype not in valid_types:
+                raise ValueError(f"Invalid ContentType: '{row['ContentType']}'. Allowed: Video, Image, PDF, Link")
+            if not url or url.lower() == 'nan':
+                raise ValueError("FileURL cannot be empty")
 
             valid_rows += 1
         except Exception as e:
@@ -868,39 +895,97 @@ def commit_promotion_import(import_job_id):
         return {"status": "failed", "error": "Job not found"}
 
     df = pd.read_excel(job.filename)
+    df = normalize_promotion_headers(df)
     created_count = 0
+    valid_types = {'video': 'Video', 'image': 'Image', 'pdf': 'PDF', 'link': 'Link'}
 
     for index, row in df.iterrows():
         try:
             title = str(row['Title']).strip()
-            ctype = str(row['ContentType']).strip()
+            raw_ctype = str(row['ContentType']).strip().lower()
             url = str(row['FileURL']).strip()
-            
+            ctype = valid_types.get(raw_ctype, 'Image')
+
+            # Multi-crop parsing
+            matched_crops = []
+            if 'Crop' in df.columns and not pd.isna(row['Crop']):
+                raw_crops = str(row['Crop']).replace(';', ',').replace('\n', ',')
+                crop_tokens = [c.strip() for c in raw_crops.split(',') if c.strip()]
+                for c_token in crop_tokens:
+                    if c_token.lower() in ['all', 'general', 'any', '-', 'na', 'n/a']:
+                        continue
+                    crop = CropMaster.objects.filter(crop_name__iexact=c_token).first()
+                    if not crop:
+                        crop = CropMaster.objects.filter(crop_name__icontains=c_token).first()
+                    if crop and crop not in matched_crops:
+                        matched_crops.append(crop)
+
+            # Multi-stage & generic stages parsing
+            matched_stages = []
+            target_stages = []
+            if 'Stage' in df.columns and not pd.isna(row['Stage']):
+                raw_stages = str(row['Stage']).replace(';', ',').replace('\n', ',')
+                stage_tokens = [s.strip() for s in raw_stages.split(',') if s.strip()]
+                for s_token in stage_tokens:
+                    if s_token.lower() in ['all', 'any', '-', 'na', 'n/a']:
+                        continue
+                    if s_token not in target_stages:
+                        target_stages.append(s_token)
+                    
+                    stage_qs = CropStage.objects.filter(stage_name__iexact=s_token)
+                    if not stage_qs.exists():
+                        stage_qs = CropStage.objects.filter(stage_name__icontains=s_token)
+                    if matched_crops:
+                        stage_qs = stage_qs.filter(crop__in=matched_crops)
+                    for stg in stage_qs:
+                        if stg not in matched_stages:
+                            matched_stages.append(stg)
+
+            # Multi-product parsing
+            matched_products = []
+            if 'Product' in df.columns and not pd.isna(row['Product']):
+                raw_products = str(row['Product']).replace(';', ',').replace('\n', ',')
+                product_tokens = [p.strip() for p in raw_products.split(',') if p.strip()]
+                for p_token in product_tokens:
+                    if p_token.lower() in ['none', '-', 'na', 'n/a']:
+                        continue
+                    prod, _ = ProductMaster.objects.get_or_create(name=p_token)
+                    if prod not in matched_products:
+                        matched_products.append(prod)
+
+            category = 'Product'
+            if 'Category' in df.columns and not pd.isna(row['Category']):
+                cat_val = str(row['Category']).strip()
+                valid_cats = ['Product', 'Tagline', 'WhatsApp', 'Facebook', 'Instagram', 'LinkedIn', 'Schedule', 'Testimonial', 'YouTube Playlist']
+                match_cat = next((vc for vc in valid_cats if vc.lower() == cat_val.lower()), None)
+                if match_cat:
+                    category = match_cat
+
             promo = PromotionLibrary.objects.create(
                 title=title,
                 content_type=ctype,
                 file_url=url,
+                category=category,
+                target_stages=target_stages,
                 status='Active'
             )
+            if matched_crops:
+                promo.crops.set(matched_crops)
+                promo.crop = matched_crops[0]
+            if matched_stages:
+                promo.stages.set(matched_stages)
+                promo.stage = matched_stages[0]
+            if matched_products:
+                promo.related_products.set(matched_products)
 
-            if 'Crop' in df.columns and not pd.isna(row['Crop']):
-                c_name = str(row['Crop']).strip()
-                crop = CropMaster.objects.filter(crop_name=c_name).first()
-                if crop: promo.crop = crop
+            if 'WhatsAppTemplate' in df.columns and not pd.isna(row['WhatsAppTemplate']):
+                promo.whatsapp_template = str(row['WhatsAppTemplate']).strip()
+            if 'SMSTemplate' in df.columns and not pd.isna(row['SMSTemplate']):
+                promo.sms_template = str(row['SMSTemplate']).strip()
 
-            if 'Stage' in df.columns and not pd.isna(row['Stage']):
-                s_name = str(row['Stage']).strip()
-                stage = CropStage.objects.filter(stage_name=s_name).first()
-                if stage: promo.stage = stage
-
-            if 'Product' in df.columns and not pd.isna(row['Product']):
-                p_name = str(row['Product']).strip()
-                product, _ = ProductMaster.objects.get_or_create(name=p_name)
-                promo.related_product = product
-            
             promo.save()
             created_count += 1
-        except:
+        except Exception:
             continue
 
     job.status = 'Completed'

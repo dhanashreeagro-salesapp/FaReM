@@ -159,16 +159,36 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
                     const query = templateSearch.toLowerCase();
                     
                     promotions.forEach(p => {
-                      const matchSearch = p.title?.toLowerCase().includes(query) || p.whatsapp_template?.toLowerCase().includes(query) || p.sms_template?.toLowerCase().includes(query);
+                      const matchSearch = p.title?.toLowerCase().includes(query) || 
+                        p.whatsapp_template?.toLowerCase().includes(query) || 
+                        p.sms_template?.toLowerCase().includes(query) ||
+                        (p.crop_names && p.crop_names.some(c => c.toLowerCase().includes(query))) ||
+                        (p.stage_names && p.stage_names.some(s => s.toLowerCase().includes(query))) ||
+                        (p.target_stages && p.target_stages.some(s => s.toLowerCase().includes(query)));
                       if (!matchSearch) return;
 
                       let isSuggested = false;
-                      if (filterCrop) {
-                        if (filterStage) {
-                          if (p.crop_name === filterCrop && p.stage_name === filterStage) isSuggested = true;
-                        } else {
-                          if (p.crop_name === filterCrop) isSuggested = true;
-                        }
+                      const cLow = filterCrop ? filterCrop.toLowerCase().trim() : '';
+                      const sLow = filterStage ? filterStage.toLowerCase().trim() : '';
+
+                      const cropMatches = Boolean(
+                        (p.crop_names && p.crop_names.some(c => c.toLowerCase().includes(cLow) || cLow.includes(c.toLowerCase()))) ||
+                        (p.crop_name && (p.crop_name.toLowerCase().includes(cLow) || cLow.includes(p.crop_name.toLowerCase()))) ||
+                        (!p.crop_name && (!p.crop_names || p.crop_names.length === 0)) // Universal / All Crops
+                      );
+
+                      const stageMatches = Boolean(
+                        (p.stage_names && p.stage_names.some(s => s.toLowerCase().includes(sLow) || sLow.includes(s.toLowerCase()))) ||
+                        (p.target_stages && p.target_stages.some(s => s.toLowerCase().includes(sLow) || sLow.includes(s.toLowerCase()))) ||
+                        (p.stage_name && (p.stage_name.toLowerCase().includes(sLow) || sLow.includes(p.stage_name.toLowerCase())))
+                      );
+
+                      if (cLow && sLow) {
+                        isSuggested = cropMatches && stageMatches;
+                      } else if (cLow) {
+                        isSuggested = cropMatches;
+                      } else if (sLow) {
+                        isSuggested = stageMatches;
                       }
                       
                       if (isSuggested) suggested.push(p);
@@ -179,36 +199,54 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
                       return <div className="p-3 text-center text-xs text-text-muted">No templates found.</div>;
                     }
 
+                    const renderTemplateItem = (p) => (
+                      <div 
+                        key={p.id}
+                        className={`px-2 py-2 text-sm cursor-pointer rounded hover:bg-gray-100 flex flex-col gap-0.5 ${String(selectedPromo) === String(p.id) ? 'bg-primary/10 text-primary font-bold' : 'text-text'}`}
+                        onClick={() => { setSelectedPromo(p.id); setDropdownOpen(false); }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-text truncate">{p.title}</span>
+                          <span className="text-[10px] text-text-muted px-1.5 py-0.5 bg-surface rounded border border-border shrink-0">{p.content_type}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted mt-0.5">
+                          {p.crop_names && p.crop_names.length > 0 ? (
+                            <span className="text-green-700 bg-green-50 px-1 rounded">🌱 {p.crop_names.join(', ')}</span>
+                          ) : p.crop_name ? (
+                            <span className="text-green-700 bg-green-50 px-1 rounded">🌱 {p.crop_name}</span>
+                          ) : (
+                            <span className="text-emerald-700 font-medium bg-emerald-50 px-1 rounded">🌱 All Crops</span>
+                          )}
+                          {p.stage_names && p.stage_names.length > 0 ? (
+                            <span className="text-amber-700 bg-amber-50 px-1 rounded">📅 {p.stage_names.join(', ')}</span>
+                          ) : p.stage_name ? (
+                            <span className="text-amber-700 bg-amber-50 px-1 rounded">📅 {p.stage_name}</span>
+                          ) : null}
+                          {p.product_names && p.product_names.length > 0 && (
+                            <span className="text-purple-700 bg-purple-50 px-1 rounded">📦 {p.product_names.join(', ')}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+
                     return (
                       <>
                         {suggested.length > 0 && (
                           <div className="mb-2">
                             <div className="px-2 py-1 text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1 bg-amber-50 rounded mb-1">
-                              <Sparkles size={12} /> Suggested by AI
+                              <Sparkles size={12} /> Recommended for {filterCrop || 'General'}{filterStage ? ` • ${filterStage}` : ''}
                             </div>
-                            {suggested.map(p => (
-                              <div 
-                                key={p.id}
-                                className={`px-2 py-1.5 text-sm cursor-pointer rounded hover:bg-gray-100 ${String(selectedPromo) === String(p.id) ? 'bg-primary/10 text-primary font-bold' : 'text-text'}`}
-                                onClick={() => { setSelectedPromo(p.id); setDropdownOpen(false); }}
-                              >
-                                {p.title}
-                              </div>
-                            ))}
+                            {suggested.map(renderTemplateItem)}
                           </div>
                         )}
                         {others.length > 0 && (
                           <div>
-                            {suggested.length > 0 && <div className="px-2 py-1 text-[10px] font-bold text-text-muted uppercase border-t border-border mt-1 pt-2 mb-1">Other Templates</div>}
-                            {others.map(p => (
-                              <div 
-                                key={p.id}
-                                className={`px-2 py-1.5 text-sm cursor-pointer rounded hover:bg-gray-100 ${String(selectedPromo) === String(p.id) ? 'bg-primary/10 text-primary font-bold' : 'text-text'}`}
-                                onClick={() => { setSelectedPromo(p.id); setDropdownOpen(false); }}
-                              >
-                                {p.title}
+                            {suggested.length > 0 && (
+                              <div className="px-2 py-1 text-[10px] font-bold text-text-muted uppercase border-t border-border mt-1 pt-2 mb-1">
+                                Other Templates
                               </div>
-                            ))}
+                            )}
+                            {others.map(renderTemplateItem)}
                           </div>
                         )}
                       </>

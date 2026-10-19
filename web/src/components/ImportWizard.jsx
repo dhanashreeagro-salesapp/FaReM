@@ -106,11 +106,23 @@ export default function ImportWizard({ onClose, onComplete, resource = 'farmers'
               )}
 
               {resource === 'promotions' && (
-                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted">
+                <div className="text-xs bg-bg p-3 rounded border border-border text-text-muted relative">
+                  <button 
+                    onClick={async () => {
+                      try { await api.downloadPromotionTemplate(); }
+                      catch { alert('Failed to download promotion template'); }
+                    }} 
+                    className="absolute top-3 right-3 text-primary font-medium hover:underline flex items-center gap-1"
+                  >
+                    Download Template
+                  </button>
                   <p className="font-bold mb-1">Required Columns:</p>
-                  <p>Title, ContentType, FileURL</p>
+                  <p>Title, ContentType (Video, Image, PDF, Link), FileURL</p>
                   <p className="mt-1 font-bold mb-1">Optional Columns:</p>
-                  <p>Crop, Stage, Product</p>
+                  <p>Crop, Stage, Product, Category, WhatsAppTemplate, SMSTemplate</p>
+                  <p className="mt-1 text-text-muted italic">
+                    Tip: Multiple crops, stages, or products can be separated by commas (e.g., <strong>Tomato, Chilli</strong> or <strong>Vegetative, Flowering</strong>). Leave Crop blank for content that applies to all crops.
+                  </p>
                 </div>
               )}
 

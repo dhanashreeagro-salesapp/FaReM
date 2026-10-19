@@ -473,7 +473,10 @@ class ApiClient {
   advanceCropStage(id) { return this.request(`/crop-seasons/${id}/advance_stage/`, { method: 'POST' }); }
 
   // Promotions
-  getPromotions() { return this.request('/promotions/'); }
+  getPromotions(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/promotions/${qs ? `?${qs}` : ''}`);
+  }
   createPromotion(data) { return this.request('/promotions/', { method: 'POST', body: JSON.stringify(data) }); }
   updatePromotion(id, data) { return this.request(`/promotions/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   deletePromotion(id) { return this.request(`/promotions/${id}/`, { method: 'DELETE' }); }
@@ -487,6 +490,23 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ import_job_id: jobId })
     });
+  }
+  downloadPromotionTemplate() {
+    return fetch(`${this.baseUrl}/promotions/download_template/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` }
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'promotion_content_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      });
   }
 
   // Products
