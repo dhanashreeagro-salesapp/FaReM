@@ -24,15 +24,15 @@ class PromotionLibrarySerializer(serializers.ModelSerializer):
     def get_crop_name(self, obj):
         if obj.crop:
             return obj.crop.crop_name
-        first_crop = obj.crops.first()
-        return first_crop.crop_name if first_crop else None
+        crops = obj.crops.all()
+        return crops[0].crop_name if crops else None
 
     def get_stage_name(self, obj):
         if obj.stage:
             return obj.stage.stage_name
-        first_stage = obj.stages.first()
-        if first_stage:
-            return first_stage.stage_name
+        stages = obj.stages.all()
+        if stages:
+            return stages[0].stage_name
         if obj.target_stages and len(obj.target_stages) > 0:
             return obj.target_stages[0]
         return None
