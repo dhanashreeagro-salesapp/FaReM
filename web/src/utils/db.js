@@ -1,6 +1,6 @@
 // Native IndexedDB Wrapper
 const DB_NAME = 'AgriAmigo_LocalDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = [
   'app_data',        // singleton row for crops, stages, market_rates
@@ -10,6 +10,7 @@ const STORES = [
   'visits',          // list of visit objects
   'calls',           // list of call objects
   'recommendations', // list of recommendation objects
+  'promotions',      // list of promotional library objects
   'meta'             // for sync timestamps
 ];
 
@@ -94,3 +95,6 @@ export const getAll = async (storeName) => {
     request.onerror = () => reject(request.error);
   });
 };
+
+export const getPromotionsFromDB = () => getAll('promotions');
+export const savePromotionsToDB = (promos) => bulkPut('promotions', promos);

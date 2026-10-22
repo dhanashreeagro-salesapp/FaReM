@@ -118,32 +118,38 @@ class PromotionLibraryViewSet(viewsets.ModelViewSet):
             if cached_data is not None:
                 return Response(cached_data)
 
-        qs = self.filter_queryset(self.get_queryset())
-        promos = list(qs)
-        if not promos:
-            return Response([])
-
-        promo_ids = [p.id for p in promos]
-
         crops_map = {c.id: c.crop_name for c in CropMaster.objects.all()}
         stages_map = {s.id: s.stage_name for s in CropStage.objects.all()}
         prods_map = {p.id: p.name for p in ProductMaster.objects.all()}
 
-        promo_crops = (
-            PromotionLibrary.crops.through.objects
-            .filter(promotionlibrary_id__in=promo_ids)
-            .values_list('promotionlibrary_id', 'cropmaster_id')
-        )
-        promo_stages = (
-            PromotionLibrary.stages.through.objects
-            .filter(promotionlibrary_id__in=promo_ids)
-            .values_list('promotionlibrary_id', 'cropstage_id')
-        )
-        promo_prods = (
-            PromotionLibrary.related_products.through.objects
-            .filter(promotionlibrary_id__in=promo_ids)
-            .values_list('promotionlibrary_id', 'productmaster_id')
-        )
+        if not has_filters:
+            promos = list(PromotionLibrary.objects.all().order_by('-created_at'))
+            if not promos:
+                return Response([])
+            promo_crops = PromotionLibrary.crops.through.objects.all().values_list('promotionlibrary_id', 'cropmaster_id')
+            promo_stages = PromotionLibrary.stages.through.objects.all().values_list('promotionlibrary_id', 'cropstage_id')
+            promo_prods = PromotionLibrary.related_products.through.objects.all().values_list('promotionlibrary_id', 'productmaster_id')
+        else:
+            qs = self.filter_queryset(self.get_queryset())
+            promos = list(qs)
+            if not promos:
+                return Response([])
+            promo_ids = [p.id for p in promos]
+            promo_crops = (
+                PromotionLibrary.crops.through.objects
+                .filter(promotionlibrary_id__in=promo_ids)
+                .values_list('promotionlibrary_id', 'cropmaster_id')
+            )
+            promo_stages = (
+                PromotionLibrary.stages.through.objects
+                .filter(promotionlibrary_id__in=promo_ids)
+                .values_list('promotionlibrary_id', 'cropstage_id')
+            )
+            promo_prods = (
+                PromotionLibrary.related_products.through.objects
+                .filter(promotionlibrary_id__in=promo_ids)
+                .values_list('promotionlibrary_id', 'productmaster_id')
+            )
 
         p_crops_dict = defaultdict(list)
         p_crops_names_dict = defaultdict(list)
