@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, CheckSquare, Square, Users, ArrowRight, Loader2, Phone, MapPin, Filter, RotateCcw } from 'lucide-react';
+import { X, Search, CheckSquare, Square, Users, ArrowRight, Loader2, Phone, MapPin, Filter, RotateCcw, Database } from 'lucide-react';
 import api from '../services/api';
+import { getAll } from '../utils/db';
+import syncService from '../services/syncService';
 
 export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSelection }) {
   const [farmers, setFarmers] = useState([]);
@@ -9,20 +11,63 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
   const [selectedVillage, setSelectedVillage] = useState('');
   const [selectedTaluka, setSelectedTaluka] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isLocalDB, setIsLocalDB] = useState(false);
+
+  const loadFarmers = async () => {
+    try {
+      // 1. Read instantly from local IndexedDB (zero network latency, offline capable, full hierarchy)
+      const local = await getAll('farmers');
+      if (local && Array.isArray(local) && local.length > 0) {
+        setFarmers(local);
+        setIsLocalDB(true);
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('IndexedDB read error in PromotionFarmerSelectModal:', e);
+    }
+
+    // 2. Fallback if local store is not yet populated
+    try {
+      if (syncService && typeof syncService.performSync === 'function') {
+        await syncService.performSync();
+        const synced = await getAll('farmers');
+        if (synced && synced.length > 0) {
+          setFarmers(synced);
+          setIsLocalDB(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const data = await api.getFarmers();
+      const list = Array.isArray(data) ? data : data.results || [];
+      setFarmers(list);
+    } catch (err) {
+      console.error('Failed to load farmers', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchFarmers = async () => {
+    loadFarmers();
+
+    // Listen for background delta sync completions to keep data fresh
+    const handleSync = async () => {
       try {
-        const data = await api.getFarmers();
-        const list = Array.isArray(data) ? data : data.results || [];
-        setFarmers(list);
-      } catch (err) {
-        console.error('Failed to load farmers', err);
-      } finally {
-        setLoading(false);
+        const updated = await getAll('farmers');
+        if (updated && updated.length > 0) {
+          setFarmers(updated);
+          setIsLocalDB(true);
+        }
+      } catch (e) {
+        console.warn('Error refreshing from sync event:', e);
       }
     };
-    fetchFarmers();
+
+    window.addEventListener('localdb-synced', handleSync);
+    return () => window.removeEventListener('localdb-synced', handleSync);
   }, []);
 
   const villages = useMemo(() => {
@@ -86,6 +131,9 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
     onConfirmSelection(chosen);
   };
 
+  // Limit DOM rendering to first 100 items for buttery-smooth scrolling with large local datasets
+  const visibleFarmers = filteredFarmers.slice(0, 100);
+
   return (
     <div className="fixed inset-0 bg-text/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
       <div className="bg-surface w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-border animate-scale-up">
@@ -93,7 +141,14 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-bg/40">
           <div>
-            <h3 className="font-heading font-bold text-text text-base md:text-lg">Select Farmers for WhatsApp Handoff</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-heading font-bold text-text text-base md:text-lg">Select Farmers for WhatsApp Handoff</h3>
+              {isLocalDB && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                  <Database size={10} /> Local Storage Active
+                </span>
+              )}
+            </div>
             <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
               Sending: <span className="font-semibold text-text">{promo.title}</span>
             </p>
@@ -174,7 +229,7 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
           {loading ? (
             <div className="py-12 text-center text-text-muted space-y-3">
               <Loader2 size={32} className="animate-spin mx-auto text-primary" />
-              <p className="text-sm">Loading farmers directory...</p>
+              <p className="text-sm">Loading farmers from local database...</p>
             </div>
           ) : filteredFarmers.length === 0 ? (
             <div className="py-12 text-center text-text-muted">
@@ -182,39 +237,47 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
               <p className="text-sm font-medium">No farmers found matching your filter criteria.</p>
             </div>
           ) : (
-            filteredFarmers.map(farmer => {
-              const isChecked = selectedIds.includes(farmer.id);
-              return (
-                <div
-                  key={farmer.id}
-                  onClick={() => toggleSelect(farmer.id)}
-                  className={`py-3 px-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                    isChecked ? 'bg-primary/10 border border-primary/20' : 'hover:bg-bg/60 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="text-primary mt-0.5">
-                      {isChecked ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} className="text-text-muted" />}
-                    </div>
-                    <div>
-                      <h4 className="font-heading font-semibold text-text text-sm">{farmer.full_name || 'Unnamed Farmer'}</h4>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-muted mt-0.5">
-                        <span className="flex items-center gap-1"><Phone size={11} /> {farmer.primary_mobile || 'No Mobile'}</span>
-                        {(farmer.village || farmer.taluka) && (
-                          <span className="flex items-center gap-1">
-                            <MapPin size={11} /> {[farmer.village, farmer.taluka].filter(Boolean).join(', ')}
-                          </span>
-                        )}
+            <>
+              {visibleFarmers.map(farmer => {
+                const isChecked = selectedIds.includes(farmer.id);
+                return (
+                  <div
+                    key={farmer.id}
+                    onClick={() => toggleSelect(farmer.id)}
+                    className={`py-3 px-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                      isChecked ? 'bg-primary/10 border border-primary/20' : 'hover:bg-bg/60 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-primary mt-0.5">
+                        {isChecked ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} className="text-text-muted" />}
+                      </div>
+                      <div>
+                        <h4 className="font-heading font-semibold text-text text-sm">{farmer.full_name || 'Unnamed Farmer'}</h4>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-muted mt-0.5">
+                          <span className="flex items-center gap-1"><Phone size={11} /> {farmer.primary_mobile || 'No Mobile'}</span>
+                          {(farmer.village || farmer.taluka) && (
+                            <span className="flex items-center gap-1">
+                              <MapPin size={11} /> {[farmer.village, farmer.taluka].filter(Boolean).join(', ')}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <span className={`badge text-[10px] ${farmer.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
-                    {farmer.status || 'Active'}
-                  </span>
+                    <span className={`badge text-[10px] ${farmer.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
+                      {farmer.status || 'Active'}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {filteredFarmers.length > visibleFarmers.length && (
+                <div className="p-3 text-center text-xs text-text-muted bg-bg/50 rounded-xl mt-2">
+                  Showing first {visibleFarmers.length} of {filteredFarmers.length} matching farmers. Use search or filters above to refine.
                 </div>
-              );
-            })
+              )}
+            </>
           )}
         </div>
 

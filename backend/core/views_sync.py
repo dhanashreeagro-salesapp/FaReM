@@ -137,7 +137,38 @@ def downstream_sync_view(request):
     if user.role not in [Role.ADMIN, Role.CONTENT_TEAM]:
         team_users = user.get_team_users()
         team_user_ids = [u.id for u in team_users]
+
+        from django.core.cache import cache
+        cache_key = 'territory_children_map'
+        children_map = cache.get(cache_key)
+        if children_map is None:
+            from .models import Territory
+            all_territories = Territory.objects.exclude(status__iexact='Inactive').values_list('id', 'parent_territory_id')
+            children_map = {}
+            for t_id, p_id in all_territories:
+                if p_id not in children_map:
+                    children_map[p_id] = []
+                children_map[p_id].append(t_id)
+            cache.set(cache_key, children_map, 60)
+
+        root_t_ids = []
+        if user.territory_id:
+            root_t_ids.append(user.territory_id)
+        root_t_ids.extend(list(user.managed_territories.values_list('id', flat=True)))
+
+        visited_t = set()
+        t_queue = root_t_ids
+        while t_queue:
+            curr_t_id = t_queue.pop(0)
+            if curr_t_id in visited_t:
+                continue
+            visited_t.add(curr_t_id)
+            children_ids = children_map.get(curr_t_id, [])
+            t_queue.extend(children_ids)
+
         q_filter = Q(assigned_staff_id__in=team_user_ids)
+        if visited_t:
+            q_filter |= Q(territory_id__in=visited_t)
         farmers_qs = farmers_qs.filter(q_filter)
         
     farmers = list(farmers_qs.values(
