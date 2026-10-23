@@ -35,9 +35,9 @@ const GENERIC_STAGES = [
   'Harvesting'
 ];
 
-export default function PromotionLibrary() {
+export default function PromotionLibrary({ readOnly = false, embedded = false }) {
   const { user, isAdmin } = useAuth();
-  const canManage = Boolean(isAdmin || user?.role === 'ADMIN' || user?.is_superuser);
+  const canManage = !readOnly && Boolean(isAdmin || user?.role === 'ADMIN' || user?.is_superuser);
 
   // Core data states
   const [promos, setPromos] = useState([]);
@@ -643,6 +643,7 @@ export default function PromotionLibrary() {
   return (
     <div className="space-y-6">
       {/* Page Title & Actions Header */}
+      {!embedded && (
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -659,6 +660,7 @@ export default function PromotionLibrary() {
         </div>
 
         {/* Action Buttons for Authorized Users */}
+        {canManage && (
         <div className="flex items-center gap-2.5">
           <button 
             onClick={() => setShowWizard(true)}
@@ -676,7 +678,9 @@ export default function PromotionLibrary() {
             <Plus size={15} /> Add Content
           </button>
         </div>
+        )}
       </div>
+      )}
 
       {/* Primary Navigation Tabs */}
       <div className="flex border-b border-border gap-6">

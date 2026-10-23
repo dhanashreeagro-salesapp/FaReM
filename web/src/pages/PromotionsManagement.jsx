@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { CheckCircle, XCircle, Clock, Edit2, Copy, Trash2, StopCircle, Plus } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Edit2, Copy, Trash2, StopCircle, Plus, BookOpen } from 'lucide-react';
 import SendMessageModal from '../components/SendMessageModal';
 import AudienceTargetingModal from '../components/AudienceTargetingModal';
+import PromotionLibrary from './PromotionLibrary';
 
 export default function PromotionsManagement() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('upcoming');
+  const [activeTab, setActiveTab] = useState('knowledge_bank');
   
   const [modalConfig, setModalConfig] = useState(null);
 
@@ -84,7 +85,14 @@ export default function PromotionsManagement() {
         </button>
       </div>
 
-      <div className="flex gap-4 mb-6 border-b border-border">
+      <div className="flex gap-6 mb-6 border-b border-border">
+        <button 
+          onClick={() => setActiveTab('knowledge_bank')}
+          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'knowledge_bank' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text'}`}
+        >
+          <BookOpen size={16} />
+          Digital Knowledge Bank
+        </button>
         <button 
           onClick={() => setActiveTab('upcoming')}
           className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'upcoming' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text'}`}
@@ -99,64 +107,68 @@ export default function PromotionsManagement() {
         </button>
       </div>
 
-      <div className="card overflow-hidden">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Date / Schedule</th>
-              <th>Channel</th>
-              <th>Recipients</th>
-              <th>Frequency</th>
-              <th>Status</th>
-              <th>Sent / Failed</th>
-              <th className="text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan="7" className="text-center py-8 text-text-muted">Loading...</td></tr>
-            ) : displayBatches.length === 0 ? (
-              <tr><td colSpan="7" className="text-center py-8 text-text-muted">No {activeTab} promotions found.</td></tr>
-            ) : displayBatches.map((batch, i) => (
-              <tr key={batch.id} className="animate-stagger-in" style={{ animationDelay: `${i * 30}ms` }}>
-                <td className="text-xs font-mono">
-                  {batch.scheduled_start_date ? new Date(batch.scheduled_start_date).toLocaleDateString('en-IN') : new Date(batch.created_at).toLocaleDateString('en-IN')}
-                  {batch.scheduled_end_date && ` to ${new Date(batch.scheduled_end_date).toLocaleDateString('en-IN')}`}
-                </td>
-                <td><span className={`badge ${batch.channel === 'WhatsApp' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{batch.channel}</span></td>
-                <td className="font-mono">{batch.recipient_count}</td>
-                <td className="text-xs">{batch.frequency || 'Once'}</td>
-                <td>
-                  <span className={`badge ${['Completed'].includes(batch.send_status) ? 'badge-active' : ['Cancelled', 'Rejected'].includes(batch.send_status) ? 'badge-inactive' : 'badge-pending'}`}>
-                    {batch.send_status}
-                  </span>
-                </td>
-                <td className="font-mono text-xs">
-                  <span className="text-success">{batch.sent_count}</span> / <span className="text-danger">{batch.failed_count}</span>
-                </td>
-                <td className="text-right">
-                  <div className="flex gap-2 justify-end">
-                    {activeTab === 'upcoming' ? (
-                      <>
-                        <button onClick={() => handleEdit(batch)} title="Edit Schedule" className="p-1.5 bg-surface hover:bg-bg text-text-muted hover:text-primary rounded-md transition-colors">
-                          <Edit2 size={14} />
-                        </button>
-                        <button onClick={() => handleCancel(batch.id)} title="Cancel Promotion" className="p-1.5 bg-surface hover:bg-bg text-text-muted hover:text-danger rounded-md transition-colors">
-                          <StopCircle size={14} />
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => handleDuplicate(batch)} title="Duplicate Promotion" className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-md font-medium transition-colors">
-                        <Copy size={14} /> Duplicate
-                      </button>
-                    )}
-                  </div>
-                </td>
+      {activeTab === 'knowledge_bank' ? (
+        <PromotionLibrary readOnly={true} embedded={true} />
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date / Schedule</th>
+                <th>Channel</th>
+                <th>Recipients</th>
+                <th>Frequency</th>
+                <th>Status</th>
+                <th>Sent / Failed</th>
+                <th className="text-right">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="7" className="text-center py-8 text-text-muted">Loading...</td></tr>
+              ) : displayBatches.length === 0 ? (
+                <tr><td colSpan="7" className="text-center py-8 text-text-muted">No {activeTab} promotions found.</td></tr>
+              ) : displayBatches.map((batch, i) => (
+                <tr key={batch.id} className="animate-stagger-in" style={{ animationDelay: `${i * 30}ms` }}>
+                  <td className="text-xs font-mono">
+                    {batch.scheduled_start_date ? new Date(batch.scheduled_start_date).toLocaleDateString('en-IN') : new Date(batch.created_at).toLocaleDateString('en-IN')}
+                    {batch.scheduled_end_date && ` to ${new Date(batch.scheduled_end_date).toLocaleDateString('en-IN')}`}
+                  </td>
+                  <td><span className={`badge ${batch.channel === 'WhatsApp' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{batch.channel}</span></td>
+                  <td className="font-mono">{batch.recipient_count}</td>
+                  <td className="text-xs">{batch.frequency || 'Once'}</td>
+                  <td>
+                    <span className={`badge ${['Completed'].includes(batch.send_status) ? 'badge-active' : ['Cancelled', 'Rejected'].includes(batch.send_status) ? 'badge-inactive' : 'badge-pending'}`}>
+                      {batch.send_status}
+                    </span>
+                  </td>
+                  <td className="font-mono text-xs">
+                    <span className="text-success">{batch.sent_count}</span> / <span className="text-danger">{batch.failed_count}</span>
+                  </td>
+                  <td className="text-right">
+                    <div className="flex gap-2 justify-end">
+                      {activeTab === 'upcoming' ? (
+                        <>
+                          <button onClick={() => handleEdit(batch)} title="Edit Schedule" className="p-1.5 bg-surface hover:bg-bg text-text-muted hover:text-primary rounded-md transition-colors">
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleCancel(batch.id)} title="Cancel Promotion" className="p-1.5 bg-surface hover:bg-bg text-text-muted hover:text-danger rounded-md transition-colors">
+                            <StopCircle size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => handleDuplicate(batch)} title="Duplicate Promotion" className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-md font-medium transition-colors">
+                          <Copy size={14} /> Duplicate
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {modalConfig && modalConfig.mode === 'create_audience' ? (
         <AudienceTargetingModal

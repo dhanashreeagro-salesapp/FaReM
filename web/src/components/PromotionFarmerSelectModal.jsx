@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, CheckSquare, Square, Users, ArrowRight, Loader2, Phone, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Search, CheckSquare, Square, Users, ArrowRight, Loader2, Phone, MapPin, Filter, RotateCcw } from 'lucide-react';
 import api from '../services/api';
 
 export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSelection }) {
   const [farmers, setFarmers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
+  const [selectedVillage, setSelectedVillage] = useState('');
+  const [selectedTaluka, setSelectedTaluka] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,16 +25,44 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
     fetchFarmers();
   }, []);
 
-  const filteredFarmers = farmers.filter(f => {
-    if (!search.trim()) return true;
-    const term = search.toLowerCase();
-    return (
-      (f.full_name || '').toLowerCase().includes(term) ||
-      (f.primary_mobile || '').includes(term) ||
-      (f.village || '').toLowerCase().includes(term) ||
-      (f.taluka || '').toLowerCase().includes(term)
-    );
-  });
+  const villages = useMemo(() => {
+    const set = new Set();
+    farmers.forEach(f => {
+      if (f.village && f.village.trim()) set.add(f.village.trim());
+    });
+    return Array.from(set).sort();
+  }, [farmers]);
+
+  const talukas = useMemo(() => {
+    const set = new Set();
+    farmers.forEach(f => {
+      if (f.taluka && f.taluka.trim()) set.add(f.taluka.trim());
+    });
+    return Array.from(set).sort();
+  }, [farmers]);
+
+  const filteredFarmers = useMemo(() => {
+    return farmers.filter(f => {
+      if (selectedVillage && f.village !== selectedVillage) return false;
+      if (selectedTaluka && f.taluka !== selectedTaluka) return false;
+      if (!search.trim()) return true;
+      const term = search.toLowerCase();
+      return (
+        (f.full_name || '').toLowerCase().includes(term) ||
+        (f.primary_mobile || '').includes(term) ||
+        (f.village || '').toLowerCase().includes(term) ||
+        (f.taluka || '').toLowerCase().includes(term)
+      );
+    });
+  }, [farmers, search, selectedVillage, selectedTaluka]);
+
+  const hasActiveFilters = Boolean(search || selectedVillage || selectedTaluka);
+
+  const resetFilters = () => {
+    setSearch('');
+    setSelectedVillage('');
+    setSelectedTaluka('');
+  };
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => 
@@ -73,7 +103,7 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
           </button>
         </div>
 
-        {/* Search Bar & Action Controls */}
+        {/* Search Bar & Filter Controls */}
         <div className="p-4 border-b border-border bg-bg/20 space-y-3">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -86,18 +116,55 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-text-muted px-1">
-            <button 
-              onClick={toggleAll}
-              className="flex items-center gap-1.5 font-semibold text-primary hover:underline"
+          {/* Quick Dropdown Filters */}
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={selectedVillage}
+              onChange={e => setSelectedVillage(e.target.value)}
+              className="bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary"
             >
-              {selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? (
-                <CheckSquare size={14} />
-              ) : (
-                <Square size={14} />
+              <option value="">All Villages ({villages.length})</option>
+              {villages.map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedTaluka}
+              onChange={e => setSelectedTaluka(e.target.value)}
+              className="bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary"
+            >
+              <option value="">All Talukas ({talukas.length})</option>
+              {talukas.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-text-muted px-1">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={toggleAll}
+                className="flex items-center gap-1.5 font-semibold text-primary hover:underline"
+              >
+                {selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? (
+                  <CheckSquare size={14} />
+                ) : (
+                  <Square size={14} />
+                )}
+                <span>{selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? 'Deselect All' : 'Select All Filtered'}</span>
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-1 text-text-muted hover:text-text font-medium"
+                >
+                  <RotateCcw size={12} /> Clear filters
+                </button>
               )}
-              <span>{selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? 'Deselect All' : 'Select All Filtered'}</span>
-            </button>
+            </div>
+
             <span>Selected: <strong className="text-text">{selectedIds.length}</strong> of {filteredFarmers.length} farmers</span>
           </div>
         </div>
@@ -112,7 +179,7 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
           ) : filteredFarmers.length === 0 ? (
             <div className="py-12 text-center text-text-muted">
               <Users size={36} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm font-medium">No farmers found matching your search.</p>
+              <p className="text-sm font-medium">No farmers found matching your filter criteria.</p>
             </div>
           ) : (
             filteredFarmers.map(farmer => {
