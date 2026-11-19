@@ -4,7 +4,7 @@ import api from '../services/api';
 import { getAll } from '../utils/db';
 import syncService from '../services/syncService';
 
-export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSelection }) {
+export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSelection, singleSelect = false, channel = 'WhatsApp' }) {
   const [farmers, setFarmers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
@@ -110,9 +110,13 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
   };
 
   const toggleSelect = (id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    if (singleSelect) {
+      setSelectedIds(prev => (prev.includes(id) ? [] : [id]));
+    } else {
+      setSelectedIds(prev => 
+        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      );
+    }
   };
 
   const toggleAll = () => {
@@ -142,7 +146,9 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
         <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-bg/40">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-heading font-bold text-text text-base md:text-lg">Select Farmers for WhatsApp Handoff</h3>
+              <h3 className="font-heading font-bold text-text text-base md:text-lg">
+                {singleSelect ? `Select One Farmer for ${channel}` : `Select Farmers for ${channel}`}
+              </h3>
               {isLocalDB && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                   <Database size={10} /> Local Storage Active
@@ -198,17 +204,24 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
 
           <div className="flex items-center justify-between text-xs text-text-muted px-1">
             <div className="flex items-center gap-3">
-              <button 
-                onClick={toggleAll}
-                className="flex items-center gap-1.5 font-semibold text-primary hover:underline"
-              >
-                {selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? (
-                  <CheckSquare size={14} />
-                ) : (
-                  <Square size={14} />
-                )}
-                <span>{selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? 'Deselect All' : 'Select All Filtered'}</span>
-              </button>
+              {!singleSelect && (
+                <button 
+                  onClick={toggleAll}
+                  className="flex items-center gap-1.5 font-semibold text-primary hover:underline"
+                >
+                  {selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? (
+                    <CheckSquare size={14} />
+                  ) : (
+                    <Square size={14} />
+                  )}
+                  <span>{selectedIds.length === filteredFarmers.length && filteredFarmers.length > 0 ? 'Deselect All' : 'Select All Filtered'}</span>
+                </button>
+              )}
+              {singleSelect && (
+                <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-semibold border border-amber-200">
+                  Select 1 farmer for single SMS dispatch
+                </span>
+              )}
 
               {hasActiveFilters && (
                 <button
@@ -292,7 +305,7 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
             disabled={selectedIds.length === 0}
             className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-medium shadow-sm hover:shadow transition-all btn-press"
           >
-            <span>Proceed to Send ({selectedIds.length})</span>
+            <span>Proceed to Send {channel} ({selectedIds.length})</span>
             <ArrowRight size={15} />
           </button>
         </div>

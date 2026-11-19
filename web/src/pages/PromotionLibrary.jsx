@@ -73,6 +73,8 @@ export default function PromotionLibrary({ readOnly = false, embedded = false })
   // Modal interactions
   const [previewPromo, setPreviewPromo] = useState(null);
   const [farmerSelectPromo, setFarmerSelectPromo] = useState(null);
+  const [smsFarmerSelectPromo, setSmsFarmerSelectPromo] = useState(null);
+  const [smsPostCheckPromo, setSmsPostCheckPromo] = useState(null); // { promo, farmer, text }
   const [whatsappModalData, setWhatsappModalData] = useState(null); // { farmerIds, initialData }
 
   const categories = ['Product', 'Tagline', 'WhatsApp', 'Facebook', 'Instagram', 'LinkedIn', 'Schedule', 'Testimonial', 'YouTube Playlist'];
@@ -262,7 +264,70 @@ export default function PromotionLibrary({ readOnly = false, embedded = false })
   };
 
   // WhatsApp Hand-off flow
-  const handleInitiateWhatsApp = (promo) => {
+  // 1:1 Single SMS Hand-off flow
+  const handleInitiateSms = (promo) => {
+    setSmsFarmerSelectPromo(promo);
+  };
+
+  const handleSmsFarmerChosen = async (selectedFarmers) => {
+    const promo = smsFarmerSelectPromo;
+    setSmsFarmerSelectPromo(null);
+    if (!selectedFarmers || selectedFarmers.length === 0) return;
+    const farmer = selectedFarmers[0];
+
+    // Format single SMS <= 70 chars: "To view {title} click {file_URL}"
+    const cleanTitle = (promo.title || 'Advisory').trim();
+    const cleanUrl = (promo.file_url || '').trim();
+    let smsBody = `To view ${cleanTitle} click ${cleanUrl}`.replace(/\s+/g, ' ').trim();
+    if (smsBody.length > 70) {
+      const maxTitleLen = Math.max(10, 70 - cleanUrl.length - 17);
+      const shortTitle = cleanTitle.length > maxTitleLen ? cleanTitle.substring(0, maxTitleLen - 3) + '...' : cleanTitle;
+      smsBody = `To view ${shortTitle} click ${cleanUrl}`.replace(/\s+/g, ' ').trim();
+    }
+    if (smsBody.length > 70) {
+      smsBody = smsBody.substring(0, 67) + '...';
+    }
+
+    const rawMobile = farmer.primary_mobile || '';
+    const cleanDigits = rawMobile.replace(/\D/g, '').replace(/^0+/, '');
+    const finalPhone = cleanDigits.length === 10 ? `+91${cleanDigits}` : (cleanDigits.startsWith('91') ? `+${cleanDigits}` : `+${cleanDigits}`);
+
+    // Launch native SMS
+    const smsUrl = `sms:${finalPhone}?&body=${encodeURIComponent(smsBody)}`;
+    window.location.href = smsUrl;
+
+    // Prompt user confirmation
+    setTimeout(() => {
+      setSmsPostCheckPromo({ promo, farmer, text: smsBody });
+    }, 1500);
+  };
+
+  const handleConfirmPromoSmsOutcome = async (wasSent) => {
+    if (!smsPostCheckPromo) return;
+    const { promo, farmer, text } = smsPostCheckPromo;
+    setSmsPostCheckPromo(null);
+
+    try {
+      const now = new Date();
+      await api.createActivityLog({
+        farmer: farmer.id,
+        activity_type: 'SMS',
+        date: now.toISOString().split('T')[0],
+        time: now.toTimeString().split(' ')[0],
+        visit_purpose: 'Individual Promotion SMS',
+        notes: `Promotion: ${promo.title}. Status: ${wasSent ? 'User Confirmed Sent' : 'User Cancelled / Not Sent'}. Text: ${text}`,
+        sync_status: 'Synced'
+      });
+    } catch (e) {
+      console.warn('Activity log creation error:', e);
+    }
+
+    if (wasSent) {
+      alert(`Promotion SMS send confirmed for ${farmer.full_name}.`);
+    }
+  };
+
+    const handleInitiateWhatsApp = (promo) => {
     // Open farmer selection modal first
     setFarmerSelectPromo(promo);
   };
@@ -538,6 +603,14 @@ export default function PromotionLibrary({ readOnly = false, embedded = false })
                 title="Send via WhatsApp"
               >
                 <Send size={15} />
+              </button>
+              {/* Native SMS Action Button */}
+              <button 
+                onClick={() => handleInitiateSms(promo)}
+                className="p-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200 shadow-sm"
+                title="Send concise SMS (<= 70 chars) to one farmer"
+              >
+                <MessageSquare size={15} />
               </button>
               {/* Preview Button */}
               <button 
@@ -1406,6 +1479,54 @@ export default function PromotionLibrary({ readOnly = false, embedded = false })
       )}
 
       {/* ========================================================= */}
+            {/* ========================================================= */}
+      {/* MODAL 1B: Farmer Selection Step for 1:1 Native SMS        */}
+      {/* ========================================================= */}
+      {smsFarmerSelectPromo && (
+        <PromotionFarmerSelectModal
+          promo={smsFarmerSelectPromo}
+          singleSelect={true}
+          channel="SMS"
+          onClose={() => setSmsFarmerSelectPromo(null)}
+          onConfirmSelection={handleSmsFarmerChosen}
+        />
+      )}
+
+      {/* MODAL 1B Post-Check: Confirm SMS Sent                      */}
+      {smsPostCheckPromo && (
+        <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+              <MessageSquare size={24} />
+            </div>
+            <h3 className="text-base font-bold text-text">Did you send the Promotion SMS?</h3>
+            <p className="text-xs text-text-muted">
+              Please confirm whether the SMS was dispatched to <span className="font-semibold text-text">{smsPostCheckPromo.farmer?.full_name}</span>:
+            </p>
+            <div className="p-2.5 bg-bg rounded-xl border border-border text-xs font-mono text-text break-words text-left">
+              <span className="text-[10px] text-text-muted uppercase font-sans font-bold block mb-1">Message ({smsPostCheckPromo.text.length}/70 chars):</span>
+              {smsPostCheckPromo.text}
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmPromoSmsOutcome(false)}
+                className="px-3 py-2 border border-border text-text hover:bg-bg rounded-xl text-xs font-semibold"
+              >
+                SMS Not Sent
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmPromoSmsOutcome(true)}
+                className="px-3 py-2 bg-success text-white rounded-xl text-xs font-semibold hover:bg-success/90 shadow-sm"
+              >
+                I Sent This SMS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL 2: Farmer Selection Step for WhatsApp Handoff       */}
       {/* ========================================================= */}
       {farmerSelectPromo && (

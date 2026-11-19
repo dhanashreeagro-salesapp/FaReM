@@ -73,8 +73,10 @@ class BulkSendBatchViewSet(viewsets.ModelViewSet):
             send_status='Pending'
         )
         
-        # If it's a small manual WhatsApp send (<= 5), it's handled by frontend wa.me
-        if channel == 'WhatsApp' and len(farmer_ids) <= 5 and not batch.scheduled_start_date:
+        # Field staff manual WhatsApp sends (<= 5) are handled by frontend wa.me.
+        # But for Admin / Content Admin bulk WhatsApp, always dispatch via backend API even if small batch.
+        is_admin_or_content = user.role in [Role.ADMIN, Role.CONTENT_ADMIN, Role.CONTENT_TEAM]
+        if channel == 'WhatsApp' and len(farmer_ids) <= 5 and not batch.scheduled_start_date and not is_admin_or_content:
             batch.send_status = 'Completed'
             batch.sent_count = len(farmer_ids)
             batch.save(update_fields=['send_status', 'sent_count'])

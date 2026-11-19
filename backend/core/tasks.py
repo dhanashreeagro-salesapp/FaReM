@@ -543,24 +543,51 @@ def __send_notification__(channel, mobile_number, text_content, custom_template=
 
     try:
         mobile_clean = str(mobile_number).replace('+91', '').replace('+', '')
-        if channel == 'WhatsApp' and config.interakt_api_key:
-            headers = {
-                'Authorization': f'Basic {config.interakt_api_key}',
-                'Content-Type': 'application/json'
-            }
-            template_name = custom_template or config.interakt_template_name or 'farmer_alert_01'
-            payload = {
-                "countryCode": "+91",
-                "phoneNumber": mobile_clean,
-                "type": "Template",
-                "template": {
-                    "name": template_name,
-                    "languageCode": "en",
-                    "bodyValues": [text_content[:1024]]
+        if channel == 'WhatsApp':
+            # Check configured vendor WhatsApp URL in AppConfiguration (e.g. Auurum Digital / WhatsApp Cloud API)
+            vendor_url = config.interakt_api_key
+            template_name = custom_template or config.interakt_template_name or 'agriamigo_advisory_recommendation'
+            if vendor_url and 'http' in vendor_url:
+                # Phone format: 91 prefix without plus
+                wa_phone = f"91{mobile_clean[-10:]}" if len(mobile_clean) >= 10 else mobile_clean
+                headers = {'Content-Type': 'application/json'}
+                payload = {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": wa_phone,
+                    "type": "template",
+                    "template": {
+                        "name": template_name,
+                        "language": {"code": "en"},
+                        "components": [
+                            {
+                                "type": "body",
+                                "parameters": [
+                                    {"type": "text", "text": text_content[:1024]}
+                                ]
+                            }
+                        ]
+                    }
                 }
-            }
-            resp = requests.post("https://api.interakt.ai/v1/public/message/", json=payload, headers=headers, timeout=10)
-            success = resp.status_code in [200, 201, 202]
+                resp = requests.post(vendor_url, json=payload, headers=headers, timeout=12)
+                success = resp.status_code in [200, 201, 202]
+            elif config.interakt_api_key:
+                headers = {
+                    'Authorization': f'Basic {config.interakt_api_key}',
+                    'Content-Type': 'application/json'
+                }
+                payload = {
+                    "countryCode": "+91",
+                    "phoneNumber": mobile_clean,
+                    "type": "Template",
+                    "template": {
+                        "name": template_name,
+                        "languageCode": "en",
+                        "bodyValues": [text_content[:1024]]
+                    }
+                }
+                resp = requests.post("https://api.interakt.ai/v1/public/message/", json=payload, headers=headers, timeout=10)
+                success = resp.status_code in [200, 201, 202]
 
         elif channel == 'SMS':
             if getattr(config, 'active_sms_provider', 'STPL') == 'STPL' and config.stpl_api_key:
@@ -761,6 +788,19 @@ def execute_bulk_send_batch(batch_id):
             try:
                 farmer = Farmer.objects.get(id=farmer_id)
                 succ = __send_notification__(batch.channel, farmer.primary_mobile, text_content, custom_template=template_name)
+                from .models import ActivityLog
+                from django.utils import timezone
+                now_dt = timezone.now()
+                ActivityLog.objects.create(
+                    farmer=farmer,
+                    logged_by_user=batch.created_by_user,
+                    activity_type=batch.channel,
+                    date=now_dt.date(),
+                    time=now_dt.time(),
+                    visit_purpose=f"Bulk {batch.channel} Promotion",
+                    notes=f"Campaign: {batch.content.title}. Status: {'Provider Accepted' if succ else 'Failed'}",
+                    sync_status='Synced'
+                )
                 if succ:
                     sent += 1
                     if is_content_admin:

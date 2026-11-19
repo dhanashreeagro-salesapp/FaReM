@@ -30,6 +30,8 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showWhatsAppConfirm, setShowWhatsAppConfirm] = useState(false);
+  const [showSmsConfirm, setShowSmsConfirm] = useState(false);
+  const [showSmsPostCheck, setShowSmsPostCheck] = useState(false);
 
   // Load All Master Crops & Products
   useEffect(() => {
@@ -275,6 +277,67 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
       return `+91 ${normalized.slice(2, 7)} ${normalized.slice(7)}`;
     }
     return `+${normalized}`;
+  };
+
+  const buildSmsMessage = () => {
+    const cropName = availableCrops.find(c => String(c.id) === String(selectedCrop))?.crop_name || 'Crop';
+    const prod = productName || 'Product';
+    const dVal = dose ? `${dose}${doseUnit || ''}` : '';
+    // Format: "AgriAmigo: {Product} {Dose} for {Crop}. Apply {Timing}." strictly under 70 characters
+    let msg = `AgriAmigo: ${prod} ${dVal} for ${cropName}. Apply ${timing}.`.replace(/\s+/g, ' ').trim();
+    if (msg.length > 70) {
+      msg = `AgriAmigo: ${prod} ${dVal} for ${cropName}.`.replace(/\s+/g, ' ').trim();
+    }
+    if (msg.length > 70) {
+      msg = msg.substring(0, 67) + '...';
+    }
+    return msg;
+  };
+
+  const handleSendSmsClick = () => {
+    if (validateWhatsAppRecipient()) {
+      setShowSmsConfirm(true);
+    }
+  };
+
+  const handleLaunchNativeSms = async () => {
+    setShowSmsConfirm(false);
+    const normalizedPhone = normalizeIndianPhoneNumber(farmer?.primary_mobile);
+    const smsText = buildSmsMessage();
+
+    // 1. Save recommendation record internally first
+    await handleSaveRecommendation('SMS');
+
+    // 2. Launch native SMS application with prefilled number and message
+    const cleanPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12 ? `+${normalizedPhone}` : normalizedPhone;
+    const smsUrl = `sms:${cleanPhone}?&body=${encodeURIComponent(smsText)}`;
+    window.location.href = smsUrl;
+
+    // 3. Prompt user confirmation upon return to window
+    setTimeout(() => {
+      setShowSmsPostCheck(true);
+    }, 1500);
+  };
+
+  const handleConfirmSmsOutcome = async (wasSent) => {
+    setShowSmsPostCheck(false);
+    try {
+      const now = new Date();
+      await api.createActivityLog({
+        farmer: farmer.id,
+        activity_type: 'SMS',
+        date: now.toISOString().split('T')[0],
+        time: now.toTimeString().split(' ')[0],
+        visit_purpose: 'Individual Recommendation SMS',
+        notes: `Advisory: ${productName}. Outcome: ${wasSent ? 'User Confirmed Sent' : 'User Cancelled / Not Sent'}. Text: ${buildSmsMessage()}`,
+        sync_status: 'Synced'
+      });
+    } catch (e) {
+      console.warn('Activity log sync error:', e);
+    }
+    if (wasSent) {
+      alert(`SMS send confirmed for ${farmer?.full_name}.`);
+    }
   };
 
   const buildAdvisoryMessage = () => {
@@ -566,8 +629,9 @@ AgriAmigo Advisory`;
           <button
             type="button"
             disabled={loading}
-            onClick={() => handleSaveRecommendation('SMS')}
+            onClick={handleSendSmsClick}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-md"
+            title="Send concise advisory SMS (<= 70 chars) via device SMS app"
           >
             <Send size={14} />
             <span>Send SMS</span>
@@ -582,6 +646,71 @@ AgriAmigo Advisory`;
             <span>Send on WhatsApp</span>
           </button>
         </div>
+
+        {showSmsConfirm && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+              <h3 className="text-base font-bold text-text">Confirm Native SMS Advisory</h3>
+              <p className="text-xs text-text-muted">
+                Send SMS to <span className="font-bold text-text">{farmer?.full_name}</span> ({formatPhoneForDisplay(farmer?.primary_mobile)})
+              </p>
+              
+              <div className="p-3 bg-bg rounded-xl border border-border text-xs font-mono text-text break-words">
+                <div className="text-[10px] text-text-muted uppercase font-bold font-sans mb-1">
+                  Prefilled SMS Text ({buildSmsMessage().length}/70 chars):
+                </div>
+                {buildSmsMessage()}
+              </div>
+
+              <div className="flex justify-end gap-2 text-xs pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSmsConfirm(false)}
+                  className="px-4 py-2 border border-border text-text hover:bg-bg rounded-xl font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLaunchNativeSms}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
+                >
+                  Open SMS App
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showSmsPostCheck && (
+          <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Send size={24} />
+              </div>
+              <h3 className="text-base font-bold text-text">Did you send the SMS?</h3>
+              <p className="text-xs text-text-muted">
+                Please confirm whether the SMS was dispatched to {farmer?.full_name} from your messaging app:
+              </p>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmSmsOutcome(false)}
+                  className="px-3 py-2 border border-border text-text hover:bg-bg rounded-xl text-xs font-semibold"
+                >
+                  SMS Not Sent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmSmsOutcome(true)}
+                  className="px-3 py-2 bg-success text-white rounded-xl text-xs font-semibold hover:bg-success/90 shadow-sm"
+                >
+                  I Sent This SMS
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showWhatsAppConfirm && (
           <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

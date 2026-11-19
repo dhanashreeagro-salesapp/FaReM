@@ -119,6 +119,13 @@ export default function FarmerTimeline({ farmerId }) {
                   {item.details.notes && <p><strong>Notes:</strong> {item.details.notes}</p>}
                 </div>
               )}
+
+              {(item.type === 'SMS Message' || item.type === 'WhatsApp Message') && (
+                <div className="text-xs text-text space-y-1 bg-surface p-2.5 rounded-lg border border-border">
+                  <p><strong>Status:</strong> <span className="font-semibold text-primary">{item.status || item.details?.status || 'Sent'}</span></p>
+                  {item.description && <p><strong>Details:</strong> {item.description}</p>}
+                </div>
+              )}
             </div>
           </div>
         ))}

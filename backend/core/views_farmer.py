@@ -425,7 +425,7 @@ class FarmerViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def timeline(self, request, pk=None):
         farmer = self.get_object()
-        from .models import FieldVisit, CallLog, Recommendation, StageChangeLog
+        from .models import FieldVisit, CallLog, Recommendation, StageChangeLog, ActivityLog
         
         events = []
         for v in FieldVisit.objects.filter(farmer=farmer).select_related('staff', 'plot'):
@@ -470,6 +470,21 @@ class FarmerViewSet(viewsets.ModelViewSet):
                 'description': s.notes or 'Crop stage update',
                 'user': (f"{s.changed_by.first_name} {s.changed_by.last_name}".strip() or s.changed_by.email) if s.changed_by else 'System',
                 'timestamp': s.date_changed.isoformat() if s.date_changed else None,
+            })
+
+        for a in ActivityLog.objects.filter(farmer=farmer, activity_type__in=['SMS', 'WhatsApp']).select_related('logged_by_user'):
+            import datetime
+            dt = datetime.datetime.combine(a.date, a.time).isoformat() if a.date and a.time else None
+            events.append({
+                'id': str(a.id),
+                'type': f"{a.activity_type} Message",
+                'title': a.visit_purpose or f"{a.activity_type} Message",
+                'description': a.notes or f"{a.activity_type} communication",
+                'staff_name': (f"{a.logged_by_user.first_name} {a.logged_by_user.last_name}".strip() or a.logged_by_user.email) if a.logged_by_user else 'Unknown',
+                'user': (f"{a.logged_by_user.first_name} {a.logged_by_user.last_name}".strip() or a.logged_by_user.email) if a.logged_by_user else 'Unknown',
+                'timestamp': dt,
+                'status': a.sync_status,
+                'details': {'notes': a.notes, 'status': a.sync_status}
             })
 
         events.sort(key=lambda x: str(x['timestamp'] or ''), reverse=True)

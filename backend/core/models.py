@@ -274,7 +274,7 @@ class ActivityLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     farmer = models.ForeignKey(Farmer, on_delete=models.CASCADE, related_name='activities')
     logged_by_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='logged_activities')
-    activity_type = models.CharField(max_length=50, choices=[('Visit', 'Visit'), ('Call', 'Call')])
+    activity_type = models.CharField(max_length=50, choices=[('Visit', 'Visit'), ('Call', 'Call'), ('SMS', 'SMS'), ('WhatsApp', 'WhatsApp')])
     date = models.DateField()
     time = models.TimeField()
     location = gis_models.PointField(null=True, blank=True)

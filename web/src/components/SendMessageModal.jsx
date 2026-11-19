@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Calendar, Clock, RefreshCw, Search, ChevronDown, Sparkles } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from './AuthProvider';
 
 export default function SendMessageModal({ farmerIds, onClose, onSuccess, initialData, mode = 'create' }) {
   const [promotions, setPromotions] = useState([]);
@@ -16,10 +17,15 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
   const [robustFarmers, setRobustFarmers] = useState(farmerIds);
 
   const filters = initialData?.filters || {};
+  const { user } = useAuth();
+  const isAdminOrContent = user?.role === 'Admin' || user?.role === 'ContentTeam' || user?.role === 'ContentAdmin';
+
   const { crop: filterCrop, stage: filterStage } = filters;
   
   const justIds = robustFarmers.map(f => typeof f === 'object' ? f.id : f);
-  const isManualWhatsApp = channel === 'WhatsApp' && scheduleMode === 'Immediate' && justIds.length <= 5 && typeof robustFarmers[0] === 'object';
+  // Manual WhatsApp (wa.me) is reserved for Field Staff / Managers sending <= 5 items.
+  // For Admin / Content Admin, all bulk campaigns are dispatched via backend API.
+  const isManualWhatsApp = !isAdminOrContent && channel === 'WhatsApp' && scheduleMode === 'Immediate' && justIds.length <= 5 && typeof robustFarmers[0] === 'object';
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -125,6 +131,17 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
         </div>
         
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {isAdminOrContent && (
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs space-y-1">
+              <div className="flex items-center justify-between font-bold text-emerald-950">
+                <span>📢 Bulk WhatsApp API Broadcast (Admin / Content Admin)</span>
+                <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-300">API Queue</span>
+              </div>
+              <p className="text-text-muted">
+                Messages will be dispatched to {farmerIds.length} recipient(s) via the configured WhatsApp API settings with weekly frequency caps applied.
+              </p>
+            </div>
+          )}
           <div className="relative">
             <label className="block text-sm font-semibold text-text mb-1">Select Message Template *</label>
             <div 
@@ -321,7 +338,7 @@ export default function SendMessageModal({ farmerIds, onClose, onSuccess, initia
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg disabled:opacity-50 btn-press">
-              {isManualWhatsApp ? 'Done' : (loading ? 'Processing...' : 'Send Message')}
+              {isManualWhatsApp ? 'Done' : (loading ? 'Processing...' : (isAdminOrContent ? `Launch Campaign (${farmerIds.length} farmers)` : 'Send Message'))}
             </button>
           </div>
         </form>
