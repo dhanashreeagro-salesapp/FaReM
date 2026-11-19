@@ -23,6 +23,23 @@ def audit_pre_save(sender, instance, **kwargs):
         except sender.DoesNotExist:
             instance._old_instance = None
 
+def safe_dispatch_audit_log(**kwargs):
+    try:
+        create_audit_log_async.delay(**kwargs)
+    except Exception:
+        try:
+            SystemAuditLog.objects.create(
+                entity_type=kwargs.get('entity_type', ''),
+                entity_id=str(kwargs.get('entity_id', '')),
+                field_changed=kwargs.get('field_changed', ''),
+                old_value=str(kwargs.get('old_value', '')),
+                new_value=str(kwargs.get('new_value', '')),
+                user_id=str(kwargs.get('user_id', '')) if kwargs.get('user_id') else '',
+                action_type=kwargs.get('action_type', '')
+            )
+        except Exception:
+            pass
+
 @receiver(post_save, sender=Farmer)
 @receiver(post_save, sender=Territory)
 @receiver(post_save, sender=User)
@@ -32,7 +49,7 @@ def audit_post_save(sender, instance, created, **kwargs):
     user_id = str(user.id) if user else None
     
     if created:
-        create_audit_log_async.delay(
+        safe_dispatch_audit_log(
             entity_type=sender.__name__,
             entity_id=str(instance.id),
             field_changed='All',
@@ -49,7 +66,7 @@ def audit_post_save(sender, instance, created, **kwargs):
                 old_value = getattr(old_instance, field_name)
                 new_value = getattr(instance, field_name)
                 if old_value != new_value:
-                    create_audit_log_async.delay(
+                    safe_dispatch_audit_log(
                         entity_type=sender.__name__,
                         entity_id=str(instance.id),
                         field_changed=field_name,
@@ -67,7 +84,7 @@ def audit_post_delete(sender, instance, **kwargs):
     user = get_current_user()
     user_id = str(user.id) if user else None
     
-    create_audit_log_async.delay(
+    safe_dispatch_audit_log(
         entity_type=sender.__name__,
         entity_id=str(instance.id),
         field_changed='All',
