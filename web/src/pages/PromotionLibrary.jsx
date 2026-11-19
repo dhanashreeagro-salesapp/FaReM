@@ -4,7 +4,7 @@ import { useAuth } from '../components/AuthProvider';
 import { 
   Plus, X, Edit2, Trash2, Search, Upload, ExternalLink, Check, Sparkles, Filter, 
   RotateCcw, Eye, Send, Sprout, Package, Layers, Grid, ChevronRight, CheckCircle2,
-  RefreshCw, FileText, Video as VideoIcon, Image as ImageIcon, Link as LinkIcon
+  RefreshCw, FileText, Video as VideoIcon, Image as ImageIcon, Link as LinkIcon, MessageSquare
 } from 'lucide-react';
 import ImportWizard from '../components/ImportWizard';
 import PromotionPreviewModal from '../components/PromotionPreviewModal';
