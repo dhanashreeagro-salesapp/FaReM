@@ -12,6 +12,9 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
   const [selectedTaluka, setSelectedTaluka] = useState('');
   const [loading, setLoading] = useState(true);
   const [isLocalDB, setIsLocalDB] = useState(false);
+  const [serverResults, setServerResults] = useState([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
+  const searchTimer = React.useRef(null);
 
   const loadFarmers = async () => {
     try {
@@ -29,18 +32,13 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
 
     // 2. Fallback if local store is not yet populated
     try {
+      // Trigger background delta sync so local DB gets populated
       if (syncService && typeof syncService.performSync === 'function') {
-        await syncService.performSync();
-        const synced = await getAll('farmers');
-        if (synced && synced.length > 0) {
-          setFarmers(synced);
-          setIsLocalDB(true);
-          setLoading(false);
-          return;
-        }
+        syncService.performSync().catch(() => {});
       }
 
-      const data = await api.getFarmers();
+      // Fetch a larger page for initial browsing
+      const data = await api.getFarmers({ page_size: 200 });
       const list = Array.isArray(data) ? data : data.results || [];
       setFarmers(list);
     } catch (err) {
@@ -70,6 +68,41 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
     return () => window.removeEventListener('localdb-synced', handleSync);
   }, []);
 
+  // Debounced Live Server Search across all 6,982+ database farmers
+  useEffect(() => {
+    if (!search || !search.trim()) {
+      setServerResults([]);
+      setIsSearchingServer(false);
+      return;
+    }
+
+    // If local DB is loaded and has a large directory (>= 500 records), local in-memory search is already exhaustive
+    if (isLocalDB && farmers.length >= 500) {
+      setServerResults([]);
+      return;
+    }
+
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    searchTimer.current = setTimeout(async () => {
+      setIsSearchingServer(true);
+      try {
+        const resp = await api.getFarmers({ search: search.trim(), page_size: 100 });
+        const list = Array.isArray(resp) ? resp : resp.results || [];
+        setServerResults(list);
+      } catch (e) {
+        console.warn('Server search failed:', e);
+      } finally {
+        setIsSearchingServer(false);
+      }
+    }, 250);
+
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [search, isLocalDB, farmers.length]);
+
+
   const villages = useMemo(() => {
     const set = new Set();
     farmers.forEach(f => {
@@ -87,7 +120,15 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
   }, [farmers]);
 
   const filteredFarmers = useMemo(() => {
-    return farmers.filter(f => {
+    // If active search returned server-side results (covering all DB records), merge them
+    let baseList = farmers;
+    if (search.trim() && serverResults.length > 0) {
+      const existingIds = new Set(farmers.map(f => f.id));
+      const newItems = serverResults.filter(f => !existingIds.has(f.id));
+      baseList = [...serverResults, ...farmers.filter(f => !newItems.some(n => n.id === f.id))];
+    }
+
+    return baseList.filter(f => {
       if (selectedVillage && f.village !== selectedVillage) return false;
       if (selectedTaluka && f.taluka !== selectedTaluka) return false;
       if (!search.trim()) return true;
@@ -99,7 +140,7 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
         (f.taluka || '').toLowerCase().includes(term)
       );
     });
-  }, [farmers, search, selectedVillage, selectedTaluka]);
+  }, [farmers, serverResults, search, selectedVillage, selectedTaluka]);
 
   const hasActiveFilters = Boolean(search || selectedVillage || selectedTaluka);
 
@@ -131,7 +172,8 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
     if (selectedIds.length === 0) {
       return alert('Please select at least one farmer to send the promotion.');
     }
-    const chosen = farmers.filter(f => selectedIds.includes(f.id));
+    const allAvailable = [...farmers, ...serverResults];
+    const chosen = allAvailable.filter(f => selectedIds.includes(f.id));
     onConfirmSelection(chosen);
   };
 
@@ -173,8 +215,11 @@ export default function PromotionFarmerSelectModal({ promo, onClose, onConfirmSe
               placeholder="Search farmer by name, mobile, village, taluka..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface border border-border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all"
+              className="w-full bg-surface border border-border rounded-xl pl-9 pr-10 py-2 text-sm focus:outline-none focus:border-primary transition-all"
             />
+            {isSearchingServer && (
+              <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary animate-spin" />
+            )}
           </div>
 
           {/* Quick Dropdown Filters */}
