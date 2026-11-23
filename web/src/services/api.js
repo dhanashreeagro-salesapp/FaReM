@@ -158,8 +158,10 @@ class ApiClient {
         return response;
       } catch (err) {
         lastError = err;
-        // Auto retry network "Failed to fetch" errors up to retries count
-        if (attempt < retries && (err.name === 'TypeError' || (err.message && err.message.includes('fetch')))) {
+        const method = (options.method || 'GET').toUpperCase();
+        const isSafeToRetry = method === 'GET' || method === 'HEAD';
+        // Auto retry network "Failed to fetch" errors up to retries count for safe idempotent requests
+        if (isSafeToRetry && attempt < retries && (err.name === 'TypeError' || (err.message && err.message.includes('fetch')))) {
           await new Promise((res) => setTimeout(res, (attempt + 1) * 2000));
         } else {
           if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
@@ -459,7 +461,13 @@ class ApiClient {
     const qs = new URLSearchParams(params).toString();
     return this.request(`/plots/${qs ? `?${qs}` : ''}`);
   }
-  createPlot(data) { return this.request('/plots/', { method: 'POST', body: JSON.stringify(data) }); }
+  createPlot(data) {
+    const payload = { ...data };
+    if (!payload.id && typeof crypto !== 'undefined' && crypto.randomUUID) {
+      payload.id = crypto.randomUUID();
+    }
+    return this.request('/plots/', { method: 'POST', body: JSON.stringify(payload) });
+  }
   updatePlot(id, data) { return this.request(`/plots/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   deletePlot(id) { return this.request(`/plots/${id}/`, { method: 'DELETE' }); }
 
@@ -468,7 +476,13 @@ class ApiClient {
     const qs = new URLSearchParams(params).toString();
     return this.request(`/crop-seasons/${qs ? `?${qs}` : ''}`);
   }
-  createCropSeason(data) { return this.request('/crop-seasons/', { method: 'POST', body: JSON.stringify(data) }); }
+  createCropSeason(data) {
+    const payload = { ...data };
+    if (!payload.id && typeof crypto !== 'undefined' && crypto.randomUUID) {
+      payload.id = crypto.randomUUID();
+    }
+    return this.request('/crop-seasons/', { method: 'POST', body: JSON.stringify(payload) });
+  }
   updateCropSeason(id, data) { return this.request(`/crop-seasons/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }); }
   advanceCropStage(id) { return this.request(`/crop-seasons/${id}/advance_stage/`, { method: 'POST' }); }
 

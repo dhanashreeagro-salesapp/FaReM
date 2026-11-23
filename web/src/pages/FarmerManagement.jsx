@@ -207,8 +207,30 @@ export default function FarmerManagement() {
         setHasPrev(false);
       }
     } catch (err) { 
-      console.error(err);
-      setFarmers([]); 
+      console.warn("api.getFarmers network error, falling back to local IndexedDB:", err);
+      try {
+        const { getAll } = await import('../utils/db');
+        const localFarmers = await getAll('farmers');
+        if (localFarmers && localFarmers.length > 0) {
+          let filtered = localFarmers;
+          if (search) {
+            const sLower = search.toLowerCase();
+            filtered = filtered.filter(f => 
+              (f.full_name && f.full_name.toLowerCase().includes(sLower)) ||
+              (f.primary_mobile && f.primary_mobile.includes(sLower)) ||
+              (f.village && f.village.toLowerCase().includes(sLower))
+            );
+          }
+          setFarmers(filtered);
+          setTotalCount(filtered.length);
+          setHasNext(false);
+          setHasPrev(false);
+        } else {
+          setFarmers([]); 
+        }
+      } catch {
+        setFarmers([]);
+      }
     }
     setLoading(false);
   }, [buildQueryParams]);

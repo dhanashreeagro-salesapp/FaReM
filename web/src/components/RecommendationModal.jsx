@@ -73,7 +73,22 @@ export default function RecommendationModal({ farmer, onClose, onSuccess, onCrea
           updateCropsForPlot(null, allCrops);
         }
       } catch (err) {
-        console.warn("Could not load farmer plots:", err);
+        console.warn("Could not load farmer plots online, attempting local IndexedDB:", err);
+        try {
+          const { getAll } = await import('../utils/db');
+          const localPlots = await getAll('plots');
+          const list = (localPlots || []).filter(p => String(p.farmer || p.farmer_id) === String(farmer.id));
+          setFarmerPlots(list);
+          if (list.length > 0) {
+            setSelectedPlotId(list[0].id);
+            updateCropsForPlot(list[0], allCrops);
+          } else {
+            setSelectedPlotId('');
+            updateCropsForPlot(null, allCrops);
+          }
+        } catch {
+          setFarmerPlots([]);
+        }
       }
     }
     loadFarmerPlots();

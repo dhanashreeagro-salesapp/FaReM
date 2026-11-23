@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Plot, CropSeason, StageChangeLog
 
 class CropSeasonSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False)
     crop_name = serializers.CharField(source='crop.crop_name', read_only=True)
     stage_name = serializers.SerializerMethodField()
 
@@ -23,6 +24,7 @@ class CropSeasonSerializer(serializers.ModelSerializer):
         return "Germination / Initial Growth"
 
 class PlotSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False)
     location_wkt = serializers.CharField(write_only=True, required=False)
     location_geojson = serializers.SerializerMethodField()
     latitude = serializers.SerializerMethodField()

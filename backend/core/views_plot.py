@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.db.models import Q
 from datetime import timedelta
 from .models import Plot, CropSeason, StageChangeLog, CropStage, Role
 from .serializers_plot import PlotSerializer, CropSeasonSerializer, StageChangeLogSerializer
@@ -18,13 +19,18 @@ class PlotViewSet(viewsets.ModelViewSet):
         if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
             queryset = Plot.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
+            team_users = user.get_team_users()
+            team_user_ids = [u.id for u in team_users]
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
-            queryset = Plot.objects.filter(farmer__territory__in=territories)
+            q_filter = Q(farmer__assigned_staff_id__in=team_user_ids)
+            if territories:
+                q_filter |= Q(farmer__territory__in=territories)
+            queryset = Plot.objects.filter(q_filter)
         elif user.role == Role.FIELD_STAFF:
             queryset = Plot.objects.filter(farmer__assigned_staff=user)
             
@@ -35,9 +41,16 @@ class PlotViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         wkt = serializer.validated_data.pop('location_wkt', None)
-        # Capture any manually provided area_acres before save
-        manual_area = serializer.validated_data.get('area_acres')
-        plot = serializer.save()
+        client_id = self.request.data.get('id')
+        if client_id:
+            import uuid
+            try:
+                parsed_id = uuid.UUID(str(client_id))
+                plot = serializer.save(id=parsed_id)
+            except (ValueError, TypeError):
+                plot = serializer.save()
+        else:
+            plot = serializer.save()
         
         update_fields = []
         if wkt:
@@ -59,7 +72,6 @@ class PlotViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         wkt = serializer.validated_data.pop('location_wkt', None)
-        manual_area = serializer.validated_data.get('area_acres')
         plot = serializer.save()
         
         update_fields = []
@@ -90,13 +102,18 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
         if user.role in [Role.ADMIN, Role.ZONAL_MANAGER, Role.CONTENT_TEAM]:
             queryset = CropSeason.objects.all()
         elif user.role == Role.TERRITORY_MANAGER:
+            team_users = user.get_team_users()
+            team_user_ids = [u.id for u in team_users]
             territories = []
             if user.territory:
                 territories.extend(user.territory.get_all_sub_territories())
             for managed_territory in user.managed_territories.all():
                 territories.extend(managed_territory.get_all_sub_territories())
             territories = list(set(territories))
-            queryset = CropSeason.objects.filter(plot__farmer__territory__in=territories)
+            q_filter = Q(plot__farmer__assigned_staff_id__in=team_user_ids)
+            if territories:
+                q_filter |= Q(plot__farmer__territory__in=territories)
+            queryset = CropSeason.objects.filter(q_filter)
         elif user.role == Role.FIELD_STAFF:
             queryset = CropSeason.objects.filter(plot__farmer__assigned_staff=user)
             
@@ -106,7 +123,17 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        season = serializer.save()
+        client_id = self.request.data.get('id')
+        if client_id:
+            import uuid
+            try:
+                parsed_id = uuid.UUID(str(client_id))
+                season = serializer.save(id=parsed_id)
+            except (ValueError, TypeError):
+                season = serializer.save()
+        else:
+            season = serializer.save()
+
         if not season.current_stage and season.sowing_date:
             from django.utils import timezone
             today = timezone.now().date()
@@ -143,8 +170,6 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
         next_stage = next_stages.first()
 
         if next_stage:
-            # Formula: SowingDate + Σ(DaysFromPreviousStage) for stages 1 through N+1
-            # First, get all stages up to and including the next stage
             all_stages_up_to_next = CropStage.objects.filter(
                 crop=season.crop,
                 sequence_number__lte=next_stage.sequence_number
@@ -157,8 +182,6 @@ class CropSeasonViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsStaffOrManagerOrAdmin])
     def advance_stage(self, request, pk=None):
         season = self.get_object()
-        
-        # User confirmation is required before this API is called (handled in frontend logic)
         
         old_stage = season.current_stage
         if not old_stage:

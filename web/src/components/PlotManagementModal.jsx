@@ -4,6 +4,8 @@ import { MapContainer, TileLayer, Polygon, useMapEvents, useMap } from 'react-le
 import 'leaflet/dist/leaflet.css';
 import api from '../services/api';
 import * as turf from '@turf/turf';
+import { getAll, putItem, bulkPut, getVal } from '../utils/db';
+import { offlineQueue } from '../utils/offlineQueue';
 
 function LocationSelector({ setPolygonPoints, polygonPoints }) {
   useMapEvents({
@@ -54,22 +56,62 @@ export default function PlotManagementModal({ farmer, onClose }) {
 
   const fetchPlots = async () => {
     setLoading(true);
+
+    // 1. Instantly read from local IndexedDB
     try {
-      const data = await api.getPlots({ farmer: farmer.id });
-      setPlots(Array.isArray(data) ? data : data.results || []);
-    } catch (e) {
-      console.error(e);
+      const localPlots = await getAll('plots');
+      if (localPlots && localPlots.length > 0) {
+        const farmerPlots = localPlots.filter(p => String(p.farmer || p.farmer_id) === String(farmer.id));
+        if (farmerPlots.length > 0) {
+          setPlots(farmerPlots);
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.warn("Local IndexedDB plots read warning:", err);
     }
-    setLoading(false);
+
+    // 2. Fetch fresh plots from backend if online
+    try {
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        const data = await api.getPlots({ farmer: farmer.id });
+        const serverPlots = Array.isArray(data) ? data : data.results || [];
+        
+        if (serverPlots.length > 0) {
+          await bulkPut('plots', serverPlots);
+        }
+
+        // Merge server plots with any local pending plots
+        const allLocal = await getAll('plots');
+        const mergedFarmerPlots = allLocal.filter(p => String(p.farmer || p.farmer_id) === String(farmer.id));
+        setPlots(mergedFarmerPlots.length > 0 ? mergedFarmerPlots : serverPlots);
+      }
+    } catch (e) {
+      console.warn("Online plots fetch warning (using local IndexedDB cache):", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchPlots();
+
+    // Load crops master data with local IndexedDB fallback
     api.getCrops().then(d => {
       const arr = Array.isArray(d) ? d : d.results || [];
       arr.sort((a, b) => a.crop_name.localeCompare(b.crop_name));
       setCrops(arr);
-    }).catch(() => {});
+    }).catch(async () => {
+      try {
+        const localCrops = await getVal('app_data', 'crops');
+        if (localCrops && localCrops.length > 0) {
+          localCrops.sort((a, b) => a.crop_name.localeCompare(b.crop_name));
+          setCrops(localCrops);
+        }
+      } catch (err) {
+        console.warn("Could not load local crops fallback:", err);
+      }
+    });
   }, [farmer.id]);
 
   useEffect(() => {
@@ -91,11 +133,40 @@ export default function PlotManagementModal({ farmer, onClose }) {
 
   const fetchSeasons = async (plotId) => {
     setLoading(true);
+
+    // 1. Local IndexedDB read
     try {
-      const data = await api.getCropSeasons({ plot: plotId });
-      setSeasons(Array.isArray(data) ? data : data.results || []);
-    } catch(e) {}
-    setLoading(false);
+      const localSeasons = await getAll('crop_seasons');
+      if (localSeasons && localSeasons.length > 0) {
+        const plotSeasons = localSeasons.filter(s => String(s.plot || s.plot_id) === String(plotId));
+        if (plotSeasons.length > 0) {
+          setSeasons(plotSeasons);
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.warn("Local IndexedDB seasons read warning:", err);
+    }
+
+    // 2. Online fetch if available
+    try {
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        const data = await api.getCropSeasons({ plot: plotId });
+        const serverList = Array.isArray(data) ? data : data.results || [];
+        
+        if (serverList.length > 0) {
+          await bulkPut('crop_seasons', serverList);
+        }
+
+        const allLocal = await getAll('crop_seasons');
+        const mergedSeasons = allLocal.filter(s => String(s.plot || s.plot_id) === String(plotId));
+        setSeasons(mergedSeasons.length > 0 ? mergedSeasons : serverList);
+      }
+    } catch(e) {
+      console.warn("Crop seasons fetch warning (using local):", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSelectPlot = (plot) => {
@@ -118,23 +189,48 @@ export default function PlotManagementModal({ farmer, onClose }) {
     coords.push(`${polygonPoints[0][1]} ${polygonPoints[0][0]}`);
     const wkt = `POLYGON((${coords.join(', ')}))`;
 
+    const clientPlotId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `temp_p_${Date.now()}`;
+    const newPlotObj = {
+      id: clientPlotId,
+      farmer: farmer.id,
+      farmer_id: farmer.id,
+      plot_name: form.plot_name,
+      area_acres: form.area_acres || null,
+      calculated_area_acres: calculatedArea > 0 ? Number(calculatedArea.toFixed(2)) : null,
+      soil_type: form.soil_type,
+      irrigation_source: form.irrigation_source,
+      location_wkt: wkt,
+      is_active: true,
+      _sync_status: 'pending'
+    };
+
     setLoading(true);
     try {
-      await api.createPlot({
-        farmer: farmer.id,
-        plot_name: form.plot_name,
-        area_acres: form.area_acres || null,
-        soil_type: form.soil_type,
-        irrigation_source: form.irrigation_source,
-        location_wkt: wkt,
-        is_active: true
-      });
+      // 1. Immediately save to local IndexedDB and offlineQueue
+      await putItem('plots', newPlotObj);
+      offlineQueue.savePlot(newPlotObj);
+
+      // 2. Optimistic UI update so the plot is immediately visible
+      setPlots(prev => [newPlotObj, ...prev.filter(p => p.id !== clientPlotId)]);
       setView('list');
       setPolygonPoints([]);
       setForm({ plot_name: '', area_acres: '', soil_type: '', irrigation_source: '' });
-      fetchPlots();
+
+      // 3. Online sync attempt if connected
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          await api.createPlot(newPlotObj);
+          newPlotObj._sync_status = 'synced';
+          await putItem('plots', newPlotObj);
+          offlineQueue.removePlot(clientPlotId);
+          setPlots(prev => prev.map(p => p.id === clientPlotId ? { ...p, _sync_status: 'synced' } : p));
+        } catch (netErr) {
+          console.warn("Network save failed, retained in offline queue:", netErr);
+        }
+      }
     } catch (e) {
-      alert(e.error || 'Failed to save plot');
+      console.error("Local save error:", e);
+      alert("Failed to save plot locally: " + (e.message || e));
     } finally {
       setLoading(false);
     }
@@ -151,19 +247,44 @@ export default function PlotManagementModal({ farmer, onClose }) {
       return;
     }
 
+    const clientSeasonId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `temp_s_${Date.now()}`;
+    const newSeasonObj = {
+      id: clientSeasonId,
+      plot: selectedPlot.id,
+      plot_id: selectedPlot.id,
+      crop: seasonForm.crop,
+      crop_id: seasonForm.crop,
+      variety_name: seasonForm.variety_name,
+      area_acres: seasonForm.area_acres,
+      sowing_date: seasonForm.sowing_date,
+      status: 'Active',
+      _sync_status: 'pending'
+    };
+
     try {
-      await api.createCropSeason({
-        plot: selectedPlot.id,
-        crop: seasonForm.crop,
-        variety_name: seasonForm.variety_name,
-        area_acres: seasonForm.area_acres,
-        sowing_date: seasonForm.sowing_date,
-        status: 'Active'
-      });
+      // 1. Immediately save to local IndexedDB and offlineQueue
+      await putItem('crop_seasons', newSeasonObj);
+      offlineQueue.saveCropSeason(newSeasonObj);
+
+      // 2. Optimistic UI update
+      setSeasons(prev => [newSeasonObj, ...prev.filter(s => s.id !== clientSeasonId)]);
       setSeasonForm({ crop: '', variety_name: '', area_acres: '', sowing_date: '' });
-      fetchSeasons(selectedPlot.id);
-    } catch(e) {
-      alert(e.error || 'Failed to start season');
+
+      // 3. Online sync attempt if connected
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          await api.createCropSeason(newSeasonObj);
+          newSeasonObj._sync_status = 'synced';
+          await putItem('crop_seasons', newSeasonObj);
+          offlineQueue.removeCropSeason(clientSeasonId);
+          setSeasons(prev => prev.map(s => s.id === clientSeasonId ? { ...s, _sync_status: 'synced' } : s));
+        } catch (netErr) {
+          console.warn("Online season create failed, retained offline:", netErr);
+        }
+      }
+    } catch(err) {
+      console.error("Local season save error:", err);
+      alert("Failed to save crop season: " + (err.message || err));
     }
   };
 
@@ -298,7 +419,17 @@ export default function PlotManagementModal({ farmer, onClose }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {visiblePlots.map(plot => (
                     <div key={plot.id} className={`border ${plot.is_active === false ? 'border-danger/30 bg-danger/5 opacity-70' : 'border-border bg-bg'} rounded-lg p-4 hover:border-primary/50 cursor-pointer transition-colors`} onClick={() => handleSelectPlot(plot)}>
-                      <h3 className="font-heading font-semibold text-lg text-primary">{plot.plot_name} {plot.is_active === false && <span className="text-xs text-danger ml-2">(Disabled)</span>}</h3>
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-heading font-semibold text-lg text-primary">
+                          {plot.plot_name}
+                          {plot.is_active === false && <span className="text-xs text-danger ml-2">(Disabled)</span>}
+                        </h3>
+                        {plot._sync_status === 'pending' && (
+                          <span className="text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium ml-2 whitespace-nowrap">
+                            Offline (Pending Sync)
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-2 text-sm space-y-1">
                         <p className="flex justify-between"><span className="text-text-muted">Area:</span> <span className="font-mono text-right">{plot.area_acres ? `${Number(plot.area_acres).toFixed(2)} Acres` : '—'} {plot.calculated_area_acres && <span className="text-[10px] text-text-muted block">(Geo: {Number(plot.calculated_area_acres).toFixed(2)})</span>}</span></p>
                         <p className="flex justify-between"><span className="text-text-muted">Soil:</span> <span>{plot.soil_type || '—'}</span></p>
@@ -427,7 +558,15 @@ export default function PlotManagementModal({ farmer, onClose }) {
                         {activeSeasons.map(activeSeason => (
                           <div key={activeSeason.id} className="border-b border-border/50 pb-4 last:border-0 last:pb-0">
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                              <div><span className="block text-xs text-text-muted mb-1">Crop</span><span className="font-medium">{getCropName(activeSeason.crop)}</span></div>
+                              <div>
+                                <span className="block text-xs text-text-muted mb-1">Crop</span>
+                                <span className="font-medium">{getCropName(activeSeason.crop || activeSeason.crop_id)}</span>
+                                {activeSeason._sync_status === 'pending' && (
+                                  <span className="text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium ml-2">
+                                    Pending Sync
+                                  </span>
+                                )}
+                              </div>
                               <div><span className="block text-xs text-text-muted mb-1">Variety</span><span className="font-medium">{activeSeason.variety_name || '—'}</span></div>
                               <div><span className="block text-xs text-text-muted mb-1">Area</span><span className="font-medium">{activeSeason.area_acres || selectedPlot.area_acres} Acres</span></div>
                               <div><span className="block text-xs text-text-muted mb-1">Sowing Date</span><span className="font-medium">{activeSeason.sowing_date}</span></div>
@@ -516,7 +655,7 @@ export default function PlotManagementModal({ farmer, onClose }) {
                     {pastSeasons.map(season => (
                       <div key={season.id} className="border border-border rounded-lg p-4 bg-bg flex flex-col md:flex-row justify-between md:items-center gap-4">
                         <div>
-                          <p className="font-medium text-text">{getCropName(season.crop)} {season.variety_name && <span className="text-text-muted text-sm border-l border-border pl-2 ml-2">{season.variety_name}</span>}</p>
+                          <p className="font-medium text-text">{getCropName(season.crop || season.crop_id)} {season.variety_name && <span className="text-text-muted text-sm border-l border-border pl-2 ml-2">{season.variety_name}</span>}</p>
                           <p className="text-sm text-text-muted mt-1">Sowed: {season.sowing_date} • Area: {season.area_acres || selectedPlot.area_acres} Acres</p>
                         </div>
                         <div className="flex items-center gap-4 text-sm font-mono">

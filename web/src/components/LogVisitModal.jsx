@@ -98,11 +98,22 @@ function LogVisitModalContent({ farmer: initialFarmer, onClose, onSuccess, onCre
     if (selectedFarmer?.id) {
       api.getPlots({ farmer: selectedFarmer.id, farmer_id: selectedFarmer.id }).then(res => {
         const raw = res.results || res || [];
-        const list = raw.filter(p => String(p.farmer?.id || p.farmer) === String(selectedFarmer.id));
+        const list = raw.filter(p => String(p.farmer?.id || p.farmer || p.farmer_id) === String(selectedFarmer.id));
         setPlots(list);
         if (list.length > 0) setSelectedPlot(list[0]);
         else setSelectedPlot(null);
-      }).catch(() => setPlots([]));
+      }).catch(async () => {
+        try {
+          const { getAll } = await import('../utils/db');
+          const localPlots = await getAll('plots');
+          const list = (localPlots || []).filter(p => String(p.farmer || p.farmer_id) === String(selectedFarmer.id));
+          setPlots(list);
+          if (list.length > 0) setSelectedPlot(list[0]);
+          else setSelectedPlot(null);
+        } catch {
+          setPlots([]);
+        }
+      });
     }
   }, [selectedFarmer]);
 

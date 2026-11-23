@@ -86,6 +86,40 @@ export const bulkPut = async (storeName, items) => {
   });
 };
 
+export const putItem = async (storeName, item) => {
+  if (!item) return;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readwrite');
+    const store = transaction.objectStore(storeName);
+    const request = store.put(item);
+    request.onsuccess = () => resolve(request.result);
+    transaction.onerror = (e) => reject(e);
+  });
+};
+
+export const getItem = async (storeName, id) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readonly');
+    const store = transaction.objectStore(storeName);
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteItem = async (storeName, id) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readwrite');
+    const store = transaction.objectStore(storeName);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve(request.result);
+    transaction.onerror = (e) => reject(e);
+  });
+};
+
 export const getAll = async (storeName) => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
