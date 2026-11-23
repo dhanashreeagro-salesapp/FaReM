@@ -1,4 +1,5 @@
 import React from 'react';
+import { isTestEnvironment } from '../utils/envHelper';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 import { Users, Map, Wheat, UserCheck, Megaphone, Send, BarChart3, Shield, Settings, LogOut, MapPin, Award, Database, X, Sprout } from 'lucide-react';
@@ -44,9 +45,16 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="flex items-center gap-3 min-w-0">
           <img src="/agriamigo-logo.png" alt="Agri Amigo Logo" className="w-10 h-10 object-contain shrink-0 rounded-lg shadow-sm" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-base font-heading font-bold text-emerald-900 leading-tight tracking-tight">
-              Agri Amigo
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-heading font-bold text-emerald-900 leading-tight tracking-tight">
+                Agri Amigo
+              </h1>
+              {isTestEnvironment() && (
+                <span className="bg-amber-400 text-slate-950 font-black text-[9px] uppercase px-1.5 py-0.5 rounded shadow-xs">
+                  TEST
+                </span>
+              )}
+            </div>
             <p className="text-[10px] font-semibold text-emerald-800 truncate">Together for Better Farms</p>
           </div>
         </div>

@@ -126,3 +126,99 @@ h1, h2, h3, h4, h5, h6 {
 .card {
   @apply bg-surface rounded-lg border border-border shadow-sm;
 }
+
+
+/* ============================================================
+   TEST / STAGING ENVIRONMENT THEME (Royal Indigo + Sky Blue)
+   Activated dynamically via data-env="test" on <html> element.
+   Completely dormant in production; zero impact on master branch.
+   ============================================================ */
+[data-env="test"] {
+  --color-bg: #E0F2FE;          /* Sky Blue background for main app */
+  --color-surface: #F0F9FF;     /* Soft Light Sky Blue replacing white surfaces */
+  --color-border: #BAE6FD;      /* Sky Blue border */
+  --color-primary: #6D28D9;     /* Royal Violet / Indigo */
+  --color-primary-light: #8B5CF6;
+  --color-primary-dark: #5B21B6;
+  --color-accent: #7C3AED;
+}
+
+/* Replace white and neutral backgrounds with Sky Blue */
+[data-env="test"] body {
+  background-color: #E0F2FE !important;
+}
+
+[data-env="test"] .bg-bg {
+  background-color: #E0F2FE !important;
+}
+
+[data-env="test"] .bg-surface,
+[data-env="test"] .bg-white {
+  background-color: #F0F9FF !important;
+}
+
+/* Header in Sky Blue */
+[data-env="test"] header {
+  background-color: #F0F9FF !important;
+  border-bottom-color: #BAE6FD !important;
+}
+
+/* Sidebar in Sky Blue */
+[data-env="test"] aside,
+[data-env="test"] div[class*="w-64"][class*="bg-surface"] {
+  background-color: #E0F2FE !important;
+  border-right-color: #BAE6FD !important;
+}
+
+/* Sidebar brand header in soft violet tint */
+[data-env="test"] .bg-emerald-50\/70,
+[data-env="test"] .bg-emerald-50 {
+  background-color: #EDE9FE !important;
+  border-bottom-color: #DDD6FE !important;
+}
+
+[data-env="test"] .text-emerald-900,
+[data-env="test"] .text-emerald-800 {
+  color: #5B21B6 !important;
+}
+
+[data-env="test"] .text-emerald-700 {
+  color: #6D28D9 !important;
+}
+
+[data-env="test"] .bg-emerald-700,
+[data-env="test"] .bg-emerald-800 {
+  background-color: #6D28D9 !important;
+  border-color: #5B21B6 !important;
+}
+
+/* Royal Violet for primary buttons & active navigation */
+[data-env="test"] .bg-primary {
+  background-color: #6D28D9 !important;
+}
+
+[data-env="test"] .hover\:bg-primary:hover,
+[data-env="test"] .hover\:bg-primary-dark:hover {
+  background-color: #5B21B6 !important;
+}
+
+[data-env="test"] .text-primary {
+  color: #6D28D9 !important;
+}
+
+[data-env="test"] .border-primary {
+  border-color: #6D28D9 !important;
+}
+
+/* Data tables in test environment */
+[data-env="test"] .data-table thead {
+  background-color: #BAE6FD !important;
+}
+
+[data-env="test"] .data-table tbody tr:hover {
+  background-color: #E0F2FE !important;
+}
+
+[data-env="test"] .border-border {
+  border-color: #BAE6FD !important;
+}

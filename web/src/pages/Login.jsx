@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import { isTestEnvironment } from '../utils/envHelper';
 
 export default function Login() {
   const { login } = useAuth();
@@ -44,6 +45,13 @@ export default function Login() {
           <h1 className="text-2xl font-heading font-bold text-emerald-800 tracking-tight">AgriAmigo</h1>
           <p className="text-text-muted mt-1 text-sm font-medium">Farmer Relationship Management</p>
         </div>
+
+        {isTestEnvironment() && (
+          <div className="bg-amber-100 border border-amber-300 text-amber-950 rounded-lg px-3 py-2 mb-4 text-xs font-semibold flex items-center justify-center gap-2 shadow-xs">
+            <span>🧪</span>
+            <span>TEST ENVIRONMENT — Connected to Test DB</span>
+          </div>
+        )}
 
 
         {error && (

@@ -1,4 +1,5 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { isTestEnvironment } from './utils/envHelper';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import Sidebar from './components/Sidebar';
@@ -44,6 +45,23 @@ function ProtectedLayout() {
     <div className="flex h-screen bg-bg overflow-hidden relative">
       <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {isTestEnvironment() && (
+          <div className="bg-gradient-to-r from-violet-900 via-indigo-900 to-violet-900 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between shadow-md z-30 border-b border-violet-700/60 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="bg-amber-400 text-slate-950 font-black text-[10px] tracking-wider uppercase px-2 py-0.5 rounded shadow-sm">
+                TEST ENVIRONMENT
+              </span>
+              <span className="text-violet-100 hidden sm:inline">
+                Connected to Test Database (Main Branch) — Safe for Testing
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-violet-200">
+              <span className="bg-violet-950/70 px-2 py-0.5 rounded border border-violet-600/50">
+                Branch: <strong className="text-white">main</strong>
+              </span>
+            </div>
+          </div>
+        )}
         <header className="bg-surface border-b border-border z-10 py-3 px-4 md:px-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -122,6 +140,18 @@ function ProtectedLayout() {
 }
 
 export default function App() {
+  const isTestEnv = isTestEnvironment();
+
+  useEffect(() => {
+    if (isTestEnv) {
+      document.documentElement.dataset.env = 'test';
+      document.title = '[TEST] Agri Amigo';
+    } else {
+      delete document.documentElement.dataset.env;
+      document.title = 'Agri Amigo';
+    }
+  }, [isTestEnv]);
+
   return (
     <Router>
       <AuthProvider>
